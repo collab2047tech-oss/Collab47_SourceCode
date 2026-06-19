@@ -4,16 +4,19 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Button } from "@/components/primitives/Button";
 import { Reveal } from "@/components/motion/Reveal";
-import { Calendar, Users, Briefcase } from "lucide-react";
+import { Calendar, Users, Briefcase, ExternalLink } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import {
   getProjectByShortId,
   getProjectApplications,
   getProjectMembers,
   getMyProjectApplicationState,
+  getProjectProgressPosts,
 } from "@/lib/db/projects";
 import { ApplyForm } from "@/components/composite/ApplyForm";
 import { ApplicationsPanel } from "@/components/composite/ApplicationsPanel";
+import { ProgressComposer } from "@/components/composite/ProgressComposer";
+import { DeliverForm } from "@/components/composite/DeliverForm";
 
 export default async function ProjectPage({
   params,
@@ -23,53 +26,7 @@ export default async function ProjectPage({
   const { short_id } = await params;
   const sb = await getSupabaseServer();
 
-  // --- Mock fallback when Supabase is not configured ---
-  if (!sb) {
-    return (
-      <main className="min-h-dvh bg-cream">
-        <Nav />
-        <div className="container-edit max-w-3xl pt-32 pb-20">
-          <p className="text-caption text-ash">Collab Project</p>
-          <h1 className="mt-4 font-serif text-5xl text-ink">
-            The Anti-Bias{" "}
-            <span className="italic text-saffron">Hiring Lab.</span>
-          </h1>
-          <p className="mt-4 text-body-sm text-ash">
-            Posted by Akshpreet . open until 30 June 2026
-          </p>
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Tag variant="saffron">5 slots</Tag>
-            <Tag variant="outline">Design</Tag>
-            <Tag variant="outline">Research</Tag>
-          </div>
-          <div className="mt-12 space-y-6">
-            <section>
-              <h2 className="text-caption text-ash">Brief</h2>
-              <p className="mt-2 text-body text-ink">
-                A coalition of Tier-2/3 student designers and engineers
-                rebuilding the campus hiring stack from scratch. Deliverable: a
-                working anti-bias scoring algorithm + a public Figma case study.
-              </p>
-            </section>
-            <section>
-              <h2 className="text-caption text-ash">Deliverable</h2>
-              <p className="mt-2 text-body text-ink">
-                Open-source scoring algorithm + public case study by 25 July.
-              </p>
-            </section>
-          </div>
-          <div className="mt-12">
-            <Link href="/login">
-              <Button size="lg">Apply with a pitch</Button>
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // --- Real data path ---
-  const project = await getProjectByShortId(short_id);
+  const project = sb ? await getProjectByShortId(short_id) : null;
 
   if (!project) {
     return (
@@ -85,25 +42,33 @@ export default async function ProjectPage({
     );
   }
 
+  // project is non-null here, so sb is guaranteed configured.
   const {
     data: { user },
-  } = await sb.auth.getUser();
+  } = await sb!.auth.getUser();
 
   const isAuthor = user?.id === project.author_id;
 
-  const [applications, members, appState] = await Promise.all([
+  const [applications, members, appState, progressPosts] = await Promise.all([
     isAuthor ? getProjectApplications(project.id) : Promise.resolve([]),
     getProjectMembers(project.id),
     !isAuthor && user
       ? getMyProjectApplicationState(project.id)
       : Promise.resolve({ applied: false, status: null }),
+    getProjectProgressPosts(project.id),
   ]);
+
+  const isMember = user
+    ? (members as Array<{ user_id: string }>).some((m) => m.user_id === user.id)
+    : false;
 
   const statusBadgeVariant = (s: string) => {
     if (s === "open") return "saffron" as const;
     if (s === "team_formed" || s === "in_progress") return "moss" as const;
     return "outline" as const;
   };
+
+  const isDelivered = !!project.delivered_at;
 
   return (
     <main className="min-h-dvh bg-cream">
@@ -155,6 +120,25 @@ export default async function ProjectPage({
             </span>
           </div>
         </Reveal>
+
+        {/* Delivered banner */}
+        {isDelivered && (
+          <Reveal delay={0.17}>
+            <div className="mt-6 flex flex-col gap-2 rounded-lg border border-moss/30 bg-moss/5 px-5 py-4">
+              <p className="text-sm font-medium text-moss">Project delivered</p>
+              {project.deliverable_url ? (
+                <a
+                  href={project.deliverable_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-ink underline underline-offset-2 hover:text-saffron"
+                >
+                  View deliverable <ExternalLink className="size-3.5" />
+                </a>
+              ) : null}
+            </div>
+          </Reveal>
+        )}
 
         <Reveal delay={0.2}>
           <section className="mt-10">
@@ -219,7 +203,7 @@ export default async function ProjectPage({
           </Reveal>
         )}
 
-        {/* Author: applications panel */}
+        {/* Author: applications panel + mark-delivered */}
         {isAuthor && (
           <Reveal delay={0.25}>
             <div className="mt-12">
@@ -229,6 +213,15 @@ export default async function ProjectPage({
                 applications={applications as Parameters<typeof ApplicationsPanel>[0]["applications"]}
               />
             </div>
+            {!isDelivered && (
+              <div className="mt-10">
+                <h2 className="text-caption text-ash">Mark as delivered</h2>
+                <p className="mt-1 text-sm text-ash">
+                  Once marked, all members earn the Verified contributor badge on their portfolios.
+                </p>
+                <DeliverForm projectId={project.id} shortId={short_id} />
+              </div>
+            )}
           </Reveal>
         )}
 
@@ -238,7 +231,7 @@ export default async function ProjectPage({
             <div className="mt-12">
               <h2 className="text-caption text-ash">Team</h2>
               <div className="mt-4 flex flex-wrap gap-4">
-                {(members as Array<{ user_id: string; role: string; profile: { id: string; handle: string; name: string; avatar_url: string | null } }>).map((m) => (
+                {(members as Array<{ user_id: string; role: string; is_verified: boolean; profile: { id: string; handle: string; name: string; avatar_url: string | null } }>).map((m) => (
                   <Link
                     key={m.user_id}
                     href={`/u/${m.profile.handle}`}
@@ -254,10 +247,67 @@ export default async function ProjectPage({
                         {m.profile.name}
                       </p>
                       <p className="text-xs text-ash">
-                        {m.role === "owner" ? "Author" : "Member"}
+                        {m.is_verified ? "Verified contributor" : m.role === "owner" ? "Author" : "Member"}
                       </p>
                     </div>
                   </Link>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        )}
+
+        {/* Progress updates composer (members only) */}
+        {isMember && user && (
+          <Reveal delay={0.35}>
+            <div className="mt-12">
+              <h2 className="text-caption text-ash">Post an update</h2>
+              <ProgressComposer projectId={project.id} shortId={short_id} />
+            </div>
+          </Reveal>
+        )}
+
+        {/* Progress posts feed */}
+        {progressPosts.length > 0 && (
+          <Reveal delay={0.4}>
+            <div className="mt-10">
+              <h2 className="text-caption text-ash">Progress updates</h2>
+              <div className="mt-4 flex flex-col gap-4">
+                {(progressPosts as Array<{
+                  id: string;
+                  body: string;
+                  created_at: string;
+                  short_id: string;
+                  author: { handle: string; name: string; avatar_url: string | null };
+                }>).map((post) => (
+                  <div
+                    key={post.id}
+                    className="rounded-lg border border-bone bg-paper px-5 py-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Avatar
+                        name={post.author.name}
+                        src={post.author.avatar_url ?? undefined}
+                        size="xs"
+                      />
+                      <Link
+                        href={`/u/${post.author.handle}`}
+                        className="text-sm font-medium text-ink hover:underline"
+                      >
+                        @{post.author.handle}
+                      </Link>
+                      <span className="text-xs text-ash">
+                        {new Date(post.created_at).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-ink">
+                      {post.body}
+                    </p>
+                  </div>
                 ))}
               </div>
             </div>

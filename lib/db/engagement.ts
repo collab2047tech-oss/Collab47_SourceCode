@@ -1,17 +1,54 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
+import { moderateContent } from "@/lib/moderation/moderate";
 
 interface OkResult { ok: true }
 interface ErrResult { ok: false; error: string }
 type Result = OkResult | ErrResult;
 
-export async function likePost(postId: string): Promise<Result> {
+export type ReactionKind = "like" | "celebrate" | "support" | "love" | "insightful" | "funny";
+
+export async function reactToPost(postId: string, reaction: ReactionKind): Promise<Result> {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
-  const { error } = await sb.from("likes").insert({ post_id: postId, user_id: user.id });
-  if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
+
+  // Upsert: insert or update the reaction column on conflict (post_id, user_id).
+  const { error } = await sb
+    .from("likes")
+    .upsert(
+      { post_id: postId, user_id: user.id, reaction },
+      { onConflict: "post_id,user_id" }
+    );
+  if (error) return { ok: false, error: error.message };
+
+  // Fire-and-forget notification to the post author (skip if reactor == author).
+  void (async () => {
+    try {
+      const { data: post } = await sb
+        .from("posts")
+        .select("author_id, short_id")
+        .eq("id", postId)
+        .maybeSingle();
+      if (!post || post.author_id === user.id) return;
+      const actor = await getActorDisplayInfo(user.id);
+      if (!actor) return;
+      await createNotification({
+        userId: post.author_id as string,
+        kind: "like",
+        actorName: actor.name,
+        text: `${actor.name} reacted to your post`,
+        href: `/p/${post.short_id as string}`,
+      });
+    } catch { /* best-effort */ }
+  })();
+
   return { ok: true };
+}
+
+export async function likePost(postId: string): Promise<Result> {
+  return reactToPost(postId, "like");
 }
 
 export async function unlikePost(postId: string): Promise<Result> {
@@ -33,8 +70,13 @@ export async function addComment(args: {
   if (!body) return { ok: false, error: "Comment cannot be empty" };
   if (body.length > 600) return { ok: false, error: "Comment too long (max 600)" };
 
+  const moderationResult = await moderateContent(body);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
+
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true, commentId: "mock-comment" };
+  if (!sb) return { ok: false, error: "Database not connected." };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
 
@@ -59,6 +101,28 @@ export async function addComment(args: {
     .select("id")
     .single();
   if (error) return { ok: false, error: error.message };
+
+  // Fire-and-forget notification to the post author (skip if commenter == author).
+  void (async () => {
+    try {
+      const { data: post } = await sb
+        .from("posts")
+        .select("author_id, short_id")
+        .eq("id", args.postId)
+        .maybeSingle();
+      if (!post || post.author_id === user.id) return;
+      const actor = await getActorDisplayInfo(user.id);
+      if (!actor) return;
+      await createNotification({
+        userId: post.author_id as string,
+        kind: "comment",
+        actorName: actor.name,
+        text: `${actor.name} commented on your post`,
+        href: `/p/${post.short_id as string}`,
+      });
+    } catch { /* best-effort */ }
+  })();
+
   return { ok: true, commentId: data.id as string };
 }
 
@@ -75,13 +139,13 @@ export async function repostPost(args: {
   addedBody?: string;
 }): Promise<Result & { postId?: string; shortId?: string }> {
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true, postId: "mock-id", shortId: "mock" };
+  if (!sb) return { ok: false, error: "Database not connected." };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
 
   const { data: original } = await sb
     .from("posts")
-    .select("hashtags, branch_tags, city_tags")
+    .select("hashtags, branch_tags, city_tags, author_id, short_id")
     .eq("id", args.originalPostId)
     .maybeSingle();
   if (!original) return { ok: false, error: "Original post not found" };
@@ -105,11 +169,22 @@ export async function repostPost(args: {
     .single();
   if (error) return { ok: false, error: error.message };
 
-  // bump repost_count on original (best-effort; ignore if rpc absent)
-  try {
-    await sb.rpc("increment_repost_count", { post_id: args.originalPostId });
-  } catch {
-    // rpc not defined yet; counts can be backfilled by a nightly job
+  // repost_count is maintained by a DB trigger. Notify the original author.
+  const originalAuthor = original.author_id as string;
+  if (originalAuthor && originalAuthor !== user.id) {
+    void (async () => {
+      try {
+        const actor = await getActorDisplayInfo(user.id);
+        if (!actor) return;
+        await createNotification({
+          userId: originalAuthor,
+          kind: "repost",
+          actorName: actor.name,
+          text: `${actor.name} reposted your post`,
+          href: `/p/${original.short_id as string}`,
+        });
+      } catch { /* best-effort */ }
+    })();
   }
 
   return { ok: true, postId: data.id as string, shortId: data.short_id as string };
@@ -145,17 +220,35 @@ export async function unbookmarkPost(postId: string): Promise<Result> {
 
 export async function getMyEngagementState(postIds: string[]) {
   const sb = await getSupabaseServer();
-  if (!sb || postIds.length === 0) return { likes: new Set<string>(), bookmarks: new Set<string>() };
+  if (!sb || postIds.length === 0) {
+    return {
+      likes: new Set<string>(),
+      bookmarks: new Set<string>(),
+      reactions: new Map<string, string>(),
+    };
+  }
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) return { likes: new Set<string>(), bookmarks: new Set<string>() };
+  if (!user) {
+    return {
+      likes: new Set<string>(),
+      bookmarks: new Set<string>(),
+      reactions: new Map<string, string>(),
+    };
+  }
 
-  const [{ data: likes }, { data: bookmarks }] = await Promise.all([
-    sb.from("likes").select("post_id").eq("user_id", user.id).in("post_id", postIds),
+  const [{ data: likeRows }, { data: bookmarks }] = await Promise.all([
+    sb.from("likes").select("post_id, reaction").eq("user_id", user.id).in("post_id", postIds),
     sb.from("bookmarks").select("post_id").eq("user_id", user.id).in("post_id", postIds),
   ]);
 
+  const reactions = new Map<string, string>();
+  for (const r of likeRows ?? []) {
+    reactions.set(r.post_id as string, (r.reaction as string) ?? "like");
+  }
+
   return {
-    likes: new Set((likes ?? []).map((r) => r.post_id as string)),
+    likes: new Set((likeRows ?? []).map((r) => r.post_id as string)),
     bookmarks: new Set((bookmarks ?? []).map((r) => r.post_id as string)),
+    reactions,
   };
 }

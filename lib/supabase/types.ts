@@ -31,6 +31,7 @@ export interface Profile {
   branch: string | null;
   year_of_study: string | null;
   city: string | null;
+  birthdate: string | null;
   interests: string[];
   cluster_id: number | null;
   verified: boolean;
@@ -38,6 +39,9 @@ export interface Profile {
   deleted_at: string | null;
   dm_permission: DMPermission;
   onboarded: boolean;
+  feed_prefs: Record<string, unknown> | null;
+  privacy: Record<string, boolean> | null;
+  notification_prefs: Record<string, { email: boolean; push: boolean }> | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,7 +65,11 @@ export interface Post {
   comment_count: number;
   repost_count: number;
   bookmark_count: number;
+  impressions: number;
+  deleted_at: string | null;
   created_at: string;
+  /** Optional link to a project for progress posts. */
+  project_id: string | null;
 }
 
 export interface Comment {
@@ -124,6 +132,8 @@ export interface Project {
   deadline: string;
   slot_count: number;
   status: ProjectStatus;
+  delivered_at: string | null;
+  deliverable_url: string | null;
   created_at: string;
 }
 
@@ -157,4 +167,7 @@ export interface NewsItem {
   city_tags: string[];
   published_at: string;
   fetched_at: string;
+  like_count: number;
+  dislike_count: number;
+  comment_count: number;
 }

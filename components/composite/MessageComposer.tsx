@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { sendMessageAction } from "@/app/(app)/messages/actions";
+import { compressImage } from "@/lib/media/compress";
 import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -68,12 +69,31 @@ export function MessageComposer({
     e.preventDefault();
     if (!body.trim() && !imageFile) return;
 
-    const fd = new FormData();
-    fd.set("conversationId", conversationId);
-    fd.set("body", body.trim());
-    if (imageFile) fd.set("image", imageFile);
+    const sb = getSupabaseBrowser();
 
     startTransition(async () => {
+      // Upload image CLIENT-SIDE to Storage; only the URL goes to the action.
+      let image_url: string | undefined;
+      if (imageFile && sb) {
+        try {
+          const toUpload = await compressImage(imageFile);
+          const ext = toUpload.name.split(".").pop()?.toLowerCase() ?? "jpg";
+          const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+          const { error } = await sb.storage.from("message-media").upload(path, toUpload, { upsert: false });
+          if (error) throw error;
+          const { data } = sb.storage.from("message-media").getPublicUrl(path);
+          image_url = data.publicUrl;
+        } catch {
+          setLocalBlockedReason("Image upload failed. Try a smaller file.");
+          return;
+        }
+      }
+
+      const fd = new FormData();
+      fd.set("conversationId", conversationId);
+      fd.set("body", body.trim());
+      if (image_url) fd.set("image_url", image_url);
+
       const result = await sendMessageAction(fd);
 
       if (result?.blockedReason) {

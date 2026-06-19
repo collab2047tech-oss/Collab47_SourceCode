@@ -1,5 +1,8 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import type { Message } from "@/lib/supabase/types";
+import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
+import { moderateContent } from "@/lib/moderation/moderate";
 
 export interface MiniProfile {
   id: string;
@@ -37,43 +40,11 @@ export interface SendMessageResult {
   error?: string;
 }
 
-// Mock fallback data
-const MOCK_CONVERSATIONS: ConversationPreview[] = [
-  {
-    id: "mock-conv-1",
-    otherUser: { id: "u1", handle: "riya", name: "Riya Sharma", avatar_url: null, college: "Thapar TIET" },
-    lastMessage: "yo are you free for the hackathon?",
-    lastMessageAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
-    unreadCount: 1,
-    isRequest: false,
-  },
-  {
-    id: "mock-conv-2",
-    otherUser: { id: "u2", handle: "arjun", name: "Arjun Mehta", avatar_url: null, college: "Punjabi University" },
-    lastMessage: "sent you the brief on Telegram",
-    lastMessageAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    unreadCount: 0,
-    isRequest: false,
-  },
-  {
-    id: "mock-conv-3",
-    otherUser: { id: "u3", handle: "vikram", name: "Vikram Singh", avatar_url: null, college: "DAV Amritsar" },
-    lastMessage: "thanks for the intro!",
-    lastMessageAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    unreadCount: 0,
-    isRequest: true,
-  },
-];
-
 export async function getMyConversations(
   bucket: "main" | "requests"
 ): Promise<ConversationPreview[]> {
   const sb = await getSupabaseServer();
-  if (!sb) {
-    return MOCK_CONVERSATIONS.filter((c) =>
-      bucket === "main" ? !c.isRequest : c.isRequest
-    );
-  }
+  if (!sb) return [];
 
   const {
     data: { user },
@@ -94,8 +65,8 @@ export async function getMyConversations(
   const { data: conversations } = await sb
     .from("conversations")
     .select(
-      `id, last_message_at,
-       conversation_members!inner(user_id, last_read_at,
+      `id, type, last_message_at,
+       conversation_members(user_id, last_read_at,
          profiles:profiles!conversation_members_user_id_fkey(id, handle, name, avatar_url, college)
        ),
        messages(id, body, is_request, created_at, sender_id)`
@@ -120,8 +91,22 @@ export async function getMyConversations(
       created_at: string;
       sender_id: string;
     }>;
+    const isGroup = conv.type === "group";
 
-    const otherMember = members.find((m) => m.user_id !== user.id);
+    // For a group, the "other user" slot represents the whole team.
+    const otherMember = isGroup
+      ? {
+          user_id: conv.id as string,
+          last_read_at: null,
+          profiles: {
+            id: conv.id as string,
+            handle: "",
+            name: `Team chat (${members.length})`,
+            avatar_url: members.find((m) => m.user_id !== user.id)?.profiles?.avatar_url ?? null,
+            college: null,
+          } as MiniProfile,
+        }
+      : members.find((m) => m.user_id !== user.id);
     if (!otherMember) continue;
 
     const myMember = members.find((m) => m.user_id === user.id);
@@ -221,8 +206,13 @@ export async function getOrCreate1to1Conversation(
     }
   }
 
-  // Create new conversation
-  const { data: newConv, error: convErr } = await sb
+  // Create the conversation + both memberships via the service-role client.
+  // Membership management is privileged (RLS forbids users adding others), so
+  // it must happen server-side after we've verified the caller above.
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured" };
+
+  const { data: newConv, error: convErr } = await admin
     .from("conversations")
     .insert({ type: "one_to_one" })
     .select("id")
@@ -232,8 +222,7 @@ export async function getOrCreate1to1Conversation(
     return { ok: false, error: convErr?.message ?? "Failed to create conversation" };
   }
 
-  // Add both members
-  const { error: membersErr } = await sb.from("conversation_members").insert([
+  const { error: membersErr } = await admin.from("conversation_members").insert([
     { conversation_id: newConv.id, user_id: user.id },
     { conversation_id: newConv.id, user_id: otherUserId },
   ]);
@@ -264,80 +253,121 @@ export async function computeIsRequest(
     return { blocked: true, reason: "You cannot message this person." };
   }
 
-  // 2. Connections check (canonical: user_a_id < user_b_id)
-  const canonA = senderId < recipientId ? senderId : recipientId;
-  const canonB = senderId < recipientId ? recipientId : senderId;
+  // 2. Project relationships (highest-priority gates).
+  const [{ data: senderProjects }, { data: recipientProjects }] = await Promise.all([
+    sb.from("projects").select("id").eq("author_id", senderId),
+    sb.from("projects").select("id").eq("author_id", recipientId),
+  ]);
 
-  const { data: connRow } = await sb
-    .from("connections")
-    .select("status")
-    .eq("user_a_id", canonA)
-    .eq("user_b_id", canonB)
-    .maybeSingle();
+  //   a) Sender has applied to a project the RECIPIENT authors -> BLOCKED.
+  //      Applicants cannot initiate to the author; the author reaches out first.
+  if (recipientProjects && recipientProjects.length > 0) {
+    const ids = recipientProjects.map((p: { id: string }) => p.id);
+    const { data: app } = await sb
+      .from("project_applications")
+      .select("id")
+      .eq("applicant_id", senderId)
+      .in("project_id", ids)
+      .maybeSingle();
+    if (app) return { blocked: true, reason: "Applicants cannot message project authors first." };
+  }
 
-  if (connRow?.status === "accepted") {
+  //   b) Sender authors a project the RECIPIENT applied to -> direct, main inbox.
+  if (senderProjects && senderProjects.length > 0) {
+    const ids = senderProjects.map((p: { id: string }) => p.id);
+    const { data: app } = await sb
+      .from("project_applications")
+      .select("id")
+      .eq("applicant_id", recipientId)
+      .in("project_id", ids)
+      .maybeSingle();
+    if (app) return { is_request: false, project_override: true };
+  }
+
+  //   c) Shared team membership (same project) -> direct, main inbox.
+  const [{ data: myTeams }, { data: theirTeams }] = await Promise.all([
+    sb.from("project_members").select("project_id").eq("user_id", senderId),
+    sb.from("project_members").select("project_id").eq("user_id", recipientId),
+  ]);
+  const mine = new Set((myTeams ?? []).map((m) => m.project_id as string));
+  if ((theirTeams ?? []).some((m) => mine.has(m.project_id as string))) {
     return { is_request: false };
   }
 
-  // 3. Mutual follow check
-  const { data: followA } = await sb
-    .from("follows")
-    .select("follower_id")
-    .eq("follower_id", senderId)
-    .eq("following_id", recipientId)
-    .maybeSingle();
-
-  const { data: followB } = await sb
-    .from("follows")
-    .select("follower_id")
-    .eq("follower_id", recipientId)
-    .eq("following_id", senderId)
-    .maybeSingle();
-
-  if (followA && followB) {
-    return { is_request: false };
-  }
-
-  // 4. Recipient dm_permission check
+  // 3. Recipient DM permission setting.
   const { data: recipientProfile } = await sb
     .from("profiles")
     .select("dm_permission")
     .eq("id", recipientId)
     .maybeSingle();
-
   const dmPerm = recipientProfile?.dm_permission ?? "everyone";
 
+  // 'nobody' allows only existing threads + project authors (handled above) -> block new.
   if (dmPerm === "nobody") {
-    return { blocked: true, reason: "This person is not accepting messages." };
+    return { blocked: true, reason: "This person is not accepting new messages." };
   }
 
+  // 4. Degree of separation on the follow + accepted-connection graph (<=3).
+  //    1st / 2nd / 3rd degree land directly in the main inbox (LinkedIn-style).
+  if (await isWithinDegree(sb, senderId, recipientId, 3)) {
+    return { is_request: false };
+  }
+
+  // 5. True stranger (no path within 3 degrees).
   if (dmPerm === "connections") {
-    return { blocked: true, reason: "This person only accepts messages from connections." };
+    return { blocked: true, reason: "This person only accepts messages from their network." };
   }
+  // 'everyone': stranger lands in the Requests folder.
+  return { is_request: true };
+}
 
-  // 5. Project author exception: sender owns a project and recipient applied to it
-  const { data: projectOwned } = await sb
-    .from("projects")
-    .select("id")
-    .eq("author_id", senderId)
-    .limit(1);
+/**
+ * BFS over the undirected social graph (follows in either direction + accepted
+ * connections) to test whether `target` is within `maxDepth` hops of `start`.
+ * Classical graph traversal, batched per level, bounded to keep it fast.
+ */
+async function isWithinDegree(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  start: string,
+  target: string,
+  maxDepth = 3
+): Promise<boolean> {
+  if (start === target) return true;
+  const visited = new Set<string>([start]);
+  let frontier = [start];
 
-  if (projectOwned && projectOwned.length > 0) {
-    const projectIds = projectOwned.map((p: { id: string }) => p.id);
-    const { data: application } = await sb
-      .from("project_applications")
-      .select("id")
-      .eq("applicant_id", recipientId)
-      .in("project_id", projectIds)
-      .maybeSingle();
+  for (let depth = 0; depth < maxDepth; depth++) {
+    if (frontier.length === 0) break;
+    const ids = frontier.slice(0, 800); // bound per level
+    const [{ data: out }, { data: inc }, { data: conns }] = await Promise.all([
+      sb.from("follows").select("following_id").in("follower_id", ids),
+      sb.from("follows").select("follower_id").in("following_id", ids),
+      sb
+        .from("connections")
+        .select("user_a_id, user_b_id")
+        .eq("status", "accepted")
+        .or(`user_a_id.in.(${ids.join(",")}),user_b_id.in.(${ids.join(",")})`),
+    ]);
 
-    if (application) {
-      return { is_request: false, project_override: true };
+    const next = new Set<string>();
+    for (const r of out ?? []) next.add(r.following_id as string);
+    for (const r of inc ?? []) next.add(r.follower_id as string);
+    for (const c of conns ?? []) {
+      next.add(c.user_a_id as string);
+      next.add(c.user_b_id as string);
+    }
+    if (next.has(target)) return true;
+
+    frontier = [];
+    for (const n of next) {
+      if (!visited.has(n)) {
+        visited.add(n);
+        frontier.push(n);
+      }
     }
   }
-
-  // Stranger with dm_permission = 'everyone': goes to requests
-  return { is_request: true };
+  return false;
 }
 
 export async function sendMessage({
@@ -356,6 +386,14 @@ export async function sendMessage({
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
+
+  // Moderate non-empty message body before DB insert
+  if (body && body.length > 0) {
+    const moderationResult = await moderateContent(body);
+    if (!moderationResult.ok) {
+      return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+    }
+  }
 
   // Find the other member of the conversation
   const { data: members } = await sb
@@ -402,6 +440,21 @@ export async function sendMessage({
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversationId);
 
+  // Fire-and-forget notification to the recipient.
+  void (async () => {
+    try {
+      const actor = await getActorDisplayInfo(user.id);
+      if (!actor) return;
+      await createNotification({
+        userId: recipientId,
+        kind: isRequest ? "dm_request" : "dm",
+        actorName: actor.name,
+        text: `${actor.name} sent you a message`,
+        href: `/messages/${conversationId}`,
+      });
+    } catch { /* best-effort */ }
+  })();
+
   return { ok: true, messageId: msg.id, isRequest };
 }
 
@@ -416,8 +469,21 @@ export async function acceptMessageRequest(
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
-  // Flip all is_request=true messages in this conversation to false
-  const { error } = await sb
+  // Verify the caller is actually a member of this conversation.
+  const { data: membership } = await sb
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership) return { ok: false, error: "Not part of this conversation" };
+
+  // Flip request->accepted via service role (RLS limits message updates to the
+  // sender; accepting a request is done by the recipient).
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured" };
+
+  const { error } = await admin
     .from("messages")
     .update({ is_request: false })
     .eq("conversation_id", conversationId)
@@ -500,5 +566,23 @@ export async function unblockUser(
 
   if (error) return { ok: false, error: error.message };
 
+  return { ok: true };
+}
+
+/** Mute / unmute a conversation for the current user (conversation_members.muted). */
+export async function muteConversation(
+  conversationId: string,
+  muted: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false, error: "Supabase not configured" };
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+  const { error } = await sb
+    .from("conversation_members")
+    .update({ muted })
+    .eq("conversation_id", conversationId)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

@@ -50,32 +50,9 @@ function serviceClient() {
   });
 }
 
-const MOCK_QUEUE: QueueItem[] = [
-  {
-    id: "r1", category: "spam",
-    report_body: "buy followers spam",
-    reported_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-    reporter_handle: "riya",
-    post_id: "p1", profile_id: null,
-    post_body: "Get 1000 followers for 99 rupees. Click here to win an iPhone.",
-    target_handle: "scammer42",
-    report_total: 3,
-  },
-  {
-    id: "r2", category: "hate",
-    report_body: null,
-    reported_at: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
-    reporter_handle: "arjun",
-    post_id: "p2", profile_id: null,
-    post_body: "Sample reported content.",
-    target_handle: "anonymous_user",
-    report_total: 2,
-  },
-];
-
 export async function getModerationQueue(limit = 50): Promise<QueueItem[]> {
   const sc = serviceClient();
-  if (!sc) return MOCK_QUEUE;
+  if (!sc) return [];
   const { data } = await sc.from("moderation_queue").select("*").limit(limit);
   return (data as QueueItem[]) ?? [];
 }
@@ -85,7 +62,7 @@ export async function resolveReport(
   action: "dismiss" | "remove_post" | "suspend_user"
 ): Promise<{ ok: boolean; error?: string }> {
   const sc = serviceClient();
-  if (!sc) return { ok: true };
+  if (!sc) return { ok: false, error: "Server not configured." };
 
   if (action === "dismiss") {
     const { error } = await sc.from("reports").update({ resolved_at: new Date().toISOString() }).eq("id", reportId);
@@ -99,7 +76,11 @@ export async function resolveReport(
   if (action === "remove_post" && report.post_id) {
     await sc.from("posts").update({ deleted_at: new Date().toISOString() }).eq("id", report.post_id);
   } else if (action === "suspend_user") {
-    const targetId = report.profile_id ?? (await sc.from("posts").select("author_id").eq("id", report.post_id!).single()).data?.author_id;
+    let targetId = report.profile_id as string | null;
+    if (!targetId && report.post_id) {
+      const { data: post } = await sc.from("posts").select("author_id").eq("id", report.post_id).maybeSingle();
+      targetId = (post?.author_id as string | undefined) ?? null;
+    }
     if (targetId) await sc.from("profiles").update({ suspended_at: new Date().toISOString() }).eq("id", targetId);
   }
 

@@ -14,7 +14,7 @@ export function Hero() {
         <Reveal>
           <div className="rule-top mb-10 max-w-md">
             <p className="text-caption">
-              Issue 01 . Built in India . For India 2026
+              Built in India . For India&apos;s students
             </p>
           </div>
         </Reveal>
@@ -34,9 +34,8 @@ export function Hero() {
         {/* Sub */}
         <Reveal delay={0.6}>
           <p className="mt-10 max-w-2xl text-body-lg text-ash">
-            A profile that shows what you built, a feed that knows your branch,
-            and a place to find the three people you actually want to build with.
-            For the years before a recruiter has heard your name.
+            Show what you build, follow the work that matters in your field, and
+            find the few people you actually want to build with.
           </p>
         </Reveal>
 

@@ -17,8 +17,13 @@ export async function updateAccountAction(
   const college = (formData.get("college") as string | null)?.trim() ?? "";
   const branch = (formData.get("branch") as string | null)?.trim() ?? "";
   const year_of_study = (formData.get("year_of_study") as string | null)?.trim() ?? "";
+  const handleRaw = (formData.get("handle") as string | null)?.trim().toLowerCase();
 
-  const result = await updateProfile({ name, college, branch, year_of_study });
+  const payload: Parameters<typeof updateProfile>[0] = { name, college, branch, year_of_study };
+  // Only forward handle when the form actually carries it (the Account section does).
+  if (handleRaw) payload.handle = handleRaw;
+
+  const result = await updateProfile(payload);
   if (!result.ok) return result;
 
   revalidatePath("/settings");

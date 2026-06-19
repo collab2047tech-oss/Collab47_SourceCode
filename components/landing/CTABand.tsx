@@ -14,7 +14,7 @@ export function CTABand() {
     <section className="bg-ink py-40 md:py-56">
       <div className="container-edit">
         <Reveal>
-          <p className="text-caption text-cream/70">Open beta, June 2026</p>
+          <p className="text-caption text-cream/70">Now in open beta</p>
         </Reveal>
         <Reveal delay={0.1}>
           <h2 className="mt-8 max-w-5xl font-serif text-6xl leading-[1.05] text-cream md:text-8xl">

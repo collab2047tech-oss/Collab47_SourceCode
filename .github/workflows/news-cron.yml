@@ -1,0 +1,28 @@
+name: Fetch news
+
+# Auto-fetches news into the database so nobody has to trigger it by hand.
+# Daily at 01:00 UTC (06:30 AM IST). Quotas are huge, so daily is safe; bump the
+# schedule if you want it more/less often. Can also be run manually below.
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  fetch-news:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger news fetch endpoint
+        env:
+          CRON_URL: ${{ secrets.NEWS_CRON_URL }}
+          CRON_SECRET: ${{ secrets.NEWS_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Set repo secrets NEWS_CRON_URL and NEWS_CRON_SECRET first."
+            exit 1
+          fi
+          echo "Fetching news..."
+          curl -fsS -m 180 -X GET "$CRON_URL" -H "x-cron-secret: $CRON_SECRET"
+          echo ""
+          echo "Done."

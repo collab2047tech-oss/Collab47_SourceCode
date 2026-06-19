@@ -17,7 +17,7 @@ const KIND_ICON: Record<string, React.ElementType> = {
   system: Bell,
 };
 
-interface MockNotification {
+interface NotificationItem {
   id: string;
   kind: string;
   text: string;
@@ -26,18 +26,11 @@ interface MockNotification {
   href: string;
 }
 
-const mockFallback: MockNotification[] = [
-  { id: "1", kind: "like", text: "liked your post", who: "Riya Sharma", when: "2m", href: "/p/abc123" },
-  { id: "2", kind: "comment", text: "commented on your post", who: "Arjun Mehta", when: "10m", href: "/p/abc123" },
-  { id: "3", kind: "follow", text: "started following you", who: "Sunita Mehta", when: "1h", href: "/u/sunita" },
-  { id: "4", kind: "project_invite", text: "invited you to a project", who: "Vikram Singh", when: "3h", href: "/c/proj1" },
-  { id: "5", kind: "dm_request", text: "sent you a message request", who: "Karthik Iyer", when: "1d", href: "/messages" },
-  { id: "6", kind: "mention", text: "mentioned you in a comment", who: "Priya Joshi", when: "2d", href: "/p/xyz789" },
-];
+export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const sb = await getSupabaseServer();
-  let items: MockNotification[] = mockFallback;
+  let items: NotificationItem[] = [];
 
   if (sb) {
     const { data: { user } } = await sb.auth.getUser();
@@ -48,16 +41,14 @@ export default async function NotificationsPage() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (data && data.length > 0) {
-        items = data.map((n) => ({
-          id: n.id,
-          kind: n.kind,
-          text: typeof n.payload === "object" && n.payload && "text" in n.payload ? String(n.payload.text) : "",
-          who: typeof n.payload === "object" && n.payload && "who" in n.payload ? String(n.payload.who) : "Someone",
-          when: new Date(n.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }),
-          href: typeof n.payload === "object" && n.payload && "href" in n.payload ? String(n.payload.href) : "/home",
-        }));
-      }
+      items = (data ?? []).map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        text: typeof n.payload === "object" && n.payload && "text" in n.payload ? String(n.payload.text) : "",
+        who: typeof n.payload === "object" && n.payload && "who" in n.payload ? String(n.payload.who) : "Someone",
+        when: new Date(n.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }),
+        href: typeof n.payload === "object" && n.payload && "href" in n.payload ? String(n.payload.href) : "/home",
+      }));
     }
   }
 

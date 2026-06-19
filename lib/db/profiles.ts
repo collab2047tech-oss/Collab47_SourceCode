@@ -24,15 +24,28 @@ export async function upsertOnboardingProfile(payload: {
   college: string;
   branch: string;
   year_of_study: string;
+  city: string;
+  birthdate: string | null;
   interests: string[];
 }) {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: false, error: "Supabase not configured" };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
+
+  // Handle must be unique; surface a friendly error if taken by someone else.
+  const { data: clash } = await sb
+    .from("profiles")
+    .select("id")
+    .eq("handle", payload.handle)
+    .neq("id", user.id)
+    .maybeSingle();
+  if (clash) return { ok: false, error: "That username is taken. Pick another." };
+
   const { error } = await sb.from("profiles").upsert({
     id: user.id,
     ...payload,
+    birthdate: payload.birthdate || null,
     onboarded: true,
   });
   if (error) return { ok: false, error: error.message };
@@ -52,18 +65,38 @@ export async function updateProfile(payload: {
   city?: string;
   avatar_url?: string;
   cover_url?: string;
+  /** Optional: new handle. Validated for format and uniqueness before saving. */
+  handle?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
 
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: false, error: "Supabase not configured" };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
+  // Validate and check uniqueness of handle if provided.
+  const { handle, ...rest } = payload;
+  const updateFields: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
+
+  if (handle !== undefined) {
+    if (!/^[a-z0-9_]{3,32}$/.test(handle)) {
+      return { ok: false, error: "Handle must be 3–32 lowercase letters, digits, or underscores." };
+    }
+    const { data: clash } = await sb
+      .from("profiles")
+      .select("id")
+      .eq("handle", handle)
+      .neq("id", user.id)
+      .maybeSingle();
+    if (clash) return { ok: false, error: "That handle is already taken. Pick another." };
+    updateFields.handle = handle;
+  }
+
   const { error } = await sb
     .from("profiles")
-    .update({ ...payload, updated_at: new Date().toISOString() })
+    .update(updateFields)
     .eq("id", user.id);
 
   if (error) return { ok: false, error: error.message };
@@ -79,18 +112,26 @@ export async function updatePrivacy(payload: {
   searchable?: boolean;
   read_receipts?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
 
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: false, error: "Supabase not configured" };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
-  // Merge with existing privacy object via jsonb concatenation
+  // Fetch current privacy value and merge so existing keys are preserved.
+  const { data: current } = await sb
+    .from("profiles")
+    .select("privacy")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const merged = { ...(current?.privacy as Record<string, unknown> ?? {}), ...payload };
+
   const { error } = await sb
     .from("profiles")
-    .update({ privacy: payload })
+    .update({ privacy: merged })
     .eq("id", user.id);
 
   if (error) return { ok: false, error: error.message };
@@ -104,17 +145,29 @@ export async function updatePrivacy(payload: {
 export async function updateNotificationPrefs(
   prefs: Record<string, { email: boolean; push: boolean }>
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
 
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: false, error: "Supabase not configured" };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
+  // Fetch current notification_prefs and merge so existing keys are preserved.
+  const { data: current } = await sb
+    .from("profiles")
+    .select("notification_prefs")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const merged = {
+    ...(current?.notification_prefs as Record<string, { email: boolean; push: boolean }> ?? {}),
+    ...prefs,
+  };
+
   const { error } = await sb
     .from("profiles")
-    .update({ notification_prefs: prefs })
+    .update({ notification_prefs: merged })
     .eq("id", user.id);
 
   if (error) return { ok: false, error: error.message };
@@ -126,10 +179,10 @@ export async function updateNotificationPrefs(
 // ---------------------------------------------------------------------------
 
 export async function deleteMyAccount(): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
 
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: false, error: "Supabase not configured" };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };

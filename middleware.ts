@@ -4,7 +4,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supab
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-const GATED_PREFIXES = ["/home", "/explore", "/network", "/messages", "/profile", "/settings", "/notifications", "/onboarding"];
+const GATED_PREFIXES = ["/home", "/explore", "/network", "/messages", "/profile", "/settings", "/notifications", "/onboarding", "/collabs"];
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: req });
@@ -32,10 +32,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Signed in but profile not onboarded -> force /onboarding
+  // Signed in but profile missing or not onboarded -> force /onboarding
   if (user && isGated && path !== "/onboarding") {
-    const { data: profile } = await supabase.from("profiles").select("onboarded").eq("id", user.id).single();
-    if (profile && !profile.onboarded) {
+    const { data: profile } = await supabase.from("profiles").select("onboarded").eq("id", user.id).maybeSingle();
+    if (!profile || !profile.onboarded) {
       const url = req.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);

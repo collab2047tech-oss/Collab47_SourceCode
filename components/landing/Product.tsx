@@ -28,11 +28,6 @@ const features = [
     title: "The Lucknow first-year beats the IIT senior.",
     body: "Scores adjust for resources, not pedigree. The student who built three things in a hostel WiFi outage ranks above the one who optimised their LinkedIn-banner.",
   },
-  {
-    label: "Vernacular",
-    title: "Sign up in Punjabi. Or just talk to it.",
-    body: "Voice fill in Hindi, Bengali, Punjabi. No English-first profile fields. Your bio reads like you, not like a corporate press release.",
-  },
 ];
 
 export function Product() {
@@ -42,7 +37,7 @@ export function Product() {
         <Reveal>
           <p className="text-caption mb-6">The Product</p>
           <h2 className="text-display-md max-w-4xl text-ink">
-            Six features.{" "}
+            Five features.{" "}
             <span className="italic text-saffron">No incumbent stacks them.</span>
           </h2>
         </Reveal>

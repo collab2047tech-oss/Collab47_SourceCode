@@ -37,11 +37,9 @@ export async function NewsRail({ branch, city }: NewsRailProps) {
 
       <div className="space-y-3">
         {items.map((item) => (
-          <a
+          <Link
             key={item.id}
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={`/news/${item.id}`}
             className="group block rounded-lg border border-bone bg-paper p-4 transition-colors hover:border-saffron"
           >
             <div className="flex gap-3">
@@ -66,7 +64,7 @@ export async function NewsRail({ branch, city }: NewsRailProps) {
                 <p className="mt-1 text-xs text-ash">{timeAgo(item.published_at)}</p>
               </div>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
 

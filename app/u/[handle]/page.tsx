@@ -4,18 +4,19 @@ import { Button } from "@/components/primitives/Button";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
 import { Nav } from "@/components/landing/Nav";
-import { MapPin, GraduationCap } from "lucide-react";
+import { MapPin, GraduationCap, ExternalLink, BadgeCheck } from "lucide-react";
 import { getProfileByHandle } from "@/lib/db/profiles";
 import { getProfilePosts } from "@/lib/db/posts";
 import { getFollowState } from "@/lib/db/social";
 import { ProfileActions } from "@/components/composite/ProfileActions";
+import { getVerifiedProjectsForUser } from "@/lib/db/projects";
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const profile = await getProfileByHandle(handle);
 
   if (!profile) {
-    // mock-data fallback for dev when Supabase isn't configured
+    // Real "not found" state: handle is unclaimed or user not signed up.
     return (
       <main className="min-h-dvh bg-cream">
         <Nav />
@@ -35,9 +36,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     );
   }
 
-  const [posts, followState] = await Promise.all([
+  const [posts, followState, verifiedProjects] = await Promise.all([
     getProfilePosts(profile.id, 12),
     getFollowState(profile.id),
+    getVerifiedProjectsForUser(profile.id),
   ]);
 
   return (
@@ -100,6 +102,66 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             )}
           </div>
         </Reveal>
+
+        {verifiedProjects.length > 0 && (
+          <Reveal delay={0.3}>
+            <div className="mt-16">
+              <div className="flex items-center gap-2">
+                <BadgeCheck className="size-4 text-saffron" />
+                <h2 className="text-caption text-ash">Verified contributions</h2>
+              </div>
+              <div className="mt-4 flex flex-col gap-3">
+                {(verifiedProjects as unknown as Array<{
+                  role: string;
+                  project: {
+                    id: string;
+                    short_id: string;
+                    title: string;
+                    deliverable_url: string | null;
+                    delivered_at: string | null;
+                    author: { handle: string; name: string };
+                  };
+                }>).map((m) => (
+                  <div
+                    key={m.project.id}
+                    className="flex items-start justify-between gap-4 rounded-lg border border-bone bg-paper px-5 py-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Tag variant="moss" className="text-xs">Verified contributor</Tag>
+                        {m.role === "owner" && (
+                          <Tag variant="saffron" className="text-xs">Author</Tag>
+                        )}
+                      </div>
+                      <Link
+                        href={`/c/${m.project.short_id}`}
+                        className="mt-2 block text-sm font-medium text-ink hover:underline"
+                      >
+                        {m.project.title}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-ash">
+                        by @{m.project.author.handle}
+                        {m.project.delivered_at
+                          ? ` . delivered ${new Date(m.project.delivered_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`
+                          : ""}
+                      </p>
+                    </div>
+                    {m.project.deliverable_url && (
+                      <a
+                        href={m.project.deliverable_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 flex items-center gap-1 text-xs text-ash hover:text-ink"
+                      >
+                        View <ExternalLink className="size-3" />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        )}
       </div>
     </main>
   );

@@ -20,33 +20,9 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
-const MOCK_COMMENTS: CommentWithAuthor[] = [
-  {
-    id: "c1",
-    body: "Wait, you built this in 9 days? Drop the repo.",
-    created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-    parent_comment_id: null,
-    author: { handle: "riya", name: "Riya Sharma", avatar_url: null },
-  },
-  {
-    id: "c2",
-    body: "Coming up tomorrow. Sharing in the discord first.",
-    created_at: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    parent_comment_id: "c1",
-    author: { handle: "vikram", name: "Vikram Singh", avatar_url: null },
-  },
-  {
-    id: "c3",
-    body: "Same boat. Building my own SaaS now. Let me know if you want a co-founder.",
-    created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    parent_comment_id: null,
-    author: { handle: "arjun", name: "Arjun Mehta", avatar_url: null },
-  },
-];
-
 export async function CommentThread({ postId }: { postId: string }) {
   const sb = await getSupabaseServer();
-  let comments: CommentWithAuthor[] = MOCK_COMMENTS;
+  let comments: CommentWithAuthor[] = [];
   if (sb) {
     const { data } = await sb
       .from("comments")

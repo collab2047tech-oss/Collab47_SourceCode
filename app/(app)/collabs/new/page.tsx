@@ -40,7 +40,7 @@ export default function NewProjectPage() {
           label="Project title"
           name="title"
           required
-          placeholder="e.g. Anti-Bias Hiring Lab"
+          placeholder="e.g. Campus food-delivery app"
           maxLength={120}
         />
 

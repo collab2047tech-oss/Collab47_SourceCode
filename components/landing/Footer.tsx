@@ -23,16 +23,15 @@ export function Footer() {
           <div>
             <p className="text-caption text-cream/60">Company</p>
             <ul className="mt-4 space-y-2 text-sm">
-              <li><Link href="#" className="hover:text-saffron">Careers</Link></li>
-              <li><Link href="#" className="hover:text-saffron">Contact</Link></li>
+              <li><a href="mailto:collab2047.tech@gmail.com" className="hover:text-saffron">Contact</a></li>
             </ul>
           </div>
           <div>
             <p className="text-caption text-cream/60">Legal</p>
             <ul className="mt-4 space-y-2 text-sm">
-              <li><Link href="#" className="hover:text-saffron">Privacy</Link></li>
-              <li><Link href="#" className="hover:text-saffron">Terms</Link></li>
-              <li><Link href="#" className="hover:text-saffron">DPDP compliance</Link></li>
+              <li><Link href="/privacy" className="hover:text-saffron">Privacy</Link></li>
+              <li><Link href="/terms" className="hover:text-saffron">Terms</Link></li>
+              <li><Link href="/privacy#dpdp" className="hover:text-saffron">DPDP compliance</Link></li>
             </ul>
           </div>
         </div>

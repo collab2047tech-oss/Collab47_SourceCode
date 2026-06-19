@@ -15,11 +15,13 @@ import {
   Bell,
   Search,
   Briefcase,
+  Newspaper,
 } from "lucide-react";
 
 const nav = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/explore", label: "Explore", icon: Compass },
+  { href: "/news", label: "News", icon: Newspaper },
   { href: "/network", label: "Network", icon: Users },
   { href: "/collabs", label: "Collabs", icon: Briefcase },
   { href: "/messages", label: "Messages", icon: MessageSquare },
@@ -28,8 +30,19 @@ const nav = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  me,
+  unreadCount = 0,
+}: {
+  children: React.ReactNode;
+  me: { name: string; handle: string; avatar_url: string | null } | null;
+  unreadCount?: number;
+}) {
   const path = usePathname();
+  const displayName = me?.name ?? "You";
+  const displayHandle = me?.handle ?? "";
+  const badge = unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : null;
 
   return (
     <div className="min-h-dvh bg-cream">
@@ -43,13 +56,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Collab47.
           </Link>
 
-          <div className="mt-12 flex items-center gap-3 rounded-lg border border-bone bg-paper p-3">
-            <Avatar name="Akshpreet" size="sm" />
+          <Link
+            href="/profile"
+            className="mt-12 flex items-center gap-3 rounded-lg border border-bone bg-paper p-3 transition-colors hover:bg-bone"
+          >
+            <Avatar name={displayName} src={me?.avatar_url ?? undefined} size="sm" />
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink">Akshpreet</p>
-              <p className="truncate text-xs text-ash">@akshpreet</p>
+              <p className="truncate text-sm font-medium text-ink">{displayName}</p>
+              {displayHandle ? (
+                <p className="truncate text-xs text-ash">@{displayHandle}</p>
+              ) : null}
             </div>
-          </div>
+          </Link>
 
           <nav className="mt-8 flex flex-col gap-1">
             {nav.map((n) => {
@@ -73,24 +91,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <button className="flex items-center justify-center gap-2 rounded-full bg-saffron px-4 py-3 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk">
+        <Link
+          href="/home#composer"
+          className="flex items-center justify-center gap-2 rounded-full bg-saffron px-4 py-3 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk"
+        >
           <Plus className="size-4" /> New post
-        </button>
+        </Link>
       </aside>
 
       {/* Top bar (mobile + desktop) */}
       <header className="sticky top-0 z-40 border-b border-bone bg-cream/85 backdrop-blur-md md:ml-60">
         <div className="flex h-16 items-center justify-between gap-4 px-4 md:px-8">
-          <div className="flex flex-1 items-center gap-3 rounded-full border border-bone bg-paper px-4 py-2 md:max-w-md">
-            <Search className="size-4 text-ash" />
+          <form action="/explore" className="flex flex-1 items-center gap-3 rounded-full border border-bone bg-paper px-4 py-2 md:max-w-md">
+            <button type="submit" aria-label="Search" className="text-ash hover:text-ink">
+              <Search className="size-4" />
+            </button>
             <input
+              name="q"
               placeholder="Search people, posts, projects"
               className="w-full bg-transparent text-sm outline-none placeholder:text-ash"
             />
-          </div>
-          <button className="rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone">
+          </form>
+          <Link
+            href="/notifications"
+            aria-label="Notifications"
+            className="relative rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone"
+          >
             <Bell className="size-4 text-ink" />
-          </button>
+            {badge ? (
+              <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-saffron px-1 text-[10px] font-semibold text-cream">
+                {badge}
+              </span>
+            ) : null}
+          </Link>
         </div>
       </header>
 

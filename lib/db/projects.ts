@@ -1,5 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
+import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
 
 export interface MiniProfile {
   id: string;
@@ -9,48 +11,6 @@ export interface MiniProfile {
   college: string | null;
 }
 
-const MOCK_PROJECTS = [
-  {
-    id: "mock-proj-1",
-    short_id: "anti-bias",
-    author_id: "u1",
-    title: "The Anti-Bias Hiring Lab",
-    brief: "A coalition of Tier-2/3 student designers and engineers rebuilding the campus hiring stack from scratch.",
-    deliverable: "Open-source scoring algorithm + public case study by 25 July.",
-    deadline: "2026-07-25",
-    slot_count: 5,
-    status: "open" as const,
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    author: { id: "u1", handle: "akshpreet", name: "Akshpreet Singh", avatar_url: null, college: "Thapar TIET" },
-  },
-  {
-    id: "mock-proj-2",
-    short_id: "crop-ai",
-    author_id: "u2",
-    title: "CropAI: Real-Time Disease Detector",
-    brief: "Building an offline-capable ML model for detecting crop disease from smartphone photos. Targeting Punjab farmers.",
-    deliverable: "Open-sourced model weights + Android demo app.",
-    deadline: "2026-08-15",
-    slot_count: 4,
-    status: "open" as const,
-    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    author: { id: "u2", handle: "arjun", name: "Arjun Mehta", avatar_url: null, college: "Punjabi University" },
-  },
-  {
-    id: "mock-proj-3",
-    short_id: "hindi-nlp",
-    author_id: "u3",
-    title: "Hindi NLP Corpus for Education",
-    brief: "Annotating a 50k-sentence Hindi education corpus. Looking for NLP researchers and linguistics students.",
-    deliverable: "Public dataset on HuggingFace + technical paper draft.",
-    deadline: "2026-09-01",
-    slot_count: 3,
-    status: "open" as const,
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    author: { id: "u3", handle: "priya", name: "Priya Joshi", avatar_url: null, college: "IIT Ropar" },
-  },
-];
-
 export async function createProject(input: {
   title: string;
   brief: string;
@@ -58,11 +18,8 @@ export async function createProject(input: {
   deadline: string;
   slot_count: number;
 }): Promise<{ ok: boolean; projectId?: string; shortId?: string; error?: string }> {
-  if (!supabaseConfigured) {
-    return { ok: true, projectId: "mock-proj-1", shortId: "anti-bias" };
-  }
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true, projectId: "mock-proj-1", shortId: "anti-bias" };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
@@ -96,9 +53,7 @@ export async function createProject(input: {
 
 export async function getProjectByShortId(shortId: string) {
   const sb = await getSupabaseServer();
-  if (!sb) {
-    return MOCK_PROJECTS.find((p) => p.short_id === shortId) ?? MOCK_PROJECTS[0];
-  }
+  if (!sb) return null;
 
   const { data } = await sb
     .from("projects")
@@ -111,7 +66,7 @@ export async function getProjectByShortId(shortId: string) {
 
 export async function listOpenProjects(limit = 20) {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_PROJECTS;
+  if (!sb) return [];
 
   const { data } = await sb
     .from("projects")
@@ -128,9 +83,9 @@ export async function applyToProject(input: {
   pitch: string;
   links: string[];
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
@@ -189,14 +144,36 @@ export async function acceptApplicant(input: {
   projectId: string;
   applicantId: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
-  const { error: updateErr } = await sb
+  // Only the project author may accept applicants.
+  const { data: project } = await sb
+    .from("projects")
+    .select("author_id, short_id")
+    .eq("id", input.projectId)
+    .maybeSingle();
+  if (!project) return { ok: false, error: "Project not found." };
+  if (project.author_id !== user.id) return { ok: false, error: "Only the project author can accept applicants." };
+
+  // Privileged writes (membership + conversation management) via service role.
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured." };
+
+  // Enforce 5-member cap (owner counts).
+  const { count: memberCount } = await admin
+    .from("project_members")
+    .select("user_id", { count: "exact", head: true })
+    .eq("project_id", input.projectId);
+  if ((memberCount ?? 0) >= 5) {
+    return { ok: false, error: "This project already has the maximum of 5 members." };
+  }
+
+  const { error: updateErr } = await admin
     .from("project_applications")
     .update({ status: "accepted" })
     .eq("project_id", input.projectId)
@@ -204,7 +181,7 @@ export async function acceptApplicant(input: {
 
   if (updateErr) return { ok: false, error: updateErr.message };
 
-  const { error: memberErr } = await sb
+  const { error: memberErr } = await admin
     .from("project_members")
     .upsert(
       { project_id: input.projectId, user_id: input.applicantId, role: "member" },
@@ -213,7 +190,7 @@ export async function acceptApplicant(input: {
 
   if (memberErr) return { ok: false, error: memberErr.message };
 
-  const { data: existingConv } = await sb
+  const { data: existingConv } = await admin
     .from("conversations")
     .select("id")
     .eq("project_id", input.projectId)
@@ -221,7 +198,7 @@ export async function acceptApplicant(input: {
     .maybeSingle();
 
   if (!existingConv) {
-    const { data: newConv, error: convErr } = await sb
+    const { data: newConv, error: convErr } = await admin
       .from("conversations")
       .insert({ type: "group", project_id: input.projectId })
       .select("id")
@@ -229,7 +206,7 @@ export async function acceptApplicant(input: {
 
     if (convErr || !newConv) return { ok: false, error: convErr?.message ?? "Failed to create group conversation." };
 
-    const { data: members } = await sb
+    const { data: members } = await admin
       .from("project_members")
       .select("user_id")
       .eq("project_id", input.projectId);
@@ -239,16 +216,31 @@ export async function acceptApplicant(input: {
         conversation_id: newConv.id,
         user_id: m.user_id,
       }));
-      await sb.from("conversation_members").upsert(convMembers, { onConflict: "conversation_id,user_id" });
+      await admin.from("conversation_members").upsert(convMembers, { onConflict: "conversation_id,user_id" });
     }
   } else {
-    await sb
+    await admin
       .from("conversation_members")
       .upsert(
         { conversation_id: existingConv.id, user_id: input.applicantId },
         { onConflict: "conversation_id,user_id" }
       );
   }
+
+  // Fire-and-forget: notify the applicant that they were accepted.
+  void (async () => {
+    try {
+      const actor = await getActorDisplayInfo(user.id);
+      if (!actor) return;
+      await createNotification({
+        userId: input.applicantId,
+        kind: "project_accepted",
+        actorName: actor.name,
+        text: `${actor.name} accepted your application`,
+        href: `/c/${project.short_id as string}`,
+      });
+    } catch { /* best-effort */ }
+  })();
 
   return { ok: true };
 }
@@ -257,11 +249,26 @@ export async function rejectApplicant(input: {
   projectId: string;
   applicantId: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (!supabaseConfigured) return { ok: true };
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true };
+  if (!sb) return { ok: false, error: "Database not connected." };
 
-  const { error } = await sb
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  // Only the project author may reject applicants.
+  const { data: project } = await sb
+    .from("projects")
+    .select("author_id")
+    .eq("id", input.projectId)
+    .maybeSingle();
+  if (!project) return { ok: false, error: "Project not found." };
+  if (project.author_id !== user.id) return { ok: false, error: "Only the project author can reject applicants." };
+
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured." };
+
+  const { error } = await admin
     .from("project_applications")
     .update({ status: "rejected" })
     .eq("project_id", input.projectId)
@@ -304,4 +311,89 @@ export async function getMyProjectApplicationState(projectId: string): Promise<{
 
   if (!data) return { applied: false, status: null };
   return { applied: true, status: data.status as "pending" | "accepted" | "rejected" };
+}
+
+// ---------------------------------------------------------------------------
+// Progress posts for a project
+// ---------------------------------------------------------------------------
+
+export async function getProjectProgressPosts(projectId: string) {
+  if (!supabaseConfigured) return [];
+  const sb = await getSupabaseServer();
+  if (!sb) return [];
+
+  const { data } = await sb
+    .from("posts")
+    .select("*, author:profiles!posts_author_id_fkey(id,handle,name,avatar_url)")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Mark project delivered + verify all members
+// ---------------------------------------------------------------------------
+
+export async function markProjectDelivered(input: {
+  projectId: string;
+  deliverableUrl: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!supabaseConfigured) return { ok: false, error: "Database not connected." };
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false, error: "Database not connected." };
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  const { data: project } = await sb
+    .from("projects")
+    .select("author_id")
+    .eq("id", input.projectId)
+    .maybeSingle();
+
+  if (!project) return { ok: false, error: "Project not found." };
+  if (project.author_id !== user.id) return { ok: false, error: "Only the project author can mark it delivered." };
+
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured." };
+
+  const { error: projectErr } = await admin
+    .from("projects")
+    .update({
+      delivered_at: new Date().toISOString(),
+      deliverable_url: input.deliverableUrl,
+      status: "delivered",
+    })
+    .eq("id", input.projectId);
+
+  if (projectErr) return { ok: false, error: projectErr.message };
+
+  const { error: membersErr } = await admin
+    .from("project_members")
+    .update({ is_verified: true })
+    .eq("project_id", input.projectId);
+
+  if (membersErr) return { ok: false, error: membersErr.message };
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Get projects where a user is a verified member (for portfolio page)
+// ---------------------------------------------------------------------------
+
+export async function getVerifiedProjectsForUser(userId: string) {
+  if (!supabaseConfigured) return [];
+  const sb = await getSupabaseServer();
+  if (!sb) return [];
+
+  const { data } = await sb
+    .from("project_members")
+    .select("role, project:projects!project_members_project_id_fkey(id,short_id,title,deliverable_url,delivered_at,author_id,author:profiles!projects_author_id_fkey(handle,name))")
+    .eq("user_id", userId)
+    .eq("is_verified", true);
+
+  return data ?? [];
 }

@@ -6,6 +6,8 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { updateProfileAction } from "@/app/(app)/profile/edit/actions";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/media/compress";
 
 const BRANCHES = [
   "CSE",
@@ -64,6 +66,7 @@ export function ProfileEditForm({
   const [coverPreview, setCoverPreview] = useState<string | null>(cover_url);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -75,11 +78,57 @@ export function ProfileEditForm({
     if (file) setCoverPreview(URL.createObjectURL(file));
   }
 
+  async function uploadImage(
+    sb: NonNullable<ReturnType<typeof getSupabaseBrowser>>,
+    userId: string,
+    file: File,
+    bucket: "avatars" | "covers"
+  ): Promise<string> {
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+    const path = `${userId}/${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from(bucket).upload(path, file, {
+      cacheControl: "3600",
+      upsert: true,
+    });
+    if (upErr) throw upErr;
+    return sb.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const data = new FormData(form);
+    // Files are uploaded client-side; never send them through the action.
+    data.delete("avatar");
+    data.delete("cover");
+    const avatarFile = avatarInputRef.current?.files?.[0] ?? null;
+    const coverFile = coverInputRef.current?.files?.[0] ?? null;
+
+    setError(null);
     startTransition(async () => {
+      const sb = getSupabaseBrowser();
+      if (sb && (avatarFile || coverFile)) {
+        const {
+          data: { user },
+        } = await sb.auth.getUser();
+        if (!user) {
+          setError("Please sign in again.");
+          return;
+        }
+        try {
+          if (avatarFile) {
+            const toUpload = await compressImage(avatarFile);
+            data.set("avatar_url", await uploadImage(sb, user.id, toUpload, "avatars"));
+          }
+          if (coverFile) {
+            const toUpload = await compressImage(coverFile);
+            data.set("cover_url", await uploadImage(sb, user.id, toUpload, "covers"));
+          }
+        } catch (err) {
+          setError(err instanceof Error ? `Image upload failed: ${err.message}` : "Image upload failed.");
+          return;
+        }
+      }
       await updateProfileAction(data);
     });
   }
@@ -244,6 +293,7 @@ export function ProfileEditForm({
       </div>
 
       {/* Actions */}
+      {error ? <p className="text-sm text-ember">{error}</p> : null}
       <div className="flex items-center gap-4 pb-12">
         <Button type="submit" size="md" disabled={isPending}>
           {isPending ? "Saving..." : "Save changes"}

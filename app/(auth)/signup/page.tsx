@@ -9,11 +9,37 @@ import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 export default function SignupPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function signUpEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const sb = getSupabaseBrowser();
+    if (!sb) {
+      setError("Sign up is not configured yet on this build.");
+      setLoading(false);
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setLoading(false);
+      return;
+    }
+    const { error } = await sb.auth.signUp({ email: email.trim(), password });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+    location.href = "/onboarding";
+  }
 
   async function signInGoogle() {
     setError(null);
@@ -81,7 +107,37 @@ export default function SignupPage() {
             Three taps. Under 60 seconds to your first feed.
           </p>
 
-          <div className="mt-10 space-y-3">
+          <form onSubmit={signUpEmail} className="mt-10 space-y-4">
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              placeholder="you@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Input
+              label="Password"
+              type="password"
+              name="password"
+              placeholder="At least 8 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+              Create account <ArrowRight className="size-4" />
+            </Button>
+          </form>
+
+          <div className="my-8 flex items-center gap-4">
+            <span className="h-px flex-1 bg-bone" />
+            <span className="text-caption">or</span>
+            <span className="h-px flex-1 bg-bone" />
+          </div>
+
+          <div className="space-y-3">
             <Button
               variant="secondary"
               size="lg"

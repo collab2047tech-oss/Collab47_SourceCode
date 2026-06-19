@@ -1,21 +1,13 @@
 import { getMyProfile } from "@/lib/db/profiles";
 import { ProfileEditForm } from "@/components/composite/ProfileEditForm";
+import { redirect } from "next/navigation";
 
-const MOCK_PROFILE = {
-  name: "Akshpreet Singh",
-  handle: "akshpreet",
-  bio: "CEO and Co-founder, Collab47. Building India's work-first network for students.",
-  college: "Punjabi University",
-  branch: "CSE",
-  year_of_study: "4",
-  city: "Amritsar",
-  avatar_url: null as string | null,
-  cover_url: null as string | null,
-};
+export const dynamic = "force-dynamic";
 
 export default async function ProfileEditPage() {
   const profile = await getMyProfile();
-  const p = profile ?? MOCK_PROFILE;
+  if (!profile) redirect("/onboarding");
+  const p = profile;
 
   return (
     <div className="mx-auto max-w-2xl">

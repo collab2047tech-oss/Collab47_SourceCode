@@ -1,13 +1,53 @@
-"use client";
-
+import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
-import { mockPeople, mockTrending } from "@/lib/mockData";
-import { TrendingUp, Sparkles, Trophy, ChevronRight } from "lucide-react";
 import { ExploreSearch } from "@/components/composite/ExploreSearch";
+import { listOpenProjects } from "@/lib/db/projects";
+import { getPopularFeed } from "@/lib/db/feed";
+import { getSuggestedConnections } from "@/lib/db/social";
+import { getSupabaseServer } from "@/lib/supabase/server";
+import { TrendingUp, Sparkles, Trophy, ChevronRight } from "lucide-react";
 
-export default function ExplorePage() {
+export const dynamic = "force-dynamic";
+
+async function getCollegeLeaderboard(limit = 5) {
+  const sb = await getSupabaseServer();
+  if (!sb) return [] as { name: string; count: number }[];
+  const { data } = await sb.from("profiles").select("college").is("deleted_at", null).limit(1000);
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const c = (row.college as string | null)?.trim();
+    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
+}
+
+export default async function ExplorePage() {
+  const [projects, popular, suggested, leaderboard] = await Promise.all([
+    listOpenProjects(1),
+    getPopularFeed(40),
+    getSuggestedConnections(4),
+    getCollegeLeaderboard(5),
+  ]);
+
+  const featured = projects[0] ?? null;
+
+  const counts = new Map<string, number>();
+  for (const p of popular) {
+    for (const t of p.hashtags ?? []) {
+      const tag = t.toLowerCase();
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+  }
+  const trending = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag, count]) => ({ tag, count }));
+
   return (
     <div className="mx-auto max-w-6xl">
       <Reveal>
@@ -27,72 +67,84 @@ export default function ExplorePage() {
       <div className="mt-12 grid gap-6 lg:grid-cols-3">
         {/* Featured project */}
         <Reveal className="lg:col-span-2">
-          <article className="group relative h-80 overflow-hidden rounded-lg bg-ink">
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,#0A0A0B_0%,#1F3A2C_100%)]" />
-            <div className="relative flex h-full flex-col justify-end p-8 text-cream">
-              <Tag variant="saffron" className="self-start">
-                Featured project
-              </Tag>
-              <h2 className="mt-4 font-serif text-4xl">
-                The Anti-Bias Hiring Lab.
-              </h2>
-              <p className="mt-3 max-w-md text-sm text-cream/80">
-                A coalition of Tier-2/3 student designers and engineers
-                rebuilding the campus hiring stack from scratch. Open call until
-                June 30.
-              </p>
-              <button className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-saffron px-5 py-2.5 text-sm text-cream transition-colors hover:bg-saffron-dk">
-                View brief <ChevronRight className="size-4" />
-              </button>
+          {featured ? (
+            <Link
+              href={`/c/${featured.short_id}`}
+              className="group relative block h-80 overflow-hidden rounded-lg bg-ink"
+            >
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)]" />
+              <div className="relative flex h-full flex-col justify-end p-8 text-cream">
+                <Tag variant="saffron" className="self-start">
+                  Featured project
+                </Tag>
+                <h2 className="mt-4 font-serif text-4xl">{featured.title}</h2>
+                <p className="mt-3 max-w-md text-sm text-cream/80 line-clamp-3">{featured.brief}</p>
+                <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-saffron px-5 py-2.5 text-sm text-cream transition-colors group-hover:bg-saffron-dk">
+                  View brief <ChevronRight className="size-4" />
+                </span>
+              </div>
+            </Link>
+          ) : (
+            <div className="flex h-80 flex-col items-center justify-center rounded-lg border border-dashed border-bone bg-paper/50 text-center">
+              <p className="text-sm text-ash">No open projects yet.</p>
+              <Link href="/collabs/new" className="mt-2 text-sm text-saffron underline">
+                Start the first one
+              </Link>
             </div>
-          </article>
+          )}
         </Reveal>
 
         {/* Trending */}
         <Reveal delay={0.1}>
           <article className="rounded-lg border border-bone bg-paper p-6">
             <div className="flex items-center gap-2 text-caption">
-              <TrendingUp className="size-3" /> Trending today
+              <TrendingUp className="size-3" /> Trending now
             </div>
-            <ul className="mt-6 space-y-4">
-              {mockTrending.map((t, i) => (
-                <li key={t.tag} className="flex items-baseline gap-3">
-                  <span className="font-serif text-2xl text-saffron tabular-nums">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-ink">#{t.tag}</p>
-                    <p className="text-xs text-ash">
-                      {t.count} posts this week
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {trending.length > 0 ? (
+              <ul className="mt-6 space-y-4">
+                {trending.map((t, i) => (
+                  <li key={t.tag} className="flex items-baseline gap-3">
+                    <span className="font-serif text-2xl text-saffron tabular-nums">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-ink">#{t.tag}</p>
+                      <p className="text-xs text-ash">{t.count} posts</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-6 text-sm text-ash">No trends yet.</p>
+            )}
           </article>
         </Reveal>
 
-        {/* New this week */}
+        {/* New people */}
         <Reveal>
           <article className="rounded-lg border border-bone bg-paper p-6">
             <div className="flex items-center gap-2 text-caption">
-              <Sparkles className="size-3" /> Joined this week
+              <Sparkles className="size-3" /> People you may know
             </div>
-            <ul className="mt-6 space-y-4">
-              {mockPeople.slice(0, 4).map((p) => (
-                <li key={p.handle} className="flex items-center gap-3">
-                  <Avatar name={p.name} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink">
-                      {p.name}
-                    </p>
-                    <p className="truncate text-xs text-ash">
-                      {p.role} . {p.college}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {suggested.length > 0 ? (
+              <ul className="mt-6 space-y-4">
+                {suggested.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/u/${p.handle}`} className="flex items-center gap-3">
+                      <Avatar name={p.name} src={p.avatar_url ?? undefined} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                        <p className="truncate text-xs text-ash">
+                          {[p.branch, p.college].filter(Boolean).join(" . ")}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-6 text-sm text-ash">No one to suggest yet.</p>
+            )}
           </article>
         </Reveal>
 
@@ -100,34 +152,25 @@ export default function ExplorePage() {
         <Reveal delay={0.1} className="lg:col-span-2">
           <article className="rounded-lg border border-bone bg-paper p-6">
             <div className="flex items-center gap-2 text-caption">
-              <Trophy className="size-3" /> College leaderboard . this month
+              <Trophy className="size-3" /> Colleges by members
             </div>
-            <ul className="mt-6 divide-y divide-bone">
-              {[
-                { name: "Thapar Institute", score: 4.8, posts: 312 },
-                { name: "Punjabi University", score: 4.6, posts: 287 },
-                { name: "GNDU Amritsar", score: 4.4, posts: 241 },
-                { name: "IIT Ropar", score: 4.3, posts: 198 },
-                { name: "DAV Amritsar", score: 4.1, posts: 156 },
-              ].map((c, i) => (
-                <li key={c.name} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-4">
-                    <span className="font-serif text-3xl text-ink tabular-nums">
-                      {i + 1}
+            {leaderboard.length > 0 ? (
+              <ul className="mt-6 divide-y divide-bone">
+                {leaderboard.map((c, i) => (
+                  <li key={c.name} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-4">
+                      <span className="font-serif text-3xl text-ink tabular-nums">{i + 1}</span>
+                      <span className="text-sm font-medium text-ink">{c.name}</span>
+                    </div>
+                    <span className="rounded-full bg-saffron/10 px-3 py-1 text-xs font-semibold tabular-nums text-saffron-dk">
+                      {c.count} {c.count === 1 ? "member" : "members"}
                     </span>
-                    <span className="text-sm font-medium text-ink">
-                      {c.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-6 text-xs text-ash">
-                    <span className="tabular-nums">{c.posts} posts</span>
-                    <span className="rounded-full bg-saffron/10 px-3 py-1 font-semibold tabular-nums text-saffron-dk">
-                      {c.score.toFixed(1)}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-6 text-sm text-ash">Not enough members yet.</p>
+            )}
           </article>
         </Reveal>
       </div>

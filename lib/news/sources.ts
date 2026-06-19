@@ -13,11 +13,9 @@ export interface NewsSource {
 }
 
 export const NEWS_SOURCES: NewsSource[] = [
-  {
-    name: "Indian Express",
-    type: "rss",
-    url: "https://indianexpress.com/feed/",
-  },
+  // NOTE: Indian Express /feed/ ships empty <description>/<content> (title-only),
+  // producing cards with no summary. Dropped. Indian coverage still comes from
+  // The Hindu, LiveMint, NewsData, GNews, Mediastack (all carry article text).
   {
     name: "The Hindu",
     type: "rss",

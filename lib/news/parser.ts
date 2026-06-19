@@ -9,6 +9,8 @@ export interface ParsedArticle {
   excerpt: string;
   image_url: string | null;
   published_at: string;
+  /** Longer source text (article body / content) used to generate summaries. */
+  content?: string;
 }
 
 /** Strip CDATA wrappers from a string */

@@ -1,0 +1,258 @@
+"use client";
+
+import { useState, useRef, useEffect, useTransition } from "react";
+import {
+  ThumbsUp,
+  PartyPopper,
+  HandHeart,
+  Heart,
+  Lightbulb,
+  Laugh,
+  Bookmark,
+  Share2,
+  MessageCircle,
+} from "lucide-react";
+import { cn } from "@/lib/cn";
+import {
+  likePostAction,
+  unlikePostAction,
+  reactToPostAction,
+  bookmarkPostAction,
+  unbookmarkPostAction,
+} from "@/app/(app)/home/engagement-actions";
+import type { ReactionKind } from "@/lib/db/engagement";
+
+type ReactionMeta = {
+  kind: ReactionKind;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+};
+
+const REACTIONS: ReactionMeta[] = [
+  { kind: "like",       label: "Like",       icon: <ThumbsUp    className="size-4" />, color: "text-saffron" },
+  { kind: "celebrate",  label: "Celebrate",  icon: <PartyPopper className="size-4" />, color: "text-amber-500" },
+  { kind: "support",    label: "Support",    icon: <HandHeart   className="size-4" />, color: "text-rose-400" },
+  { kind: "love",       label: "Love",       icon: <Heart       className="size-4" />, color: "text-red-500" },
+  { kind: "insightful", label: "Insightful", icon: <Lightbulb   className="size-4" />, color: "text-blue-400" },
+  { kind: "funny",      label: "Funny",      icon: <Laugh       className="size-4" />, color: "text-green-500" },
+];
+
+function getReactionMeta(kind?: string): ReactionMeta {
+  return REACTIONS.find((r) => r.kind === kind) ?? REACTIONS[0];
+}
+
+interface Props {
+  postId: string;
+  initialLiked: boolean;
+  initialSaved: boolean;
+  initialReaction?: string;
+  likeCount: number;
+  commentCount: number;
+  bookmarkCount: number;
+  shortId: string;
+}
+
+export function PostDetailActions({
+  postId,
+  initialLiked,
+  initialSaved,
+  initialReaction,
+  likeCount,
+  commentCount,
+  bookmarkCount,
+  shortId,
+}: Props) {
+  const [liked, setLiked] = useState(initialLiked);
+  const [reaction, setReaction] = useState<string | undefined>(initialReaction);
+  const [saved, setSaved] = useState(initialSaved);
+  const [likes, setLikes] = useState(likeCount);
+  const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
+  const reactionRef = useRef<HTMLDivElement>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!reactionPopoverOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (reactionRef.current && !reactionRef.current.contains(e.target as Node)) {
+        setReactionPopoverOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [reactionPopoverOpen]);
+
+  function toggleLike() {
+    setReactionPopoverOpen(false);
+    if (liked) {
+      const prevReaction = reaction;
+      setLiked(false);
+      setReaction(undefined);
+      setLikes((c) => Math.max(0, c - 1));
+      startTransition(async () => {
+        const res = await unlikePostAction(postId);
+        if (!res.ok) {
+          setLiked(true);
+          setReaction(prevReaction);
+          setLikes((c) => c + 1);
+        }
+      });
+    } else {
+      setLiked(true);
+      setReaction("like");
+      setLikes((c) => c + 1);
+      startTransition(async () => {
+        const res = await likePostAction(postId);
+        if (!res.ok) {
+          setLiked(false);
+          setReaction(undefined);
+          setLikes((c) => Math.max(0, c - 1));
+        }
+      });
+    }
+  }
+
+  function pickReaction(kind: ReactionKind) {
+    setReactionPopoverOpen(false);
+    const prevLiked = liked;
+    const prevReaction = reaction;
+    const prevLikes = likes;
+    const delta = liked ? 0 : 1;
+    setLiked(true);
+    setReaction(kind);
+    setLikes((c) => c + delta);
+    startTransition(async () => {
+      const res = await reactToPostAction(postId, kind);
+      if (!res.ok) {
+        setLiked(prevLiked);
+        setReaction(prevReaction);
+        setLikes(prevLikes);
+      }
+    });
+  }
+
+  function openReactionPopover() {
+    hoverTimerRef.current = setTimeout(() => setReactionPopoverOpen(true), 400);
+  }
+
+  function cancelReactionPopover() {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }
+
+  function toggleSave() {
+    const next = !saved;
+    setSaved(next);
+    startTransition(async () => {
+      const res = await (next ? bookmarkPostAction(postId) : unbookmarkPostAction(postId));
+      if (!res.ok) setSaved(!next);
+    });
+  }
+
+  function handleShare() {
+    const url = `${window.location.origin}/p/${shortId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  const meta = getReactionMeta(liked ? reaction : undefined);
+
+  return (
+    <div className={cn("mt-10 flex items-center gap-6 border-t border-bone pt-6 text-sm text-ash", isPending && "opacity-70")}>
+      {/* Reaction control */}
+      <div
+        ref={reactionRef}
+        className="relative"
+        onMouseEnter={openReactionPopover}
+        onMouseLeave={cancelReactionPopover}
+      >
+        {/* Reaction popover */}
+        {reactionPopoverOpen ? (
+          <div
+            className="absolute bottom-full left-0 mb-1.5 z-50 flex items-center gap-1 rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10"
+            onMouseEnter={() => {
+              cancelReactionPopover();
+              setReactionPopoverOpen(true);
+            }}
+            onMouseLeave={() => setReactionPopoverOpen(false)}
+          >
+            {REACTIONS.map((r) => (
+              <button
+                key={r.kind}
+                type="button"
+                onClick={() => pickReaction(r.kind)}
+                aria-label={r.label}
+                title={r.label}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-full transition-all hover:scale-125",
+                  r.color,
+                  reaction === r.kind && "scale-125 bg-bone"
+                )}
+              >
+                {r.icon}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Main reaction button */}
+        <button
+          type="button"
+          onClick={toggleLike}
+          disabled={isPending}
+          aria-label={liked ? `Remove ${meta.label}` : "Like"}
+          className={cn(
+            "flex items-center gap-1.5 transition-colors hover:text-saffron disabled:opacity-40",
+            liked ? meta.color : ""
+          )}
+        >
+          {liked ? (
+            <span className={cn("size-4 transition-all scale-110", meta.color)}>
+              {meta.icon}
+            </span>
+          ) : (
+            <ThumbsUp className="size-4 stroke-current" />
+          )}
+          {likes}
+        </button>
+      </div>
+
+      {/* Comment count (static display - thread is below) */}
+      <span className="flex items-center gap-1.5 text-ash">
+        <MessageCircle className="size-4" />
+        {commentCount}
+      </span>
+
+      {/* Bookmark */}
+      <button
+        type="button"
+        onClick={toggleSave}
+        disabled={isPending}
+        aria-label={saved ? "Remove bookmark" : "Bookmark"}
+        className={cn(
+          "flex items-center gap-1.5 transition-colors hover:text-ink disabled:opacity-40",
+          saved && "text-saffron"
+        )}
+      >
+        <Bookmark
+          className={cn("size-4 transition-all", saved ? "fill-saffron stroke-saffron scale-110" : "stroke-current")}
+        />
+        {bookmarkCount}
+      </button>
+
+      {/* Share */}
+      <button
+        type="button"
+        onClick={handleShare}
+        aria-label="Copy link"
+        className="flex items-center gap-1.5 transition-colors hover:text-ink"
+      >
+        <Share2 className="size-4" />
+        {copied ? <span className="text-xs font-medium text-moss">Copied!</span> : null}
+      </button>
+    </div>
+  );
+}

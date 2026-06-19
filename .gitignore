@@ -30,3 +30,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# claude-mem / local AI context
+CLAUDE.local.md
+**/CLAUDE.local.md

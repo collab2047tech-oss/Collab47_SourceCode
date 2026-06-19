@@ -1,0 +1,45 @@
+"use client";
+
+import { useState } from "react";
+import { Share2 } from "lucide-react";
+import { cn } from "@/lib/cn";
+
+interface Props {
+  /** Path to copy, relative to the site origin. E.g. "/u/handle" */
+  path: string;
+  label?: string;
+  className?: string;
+}
+
+export function ShareButton({ path, label = "Share", className }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  function handleShare() {
+    const url = `${window.location.origin}${path}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      aria-label={copied ? "Link copied!" : label}
+      className={cn(
+        "relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
+        "border border-bone bg-paper text-ink transition-all hover:bg-bone",
+        "active:scale-95",
+        className
+      )}
+    >
+      <Share2 className="size-4" strokeWidth={1.75} />
+      {copied ? (
+        <span className="text-moss">Copied!</span>
+      ) : (
+        <span>{label}</span>
+      )}
+    </button>
+  );
+}

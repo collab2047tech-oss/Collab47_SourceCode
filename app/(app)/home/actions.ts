@@ -9,6 +9,7 @@ import {
   unpinPost,
 } from "@/lib/db/posts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseConfigured } from "@/lib/supabase/env";
+import { moderateContent } from "@/lib/moderation/moderate";
 
 // ---------------------------------------------------------------------------
 // Media upload helper
@@ -57,7 +58,7 @@ export async function createPostAction(
   formData: FormData
 ): Promise<{ ok: boolean; postId?: string; shortId?: string; error?: string }> {
   if (!supabaseConfigured) {
-    return { ok: true, postId: "mock-id", shortId: "mock" };
+    return { ok: false, error: "Database not connected." };
   }
 
   const sb = await getSupabaseServer();
@@ -72,31 +73,38 @@ export async function createPostAction(
   if (!body) return { ok: false, error: "Post body is required." };
   if (body.length > 2000) return { ok: false, error: "Post body exceeds 2000 characters." };
 
+  const moderationResult = await moderateContent(body);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
+
   const hashtagsRaw = (formData.get("hashtags") as string | null) ?? "";
   const hashtags = hashtagsRaw
     .split(" ")
     .map((t) => t.replace(/^#/, "").toLowerCase())
     .filter(Boolean);
 
-  // Collect image files (multiple)
-  const imageFiles = formData.getAll("images") as File[];
-  const validImages = imageFiles.filter((f) => f && f.size > 0).slice(0, 5);
-
-  // Collect video file
-  const videoFile = formData.get("video") as File | null;
-  const hasVideo = videoFile && videoFile.size > 0;
-
-  // Upload images or video (mutually exclusive)
+  // Media is uploaded CLIENT-SIDE directly to Supabase Storage (so large files
+  // never pass through this Server Action's 1MB body limit). We receive URLs.
   let image_urls: string[] = [];
-  let video_url: string | null = null;
+  const imageUrlsRaw = formData.get("image_urls") as string | null;
+  if (imageUrlsRaw) {
+    try {
+      const parsed = JSON.parse(imageUrlsRaw);
+      if (Array.isArray(parsed)) {
+        image_urls = parsed.filter((u): u is string => typeof u === "string" && u.length > 0).slice(0, 5);
+      }
+    } catch {
+      /* ignore malformed input */
+    }
+  }
 
-  if (validImages.length > 0) {
-    const uploads = await Promise.all(
-      validImages.map((f) => uploadMedia(f, user.id))
-    );
-    image_urls = uploads.filter((u): u is string => u !== null);
-  } else if (hasVideo) {
-    video_url = await uploadMedia(videoFile, user.id);
+  const videoUrlRaw = (formData.get("video_url") as string | null)?.trim() ?? "";
+  const video_url = videoUrlRaw.length > 0 ? videoUrlRaw : null;
+
+  // Only one media type per post.
+  if (image_urls.length > 0 && video_url) {
+    return { ok: false, error: "Attach images or a video, not both." };
   }
 
   const result = await createPost({

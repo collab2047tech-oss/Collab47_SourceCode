@@ -70,6 +70,7 @@ create table public.posts (
   bookmark_count       int not null default 0,
   search_tsv           tsvector,
   content_vector       vector(384),
+  deleted_at           timestamptz,
   created_at           timestamptz not null default now()
 );
 create index on public.posts (author_id, created_at desc);

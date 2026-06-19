@@ -27,25 +27,8 @@ export async function getProfilePosts(profileId: string, limit = 24): Promise<Po
     .from("posts")
     .select("*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)")
     .eq("author_id", profileId)
-    .or("expires_at.is.null,expires_at.gt.now,is_pinned.eq.true")
+    .or("expires_at.is.null,expires_at.gt.now(),is_pinned.eq.true")
     .order("is_pinned", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return (data as PostWithAuthor[]) ?? [];
-}
-
-export async function getRecentFeed(forUserId: string, limit = 20): Promise<PostWithAuthor[]> {
-  const sb = await getSupabaseServer();
-  if (!sb) return [];
-  const { data } = await sb
-    .from("posts")
-    .select("*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)")
-    .in(
-      "author_id",
-      // Subquery: users we follow
-      // Supabase JS does not support subquery directly; use RPC for prod. Stub returns recent posts.
-      []
-    )
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data as PostWithAuthor[]) ?? [];
@@ -64,6 +47,8 @@ export interface CreatePostInput {
   city_tags?: string[];
   is_repost?: boolean;
   reposted_from_post_id?: string | null;
+  /** Optional: link this post to a project as a progress update. */
+  project_id?: string | null;
 }
 
 export interface PostMutationResult {
@@ -73,7 +58,7 @@ export interface PostMutationResult {
   error?: string;
 }
 
-const MOCK_RESULT: PostMutationResult = { ok: true, postId: "mock-id", shortId: "mock" };
+const NO_BACKEND: PostMutationResult = { ok: false, error: "Database not connected." };
 
 /**
  * createPost - insert a new post owned by the currently authenticated user.
@@ -81,7 +66,7 @@ const MOCK_RESULT: PostMutationResult = { ok: true, postId: "mock-id", shortId: 
  */
 export async function createPost(input: CreatePostInput): Promise<PostMutationResult> {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_RESULT;
+  if (!sb) return NO_BACKEND;
 
   const {
     data: { user },
@@ -100,7 +85,12 @@ export async function createPost(input: CreatePostInput): Promise<PostMutationRe
       city_tags: input.city_tags ?? [],
       is_repost: input.is_repost ?? false,
       reposted_from_post_id: input.reposted_from_post_id ?? null,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      project_id: input.project_id ?? null,
+      // Normal posts are PERMANENT (LinkedIn-style). Only reposts of others are
+      // ephemeral (24h, Instagram-story-style).
+      expires_at: input.is_repost
+        ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        : null,
     })
     .select("id, short_id")
     .single();
@@ -114,7 +104,7 @@ export async function createPost(input: CreatePostInput): Promise<PostMutationRe
  */
 export async function deletePost(postId: string): Promise<PostMutationResult> {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_RESULT;
+  if (!sb) return NO_BACKEND;
 
   const { error } = await sb.from("posts").delete().eq("id", postId);
   if (error) return { ok: false, error: error.message };
@@ -127,7 +117,7 @@ export async function deletePost(postId: string): Promise<PostMutationResult> {
  */
 export async function pinPost(postId: string): Promise<PostMutationResult> {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_RESULT;
+  if (!sb) return NO_BACKEND;
 
   const {
     data: { user },
@@ -159,7 +149,7 @@ export async function pinPost(postId: string): Promise<PostMutationResult> {
  */
 export async function unpinPost(postId: string): Promise<PostMutationResult> {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_RESULT;
+  if (!sb) return NO_BACKEND;
 
   const { error } = await sb
     .from("posts")
@@ -174,9 +164,33 @@ export async function unpinPost(postId: string): Promise<PostMutationResult> {
  * convertRepostToHighlight - mark a repost as a highlight and clear expires_at.
  * Only valid while the post is still a repost and within the 24h window.
  */
+// ---------------------------------------------------------------------------
+// Comment read helpers
+// ---------------------------------------------------------------------------
+
+export interface CommentWithAuthor {
+  id: string;
+  body: string;
+  created_at: string;
+  parent_comment_id: string | null;
+  author: { handle: string; name: string; avatar_url: string | null };
+}
+
+export async function getPostComments(postId: string): Promise<CommentWithAuthor[]> {
+  const sb = await getSupabaseServer();
+  if (!sb) return [];
+  const { data } = await sb
+    .from("comments")
+    .select("id, body, created_at, parent_comment_id, author:profiles!comments_author_id_fkey(handle,name,avatar_url)")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  return (data as unknown as CommentWithAuthor[]) ?? [];
+}
+
 export async function convertRepostToHighlight(postId: string): Promise<PostMutationResult> {
   const sb = await getSupabaseServer();
-  if (!sb) return MOCK_RESULT;
+  if (!sb) return NO_BACKEND;
 
   // Fetch the post to validate it's a repost and still live
   const { data: post, error: fetchError } = await sb

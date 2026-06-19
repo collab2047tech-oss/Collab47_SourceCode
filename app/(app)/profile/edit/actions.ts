@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { updateProfile, uploadProfileImage } from "@/lib/db/profiles";
+import { updateProfile } from "@/lib/db/profiles";
 
 export async function updateProfileAction(formData: FormData) {
   const name = (formData.get("name") as string | null)?.trim() ?? "";
@@ -12,21 +12,9 @@ export async function updateProfileAction(formData: FormData) {
   const year_of_study = (formData.get("year_of_study") as string | null)?.trim() ?? "";
   const city = (formData.get("city") as string | null)?.trim() ?? "";
 
-  const avatarFile = formData.get("avatar") as File | null;
-  const coverFile = formData.get("cover") as File | null;
-
-  let avatar_url: string | undefined;
-  let cover_url: string | undefined;
-
-  if (avatarFile && avatarFile.size > 0) {
-    const result = await uploadProfileImage(avatarFile, "avatar");
-    if (result.ok && result.url) avatar_url = result.url;
-  }
-
-  if (coverFile && coverFile.size > 0) {
-    const result = await uploadProfileImage(coverFile, "cover");
-    if (result.ok && result.url) cover_url = result.url;
-  }
+  // Images uploaded client-side to Storage; action only receives URLs.
+  const avatar_url = (formData.get("avatar_url") as string | null)?.trim() || undefined;
+  const cover_url = (formData.get("cover_url") as string | null)?.trim() || undefined;
 
   const payload: Parameters<typeof updateProfile>[0] = {
     name,

@@ -3,13 +3,21 @@
 import { revalidatePath } from "next/cache";
 import {
   likePost, unlikePost,
+  reactToPost,
   addComment, deleteComment,
   repostPost, removeRepost,
   bookmarkPost, unbookmarkPost,
+  type ReactionKind,
 } from "@/lib/db/engagement";
 
 export async function likePostAction(postId: string) {
   const res = await likePost(postId);
+  if (res.ok) revalidatePath("/home");
+  return res;
+}
+
+export async function reactToPostAction(postId: string, reaction: ReactionKind) {
+  const res = await reactToPost(postId, reaction);
   if (res.ok) revalidatePath("/home");
   return res;
 }

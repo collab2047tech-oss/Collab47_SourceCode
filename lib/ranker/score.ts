@@ -14,7 +14,7 @@ export interface RankerWeights {
   safety: number;
 }
 
-// Tchebycheff criterion weights. Match dominates, safety is a kill switch.
+// Tchebycheff criterion weights. Match (relevance) dominates; safety is a kill switch.
 export const DEFAULT_WEIGHTS: RankerWeights = {
   match: 0.4,
   recency: 0.2,
@@ -24,20 +24,28 @@ export const DEFAULT_WEIGHTS: RankerWeights = {
   safety: 0.3,
 };
 
-interface ScoreContext {
-  interests: string[];        // user's onboarding interest tags
-  seenIds: Set<string>;       // already-seen post ids
-  recentTags: string[];       // primary hashtags of last 3 served posts (diversity)
+export interface ScoreContext {
+  interests: string[];              // user's onboarding interest tags
+  branch?: string | null;           // user's branch (e.g. CSE) for branch_tags match
+  seenIds: Set<string>;             // already-seen post ids
+  recentTags: string[];             // primary hashtags of last served posts (diversity)
+  // Optional classical-engine inputs. Empty/absent until the CF + PPR + BM25 jobs land.
+  relevancy?: Map<string, number>;  // postId -> normalised BM25/FTS ts_rank (0..1)
+  cf?: Map<string, number>;         // postId -> item-CF affinity (0..1)
+  ppr?: Map<string, number>;        // authorId -> Personalised PageRank affinity (0..1)
 }
 
 function ageHours(iso: string): number {
   return Math.max((Date.now() - new Date(iso).getTime()) / 3.6e6, 0);
 }
+const lc = (s: string) => s.toLowerCase();
 
 /**
  * scorePost: deterministic MCDM Tchebycheff scalarisation over 6 criteria.
  * s(a) = 1 - max_j { w_j * |1 - f_j(a)| }  (maximise toward ideal f_j*=1).
- * No LLM. Proxies stand in for CF / PPR until the nightly jobs land.
+ * 100% classical, zero AI. Relevance fuses: interest-tag overlap (recall),
+ * branch match, BM25/FTS relevancy, and item-CF affinity. Author trust fuses
+ * verified status + Personalised PageRank affinity.
  */
 export function scorePost(
   post: PostWithAuthor,
@@ -46,30 +54,37 @@ export function scorePost(
 ): ScoredPost {
   const reason: string[] = [];
 
-  // f_1 match: hashtag overlap with interests (proxy for cosine + CF + PPR).
-  const overlap = post.hashtags.filter((h) =>
-    ctx.interests.map((i) => i.toLowerCase()).includes(h.toLowerCase())
-  ).length;
-  const match = Math.min(0.5 + overlap * 0.2, 1);
-  if (overlap > 0) reason.push(`matches ${overlap} of your interests`);
+  // f_1 match (relevance): interest overlap + branch match + BM25 relevancy + CF.
+  const interestSet = new Set(ctx.interests.map(lc));
+  const tagOverlap = (post.hashtags ?? []).filter((h) => interestSet.has(lc(h))).length;
+  const branchMatch =
+    ctx.branch && (post.branch_tags ?? []).some((b) => lc(b) === lc(ctx.branch as string)) ? 1 : 0;
+  const rel = ctx.relevancy?.get(post.id) ?? 0;
+  const cf = ctx.cf?.get(post.id) ?? 0;
+  const match = Math.min(0.3 + tagOverlap * 0.18 + branchMatch * 0.25 + rel * 0.3 + cf * 0.25, 1);
+  if (tagOverlap > 0) reason.push(`matches ${tagOverlap} of your interests`);
+  if (branchMatch) reason.push(`relevant to ${ctx.branch}`);
+  if (cf > 0.01) reason.push("similar to posts you engaged with");
 
   // f_2 recency: exponential decay, half-life 24h.
   const recency = Math.exp(-ageHours(post.created_at) / 24);
 
-  // f_3 engagement rate, smoothed (+10 denominator avoids 1-view spikes).
-  const impressions = (post as PostWithAuthor & { impressions?: number }).impressions ?? 100;
+  // f_3 engagement rate, smoothed.
+  const impressions = (post as PostWithAuthor & { impressions?: number }).impressions ?? 30;
   const engagement =
     (post.like_count + 2 * post.comment_count + 4 * post.bookmark_count + 8 * post.repost_count) /
     (impressions + 10);
 
-  // f_4 author trust: verified gets a bump. Baseline 0.5.
-  const authorTrust = 0.5;
+  // f_4 author trust: verified + Personalised PageRank affinity.
+  const verified = (post.author as { verified?: boolean } | undefined)?.verified ? 1 : 0;
+  const ppr = ctx.ppr?.get(post.author_id) ?? 0;
+  const authorTrust = Math.min(0.35 + verified * 0.4 + ppr * 0.25, 1);
 
-  // f_5 diversity: penalise if primary tag repeats the last 3 served posts.
-  const primary = post.hashtags[0]?.toLowerCase();
+  // f_5 diversity: penalise if primary tag repeats recently served posts.
+  const primary = (post.hashtags ?? [])[0]?.toLowerCase();
   const diversity = primary && ctx.recentTags.includes(primary) ? 0.3 : 1;
 
-  // f_6 safety kill switch. 1.0 = clean (filter already dropped flagged ones).
+  // f_6 safety kill switch (read-feed already drops flagged posts).
   const safety = 1;
 
   const criteria: Array<[number, number]> = [
@@ -90,9 +105,8 @@ export function scorePost(
 }
 
 /**
- * diversifyTopK: greedy max-coverage to span >= 4 distinct hashtags,
- * then 1 reserved exploration slot (Thompson Sampling stub: pick a mid-score
- * post the greedy pass skipped).
+ * diversifyTopK: greedy max-coverage to span distinct hashtags, then a reserved
+ * exploration slot (Thompson-sampling stub: a mid-score post the greedy pass skipped).
  */
 export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   const sorted = [...scored].sort((a, b) => b.score - a.score);
@@ -103,20 +117,17 @@ export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
     if (picked.length >= k - 1) break;
     const primary = p.hashtags[0]?.toLowerCase();
     const addsCoverage = primary && !coveredTags.has(primary);
-    // Take it if it adds tag coverage OR we still need fill.
     if (addsCoverage || coveredTags.size >= 4) {
       picked.push(p);
       if (primary) coveredTags.add(primary);
     }
   }
 
-  // Fill remaining greedily by score.
   for (const p of sorted) {
     if (picked.length >= k - 1) break;
     if (!picked.includes(p)) picked.push(p);
   }
 
-  // Exploration slot: a mid-pack post not already picked.
   const remaining = sorted.filter((p) => !picked.includes(p));
   if (remaining.length > 0) {
     picked.push(remaining[Math.floor(remaining.length / 2)]);

@@ -5,6 +5,7 @@ import { Button } from "@/components/primitives/Button";
 import { Tag } from "@/components/primitives/Tag";
 import { Avatar } from "@/components/primitives/Avatar";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { compressImage, videoTooLarge } from "@/lib/media/compress";
 import { ImagePlus, Video, Hash, ArrowRight, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -21,6 +22,22 @@ interface PostComposerProps {
 interface ImagePreview {
   file: File;
   objectUrl: string;
+}
+
+type BrowserClient = NonNullable<ReturnType<typeof getSupabaseBrowser>>;
+
+// Upload one file to the post-media bucket under the user's folder (RLS requires
+// the first path segment to equal auth.uid()). Returns the public URL.
+async function uploadToBucket(sb: BrowserClient, userId: string, file: File): Promise<string | null> {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
+  const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await sb.storage.from("post-media").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data } = sb.storage.from("post-media").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export function PostComposer({ action }: PostComposerProps) {
@@ -81,6 +98,13 @@ export function PostComposer({ action }: PostComposerProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (videoTooLarge(file)) {
+      setVideoError("Video must be under 25 MB.");
+      setVideoFile(null);
+      if (videoInputRef.current) videoInputRef.current.value = "";
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     const vid = document.createElement("video");
     vid.preload = "metadata";
@@ -127,18 +151,50 @@ export function PostComposer({ action }: PostComposerProps) {
       e.preventDefault();
       if (isDemo || isPending) return;
 
-      const fd = new FormData();
-      fd.set("body", body);
-      fd.set("hashtags", hashtags.join(" "));
-
-      if (images.length > 0) {
-        images.forEach((p) => fd.append("images", p.file));
-      } else if (videoFile) {
-        fd.set("video", videoFile);
+      const sb = getSupabaseBrowser();
+      if (!sb) {
+        setServerError("Posting is not available right now.");
+        return;
       }
 
       setServerError(null);
       startTransition(async () => {
+        // 1. Resolve the user (storage paths must live under their id for RLS).
+        const {
+          data: { user },
+        } = await sb.auth.getUser();
+        if (!user) {
+          setServerError("Please sign in again.");
+          return;
+        }
+
+        // 2. Upload media CLIENT-SIDE straight to Supabase Storage.
+        let image_urls: string[] = [];
+        let video_url: string | null = null;
+        try {
+          if (images.length > 0) {
+            for (const p of images) {
+              const toUpload = await compressImage(p.file);
+              const url = await uploadToBucket(sb, user.id, toUpload);
+              if (url) image_urls.push(url);
+            }
+          } else if (videoFile) {
+            video_url = await uploadToBucket(sb, user.id, videoFile);
+          }
+        } catch (err) {
+          setServerError(
+            err instanceof Error ? `Upload failed: ${err.message}` : "Media upload failed."
+          );
+          return;
+        }
+
+        // 3. Send only text + URLs to the action (tiny payload, no size limit).
+        const fd = new FormData();
+        fd.set("body", body);
+        fd.set("hashtags", hashtags.join(" "));
+        fd.set("image_urls", JSON.stringify(image_urls));
+        if (video_url) fd.set("video_url", video_url);
+
         const result = await action(fd);
         if (result.ok) {
           resetForm();

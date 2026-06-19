@@ -2,9 +2,11 @@ import Link from "next/link";
 import { Nav } from "@/components/landing/Nav";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
-import { Heart, MessageCircle, Share2, Bookmark } from "lucide-react";
 import { Reveal } from "@/components/motion/Reveal";
-import { getPostByShortId } from "@/lib/db/posts";
+import { getPostByShortId, getPostComments } from "@/lib/db/posts";
+import { getMyEngagementState } from "@/lib/db/engagement";
+import { PostDetailActions } from "@/components/composite/PostDetailActions";
+import { CommentsSection } from "@/components/composite/CommentsSection";
 
 export default async function PostPage({ params }: { params: Promise<{ short_id: string }> }) {
   const { short_id } = await params;
@@ -24,6 +26,14 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
       </main>
     );
   }
+
+  const [engagement, comments] = await Promise.all([
+    getMyEngagementState([post.id]),
+    getPostComments(post.id),
+  ]);
+
+  const initialLiked = engagement.likes.has(post.id);
+  const initialSaved = engagement.bookmarks.has(post.id);
 
   return (
     <main className="min-h-dvh bg-cream">
@@ -66,13 +76,26 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
             </div>
           </Reveal>
         ) : null}
+
+        {/* Action bar: Like, Comment count, Bookmark, Share - all wired */}
         <Reveal delay={0.2}>
-          <div className="mt-10 flex items-center gap-6 border-t border-bone pt-6 text-sm text-ash">
-            <button className="flex items-center gap-1.5 hover:text-saffron"><Heart className="size-4" /> {post.like_count}</button>
-            <button className="flex items-center gap-1.5 hover:text-ink"><MessageCircle className="size-4" /> {post.comment_count}</button>
-            <button className="flex items-center gap-1.5 hover:text-ink"><Bookmark className="size-4" /> {post.bookmark_count}</button>
-            <button className="flex items-center gap-1.5 hover:text-ink"><Share2 className="size-4" /></button>
-          </div>
+          <PostDetailActions
+            postId={post.id}
+            shortId={post.short_id}
+            initialLiked={initialLiked}
+            initialSaved={initialSaved}
+            likeCount={post.like_count}
+            commentCount={post.comment_count}
+            bookmarkCount={post.bookmark_count}
+          />
+        </Reveal>
+
+        {/* Comments thread */}
+        <Reveal delay={0.25}>
+          <CommentsSection
+            postId={post.id}
+            initialComments={comments}
+          />
         </Reveal>
       </article>
     </main>

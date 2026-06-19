@@ -9,11 +9,32 @@ import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function signInEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const sb = getSupabaseBrowser();
+    if (!sb) {
+      setError("Sign in is not configured yet on this build.");
+      setLoading(false);
+      return;
+    }
+    const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+    location.href = "/home";
+  }
 
   async function signInGoogle() {
     setError(null);
@@ -80,7 +101,37 @@ export default function LoginPage() {
             Sign in to your portfolio. Pick up where you left off.
           </p>
 
-          <div className="mt-10 space-y-3">
+          <form onSubmit={signInEmail} className="mt-10 space-y-4">
+            <Input
+              label="Email"
+              type="email"
+              name="email"
+              placeholder="you@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+            <Input
+              label="Password"
+              type="password"
+              name="password"
+              placeholder="Your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+              Sign in <ArrowRight className="size-4" />
+            </Button>
+          </form>
+
+          <div className="my-8 flex items-center gap-4">
+            <span className="h-px flex-1 bg-bone" />
+            <span className="text-caption">or</span>
+            <span className="h-px flex-1 bg-bone" />
+          </div>
+
+          <div className="space-y-3">
             <Button
               variant="secondary"
               size="lg"

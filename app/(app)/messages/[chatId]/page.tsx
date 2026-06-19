@@ -4,9 +4,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { MessagesShell } from "@/components/composite/MessagesShell";
 import { MessageThread } from "@/components/composite/MessageThread";
 import { MessageComposer } from "@/components/composite/MessageComposer";
-import { MoreHorizontal } from "lucide-react";
-import { Reveal } from "@/components/motion/Reveal";
-import { mockMessages } from "@/lib/mockData";
+import { ChatMenu } from "@/components/composite/ChatMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -38,42 +36,27 @@ export default async function ChatPage({ params }: PageProps) {
     getMyConversations("requests"),
   ]);
 
-  const hasSupa = mainConvs.length > 0 || requestConvs.length > 0;
+  const inboxItems = mainConvs.map((c) => ({
+    id: c.id,
+    name: c.otherUser.name,
+    handle: c.otherUser.handle,
+    avatarUrl: c.otherUser.avatar_url ?? undefined,
+    last: c.lastMessage,
+    time: relativeTime(c.lastMessageAt),
+    unread: c.unreadCount > 0,
+    href: `/messages/${c.id}`,
+  }));
 
-  const inboxItems = hasSupa
-    ? mainConvs.map((c) => ({
-        id: c.id,
-        name: c.otherUser.name,
-        handle: c.otherUser.handle,
-        avatarUrl: c.otherUser.avatar_url ?? undefined,
-        last: c.lastMessage,
-        time: relativeTime(c.lastMessageAt),
-        unread: c.unreadCount > 0,
-        href: `/messages/${c.id}`,
-      }))
-    : mockMessages.map((m) => ({
-        id: m.id,
-        name: m.name,
-        handle: "",
-        avatarUrl: undefined,
-        last: m.last,
-        time: m.time,
-        unread: m.unread,
-        href: `/messages/${m.id}`,
-      }));
-
-  const requestItems = hasSupa
-    ? requestConvs.map((c) => ({
-        id: c.id,
-        name: c.otherUser.name,
-        handle: c.otherUser.handle,
-        avatarUrl: c.otherUser.avatar_url ?? undefined,
-        last: c.lastMessage,
-        time: relativeTime(c.lastMessageAt),
-        unread: c.unreadCount > 0,
-        href: `/messages/requests`,
-      }))
-    : [];
+  const requestItems = requestConvs.map((c) => ({
+    id: c.id,
+    name: c.otherUser.name,
+    handle: c.otherUser.handle,
+    avatarUrl: c.otherUser.avatar_url ?? undefined,
+    last: c.lastMessage,
+    time: relativeTime(c.lastMessageAt),
+    unread: c.unreadCount > 0,
+    href: `/messages/requests`,
+  }));
 
   // Find the other participant from the active conversation
   const activeConv =
@@ -159,9 +142,10 @@ export default async function ChatPage({ params }: PageProps) {
           ) : (
             <div className="h-9" />
           )}
-          <button className="rounded-full p-2 transition-colors hover:bg-bone">
-            <MoreHorizontal className="size-4 text-ash" />
-          </button>
+          <ChatMenu
+            conversationId={chatId}
+            otherUserId={(otherUser as { id?: string } | null)?.id ?? null}
+          />
         </header>
 
         <MessageThread

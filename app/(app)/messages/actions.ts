@@ -8,6 +8,7 @@ import {
   markRead,
   blockUser,
   unblockUser,
+  muteConversation,
 } from "@/lib/db/messages";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { DMPermission } from "@/lib/supabase/types";
@@ -15,33 +16,15 @@ import type { DMPermission } from "@/lib/supabase/types";
 export async function sendMessageAction(formData: FormData) {
   const conversationId = formData.get("conversationId") as string;
   const body = formData.get("body") as string;
-  const imageFile = formData.get("image") as File | null;
+  // Image is uploaded client-side directly to Storage; we only receive the URL
+  // (so files never hit the Server Action's 1MB body limit).
+  const imageUrl = (formData.get("image_url") as string | null)?.trim() || undefined;
 
-  if (!conversationId || !body?.trim()) {
+  if (!conversationId || (!body?.trim() && !imageUrl)) {
     return { ok: false, error: "Missing fields" };
   }
 
-  let imageUrl: string | undefined;
-
-  if (imageFile && imageFile.size > 0) {
-    const sb = await getSupabaseServer();
-    if (sb) {
-      const ext = imageFile.name.split(".").pop() ?? "jpg";
-      const path = `${conversationId}/${Date.now()}.${ext}`;
-      const { data: uploaded, error: uploadErr } = await sb.storage
-        .from("message-media")
-        .upload(path, imageFile, { upsert: false });
-
-      if (!uploadErr && uploaded) {
-        const { data: publicData } = sb.storage
-          .from("message-media")
-          .getPublicUrl(uploaded.path);
-        imageUrl = publicData.publicUrl;
-      }
-    }
-  }
-
-  const result = await sendMessage({ conversationId, body: body.trim(), imageUrl });
+  const result = await sendMessage({ conversationId, body: (body ?? "").trim(), imageUrl });
   revalidatePath(`/messages/${conversationId}`);
   revalidatePath("/messages");
   return result;
@@ -71,6 +54,15 @@ export async function markReadAction(
   conversationId: string
 ): Promise<{ ok: boolean }> {
   return markRead(conversationId);
+}
+
+export async function muteConversationAction(
+  conversationId: string,
+  muted: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await muteConversation(conversationId, muted);
+  if (result.ok) revalidatePath(`/messages/${conversationId}`);
+  return result;
 }
 
 export async function blockUserAction(

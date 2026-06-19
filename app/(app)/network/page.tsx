@@ -1,19 +1,25 @@
+import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
-import { Button } from "@/components/primitives/Button";
 import { PersonCard } from "@/components/composite/PersonCard";
 import { NetworkTabs } from "@/components/composite/NetworkTabs";
 import { getMyConnections, getSuggestedConnections } from "@/lib/db/social";
-import { UserPlus } from "lucide-react";
+import { getMyProfile } from "@/lib/db/profiles";
+import { ShareButton } from "@/components/composite/ShareButton";
 
 export default async function NetworkPage() {
-  const [connections, followers, following, pending, suggested] =
+  const [connections, followers, following, pending, suggested, profile] =
     await Promise.all([
       getMyConnections("all"),
       getMyConnections("followers"),
       getMyConnections("following"),
       getMyConnections("pending"),
       getSuggestedConnections(8),
+      getMyProfile(),
     ]);
+
+  const collegeQuery = profile?.college
+    ? `?college=${encodeURIComponent(profile.college)}`
+    : "";
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -27,10 +33,16 @@ export default async function NetworkPage() {
               <span className="italic text-saffron">in your orbit.</span>
             </h1>
             <div className="flex gap-3">
-              <Button variant="secondary" size="md">
-                <UserPlus className="size-4" /> Invite
-              </Button>
-              <Button size="md">Find from college</Button>
+              {/* Invite - copies the app origin as an invite link */}
+              <ShareButton path="/" label="Invite" className="border-bone bg-paper text-ink" />
+
+              {/* Find from college - links to /explore filtered by the viewer's college */}
+              <Link
+                href={`/explore${collegeQuery}`}
+                className="inline-flex items-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron/90 active:scale-95"
+              >
+                Find from college
+              </Link>
             </div>
           </div>
         </div>
