@@ -120,6 +120,14 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <div className="flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-ash underline underline-offset-4 hover:text-saffron"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
               Sign in <ArrowRight className="size-4" />
             </Button>
