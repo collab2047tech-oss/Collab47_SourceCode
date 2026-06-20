@@ -2,18 +2,30 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Home, Compass, Users, Briefcase, MessageSquare, Newspaper } from "lucide-react";
 
-type NavLink = { href: string; label: string; icon: LucideIcon };
+// NOTE: links (and their icon components) are defined HERE in the client
+// component on purpose. PublicTopNav is a Server Component, and passing lucide
+// icon *functions* across the server->client prop boundary throws at runtime
+// ("Functions cannot be passed to Client Components"), 500-ing every public
+// page for signed-in users.
+const LINKS = [
+  { href: "/home", label: "Home", icon: Home },
+  { href: "/explore", label: "Explore", icon: Compass },
+  { href: "/news", label: "News", icon: Newspaper },
+  { href: "/network", label: "Network", icon: Users },
+  { href: "/collabs", label: "Collabs", icon: Briefcase },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
+];
 
 /**
  * Hamburger menu for the signed-in PublicTopNav. Gives mobile users a way to
  * reach the core app destinations from a public page (where the sidebar/bottom
  * nav of AppShell is not present). Hidden on lg+ where inline links show.
  */
-export function PublicMobileMenu({ links }: { links: NavLink[] }) {
+export function PublicMobileMenu() {
   const [open, setOpen] = useState(false);
+  const links = LINKS;
 
   useEffect(() => {
     if (!open) return;

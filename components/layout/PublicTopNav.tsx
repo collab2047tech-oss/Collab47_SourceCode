@@ -75,8 +75,9 @@ export async function PublicTopNav() {
               className="ring-2 ring-bone transition-all hover:ring-saffron/40"
             />
           </Link>
-          {/* Mobile menu: exposes app navigation on small screens. */}
-          <PublicMobileMenu links={LINKS} />
+          {/* Mobile menu: exposes app navigation on small screens.
+              (Defines its own links — passing icon fns server->client 500s.) */}
+          <PublicMobileMenu />
         </div>
       </div>
     </header>
