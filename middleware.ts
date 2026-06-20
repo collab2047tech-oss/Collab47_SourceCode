@@ -42,8 +42,9 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // Signed in user hitting /login or /signup -> redirect home
-  if (user && (path === "/login" || path === "/signup")) {
+  // Signed in user hitting the landing page / login / signup -> straight to the
+  // app feed (LinkedIn-style: logged-in users never see the marketing homepage).
+  if (user && (path === "/" || path === "/login" || path === "/signup")) {
     const url = req.nextUrl.clone();
     url.pathname = "/home";
     return NextResponse.redirect(url);
