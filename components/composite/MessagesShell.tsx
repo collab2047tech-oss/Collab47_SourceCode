@@ -44,7 +44,7 @@ export function MessagesShell({
   return (
     <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem-3.5rem)] md:h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden md:-mx-8 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
       {/* Left rail — full width on mobile, fixed rail on md+ */}
-      <aside className="flex min-w-0 flex-col bg-paper md:border-r md:border-bone">
+      <aside className="flex min-h-0 min-w-0 flex-col bg-paper md:border-r md:border-bone">
         <div className="p-4 sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-2xl text-ink">Messages</h2>

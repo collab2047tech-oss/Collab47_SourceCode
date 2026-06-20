@@ -94,7 +94,7 @@ export default async function ChatPage({ params }: PageProps) {
   return (
     <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem-3.5rem)] md:h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden md:-mx-8 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
       {/* Left rail (conversation list) — hidden on mobile; the thread is the page */}
-      <aside className="hidden min-w-0 flex-col border-r border-bone bg-paper md:flex">
+      <aside className="hidden min-h-0 min-w-0 flex-col border-r border-bone bg-paper md:flex">
         <div className="p-4 sm:p-5">
           <h2 className="font-serif text-2xl text-ink">Messages</h2>
           <div className="mt-4 flex gap-1 rounded-lg bg-cream p-1">
@@ -148,8 +148,8 @@ export default async function ChatPage({ params }: PageProps) {
         </div>
       </aside>
 
-      {/* Right pane — full width on mobile */}
-      <section className="flex min-w-0 flex-col bg-cream">
+      {/* Right pane — full width on mobile. min-h-0 lets the thread scroll. */}
+      <section className="flex min-h-0 min-w-0 flex-col bg-cream">
         <header className="flex items-center justify-between gap-2 border-b border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Mobile-only back arrow to the conversation list */}
