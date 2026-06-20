@@ -12,11 +12,10 @@ import { getNewsForUser } from "@/lib/news/fetch";
 import { toCardPost, relativeTime } from "@/lib/ui/toCardPost";
 import { createPostAction } from "./actions";
 import {
-  Users,
-  Briefcase,
   TrendingUp,
   ExternalLink,
-  UserCheck,
+  Sparkles,
+  Hash,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -70,94 +69,132 @@ export default async function HomePage() {
     .map(([tag, count]) => ({ tag, count }));
 
   const brief = newsRaw[0] ?? null;
+  const interests = profile?.interests ?? [];
 
-  const displayName = profile?.name ?? "You";
-  const displayHandle = profile?.handle ?? "";
-  const displayCollege = profile?.college ?? "";
-  const displayBranch = profile?.branch ?? "";
+  // ---------------------------------------------------------------------------
+  // Right-rail building blocks. Defined once, reused in the desktop rail and the
+  // slimmed mobile rail below the feed (no overflow at 360px).
+  // ---------------------------------------------------------------------------
+
+  const trendingCard =
+    trending.length > 0 ? (
+      <section className="card card-hover px-4 py-4">
+        <div className="mb-3 flex items-center gap-2">
+          <TrendingUp className="size-3.5 text-saffron" />
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-ash">Trending</p>
+        </div>
+        <div className="space-y-1">
+          {trending.map((t) => (
+            <Link
+              key={t.tag}
+              href={`/explore?q=%23${encodeURIComponent(t.tag)}`}
+              className="group -mx-1.5 flex items-center justify-between gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-bone/50"
+            >
+              <span className="flex min-w-0 items-center gap-1 text-sm font-medium text-ink transition-colors group-hover:text-saffron">
+                <Hash className="size-3 shrink-0 text-ash transition-colors group-hover:text-saffron" />
+                <span className="truncate">{t.tag}</span>
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-ash">{t.count} posts</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    ) : null;
+
+  const peopleCard =
+    suggested.length > 0 ? (
+      <section className="card card-hover px-4 py-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-ash">
+            People to follow
+          </p>
+          <Link href="/network" className="text-[11px] font-medium text-saffron hover:text-saffron-dk transition-colors">
+            See all
+          </Link>
+        </div>
+        <div className="space-y-1">
+          {suggested.map((p) => (
+            <Link
+              key={p.id}
+              href={`/u/${p.handle}`}
+              className="group -mx-1.5 flex items-center gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-bone/50"
+            >
+              <Avatar name={p.name} src={p.avatar_url ?? undefined} size="sm" className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-ink transition-colors group-hover:text-saffron">
+                  {p.name}
+                </p>
+                <p className="truncate text-xs text-ash">
+                  {[p.branch, p.college].filter(Boolean).join(" - ")}
+                </p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+    ) : null;
+
+  const interestsCard =
+    interests.length > 0 ? (
+      <section className="card card-hover px-4 py-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Sparkles className="size-3.5 text-saffron" />
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-ash">
+            Your interests
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {interests.slice(0, 10).map((interest) => (
+            <Link key={interest} href={`/explore?q=${encodeURIComponent(interest)}`}>
+              <Tag
+                variant="outline"
+                className="text-[11px] transition-colors hover:border-saffron/40 hover:text-saffron"
+              >
+                {interest}
+              </Tag>
+            </Link>
+          ))}
+        </div>
+      </section>
+    ) : null;
+
+  const briefCard = brief ? (
+    <section className="card card-hover px-4 py-4">
+      <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-ash">Daily brief</p>
+      <a href={brief.url} target="_blank" rel="noopener noreferrer" className="group block">
+        <div className="mb-2 flex items-center gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-saffron">
+            {brief.source}
+          </span>
+          <span className="select-none text-bone">&middot;</span>
+          <span className="text-xs text-ash">{relativeTime(brief.published_at)}</span>
+        </div>
+        <h3
+          className="text-sm font-medium leading-snug text-ink transition-colors group-hover:text-saffron"
+          style={{ fontFamily: "var(--font-serif)" }}
+        >
+          {brief.title}
+        </h3>
+        <div className="mt-2 flex items-center gap-1 text-xs text-ash transition-colors group-hover:text-saffron">
+          <ExternalLink className="size-3" />
+          <span>Read more</span>
+        </div>
+      </a>
+    </section>
+  ) : null;
 
   return (
-    <div className="mx-auto max-w-7xl">
-      {/* 3-column grid: left sidebar | center feed | right rail */}
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr_280px] xl:grid-cols-[260px_1fr_300px]">
+    <div className="mx-auto max-w-270">
+      {/* Centered two-column layout on lg+: [feed 1fr | right rail 320px].
+          Single column on mobile (feed first, slimmed rail below). */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 
-        {/* ------------------------------------------------------------------ */}
-        {/* LEFT SIDEBAR - "You" mini-card + quick links                        */}
-        {/* ------------------------------------------------------------------ */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-24 space-y-4">
-
-            {/* Profile card */}
-            <div className="overflow-hidden rounded-xl border border-bone bg-paper">
-              {/* Cover strip */}
-              <div className="h-14 bg-linear-to-br from-saffron/20 via-bone to-cream" />
-
-              <div className="px-4 pb-4 -mt-6">
-                <Link href="/profile" className="inline-block">
-                  <Avatar
-                    name={displayName}
-                    src={profile?.avatar_url ?? undefined}
-                    size="lg"
-                    className="ring-2 ring-paper ring-offset-0 hover:ring-saffron/30 transition-all"
-                  />
-                </Link>
-
-                <div className="mt-2">
-                  <Link
-                    href="/profile"
-                    className="block text-sm font-semibold text-ink hover:text-saffron transition-colors leading-tight"
-                  >
-                    {displayName}
-                  </Link>
-                  {displayHandle ? (
-                    <p className="text-xs text-ash mt-0.5">@{displayHandle}</p>
-                  ) : null}
-                  {(displayCollege || displayBranch) ? (
-                    <p className="text-xs text-ash mt-1 leading-snug">
-                      {[displayBranch, displayCollege].filter(Boolean).join(" - ")}
-                    </p>
-                  ) : null}
-                </div>
-
-                {/* Quick nav links */}
-                <div className="mt-4 space-y-0.5">
-                  <SidebarLink href="/profile" icon={<UserCheck className="size-3.5" />}>
-                    Profile
-                  </SidebarLink>
-                  <SidebarLink href="/network" icon={<Users className="size-3.5" />}>
-                    Network
-                  </SidebarLink>
-                  <SidebarLink href="/collabs" icon={<Briefcase className="size-3.5" />}>
-                    Collabs
-                  </SidebarLink>
-                </div>
-              </div>
-            </div>
-
-            {/* Interests tags */}
-            {profile?.interests && profile.interests.length > 0 ? (
-              <div className="rounded-xl border border-bone bg-paper px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-ash mb-3">
-                  Your interests
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {profile.interests.slice(0, 8).map((interest) => (
-                    <Tag key={interest} variant="outline" className="text-[11px]">
-                      {interest}
-                    </Tag>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </aside>
-
-        {/* ------------------------------------------------------------------ */}
-        {/* CENTER - Composer + tabs + feed                                     */}
-        {/* ------------------------------------------------------------------ */}
+        {/* ---------------------------------------------------------------- */}
+        {/* CENTER — composer + tabs + feed                                  */}
+        {/* ---------------------------------------------------------------- */}
         <div className="min-w-0">
           <Reveal>
-            <div className="mb-0">
+            <div id="composer" className="scroll-mt-24">
               <PostComposer action={createPostAction} />
             </div>
           </Reveal>
@@ -169,135 +206,33 @@ export default async function HomePage() {
             trending={trendingPosts}
             currentUserId={profile?.id ?? ""}
           />
+
+          {/* Mobile-only slimmed rail below the feed. Keeps the most useful
+              discovery surfaces (People + Daily brief) without clutter. */}
+          {(peopleCard || briefCard) ? (
+            <div className="mt-6 space-y-4 lg:hidden">
+              <Reveal>
+                <div className="space-y-4">
+                  {peopleCard}
+                  {briefCard}
+                </div>
+              </Reveal>
+            </div>
+          ) : null}
         </div>
 
-        {/* ------------------------------------------------------------------ */}
-        {/* RIGHT RAIL - Trending + People + Daily brief                        */}
-        {/* ------------------------------------------------------------------ */}
+        {/* ---------------------------------------------------------------- */}
+        {/* RIGHT RAIL — Trending + People + Interests + Daily brief         */}
+        {/* ---------------------------------------------------------------- */}
         <aside className="hidden lg:block">
           <div className="sticky top-24 space-y-4">
-
-            {/* Trending hashtags */}
-            {trending.length > 0 ? (
-              <Reveal>
-                <section className="rounded-xl border border-bone bg-paper px-4 py-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="size-3.5 text-saffron" />
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-ash">
-                      Trending
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {trending.map((t) => (
-                      <div key={t.tag} className="flex items-center justify-between gap-2 group">
-                        <span className="text-sm font-medium text-ink group-hover:text-saffron transition-colors truncate">
-                          #{t.tag}
-                        </span>
-                        <span className="text-xs text-ash tabular-nums shrink-0">{t.count} posts</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </Reveal>
-            ) : null}
-
-            {/* People to follow */}
-            {suggested.length > 0 ? (
-              <Reveal delay={0.08}>
-                <section className="rounded-xl border border-bone bg-paper px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-ash mb-3">
-                    People to follow
-                  </p>
-                  <div className="space-y-3">
-                    {suggested.map((p) => (
-                      <Link
-                        key={p.id}
-                        href={`/u/${p.handle}`}
-                        className="flex items-center gap-2.5 rounded-lg p-1.5 -mx-1.5 transition-colors hover:bg-bone/50 group"
-                      >
-                        <Avatar
-                          name={p.name}
-                          src={p.avatar_url ?? undefined}
-                          size="sm"
-                          className="shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-ink group-hover:text-saffron transition-colors">
-                            {p.name}
-                          </p>
-                          <p className="truncate text-xs text-ash">
-                            {[p.branch, p.college].filter(Boolean).join(" - ")}
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              </Reveal>
-            ) : null}
-
-            {/* Daily brief */}
-            {brief ? (
-              <Reveal delay={0.15}>
-                <section className="rounded-xl border border-bone bg-paper px-4 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-ash mb-3">
-                    Daily brief
-                  </p>
-                  <a
-                    href={brief.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group block"
-                  >
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-widest text-saffron">
-                        {brief.source}
-                      </span>
-                      <span className="text-bone select-none">&middot;</span>
-                      <span className="text-xs text-ash">{relativeTime(brief.published_at)}</span>
-                    </div>
-                    <h3
-                      className="text-sm font-medium leading-snug text-ink group-hover:text-saffron transition-colors"
-                      style={{ fontFamily: "var(--font-serif)" }}
-                    >
-                      {brief.title}
-                    </h3>
-                    <div className="mt-2 flex items-center gap-1 text-xs text-ash group-hover:text-saffron transition-colors">
-                      <ExternalLink className="size-3" />
-                      <span>Read more</span>
-                    </div>
-                  </a>
-                </section>
-              </Reveal>
-            ) : null}
-
+            {trendingCard ? <Reveal>{trendingCard}</Reveal> : null}
+            {peopleCard ? <Reveal delay={0.06}>{peopleCard}</Reveal> : null}
+            {interestsCard ? <Reveal delay={0.12}>{interestsCard}</Reveal> : null}
+            {briefCard ? <Reveal delay={0.18}>{briefCard}</Reveal> : null}
           </div>
         </aside>
       </div>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Left sidebar link
-// ---------------------------------------------------------------------------
-
-function SidebarLink({
-  href,
-  icon,
-  children,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-ash transition-colors hover:bg-bone hover:text-ink"
-    >
-      <span className="shrink-0 text-ash">{icon}</span>
-      {children}
-    </Link>
   );
 }

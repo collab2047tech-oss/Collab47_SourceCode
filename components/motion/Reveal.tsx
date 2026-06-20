@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import { useRef } from "react";
 
 interface RevealProps {
@@ -20,20 +20,77 @@ export function Reveal({
 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once, margin: "-80px" });
+  const reduce = useReducedMotion();
+
+  // motion/react animates via inline transforms (not CSS transitions), so the
+  // global prefers-reduced-motion CSS safety net does NOT catch it. Guard here:
+  // when the user prefers reduced motion, render statically with no offset.
+  const offset = reduce ? 0 : y;
 
   return (
     <motion.div
       ref={ref}
-      initial={{ opacity: 0, y }}
+      initial={{ opacity: 0, y: offset }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{
-        duration: 0.7,
-        delay,
+        duration: reduce ? 0 : 0.7,
+        delay: reduce ? 0 : delay,
         ease: [0.16, 1, 0.3, 1],
       }}
       className={className}
     >
       {children}
     </motion.div>
+  );
+}
+
+interface StaggerProps {
+  children: React.ReactNode;
+  className?: string;
+  /** Per-child delay step in seconds. */
+  step?: number;
+  /** Delay before the first child animates, in seconds. */
+  delay?: number;
+  y?: number;
+  once?: boolean;
+}
+
+/**
+ * Reveals direct children in sequence as the group scrolls into view.
+ * Each child fades + rises with an incremental delay. Respects
+ * prefers-reduced-motion (renders static, no offset, no delay).
+ *
+ * Usage: <Stagger><Item/><Item/><Item/></Stagger>
+ */
+export function Stagger({
+  children,
+  className,
+  step = 0.08,
+  delay = 0,
+  y = 16,
+  once = true,
+}: StaggerProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once, margin: "-80px" });
+  const reduce = useReducedMotion();
+  const items = Array.isArray(children) ? children : [children];
+
+  return (
+    <div ref={ref} className={className}>
+      {items.map((child, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: reduce ? 0 : y }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{
+            duration: reduce ? 0 : 0.6,
+            delay: reduce ? 0 : delay + i * step,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+        >
+          {child}
+        </motion.div>
+      ))}
+    </div>
   );
 }

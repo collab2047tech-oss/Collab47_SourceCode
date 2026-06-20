@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
 import { Tag } from "@/components/primitives/Tag";
-import { Reveal } from "@/components/motion/Reveal";
+import { Reveal, Stagger } from "@/components/motion/Reveal";
 import { PublicTopNav } from "@/components/layout/PublicTopNav";
 import { MapPin, GraduationCap, ExternalLink, BadgeCheck, MessageCircle, Heart, Pin, Globe, Github, Linkedin, Instagram, Twitter, Youtube } from "lucide-react";
 import { getProfileByHandle } from "@/lib/db/profiles";
@@ -105,16 +105,25 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       <PublicTopNav />
       <div className="container-edit pt-32 pb-20">
         <Reveal>
-          <div className="-mx-4 h-40 bg-[linear-gradient(135deg,#0B1220_0%,#0A0F1C_100%)] md:-mx-8 md:h-56" />
+          <div className="relative -mx-6 h-40 overflow-hidden bg-[linear-gradient(135deg,#0B1220_0%,#0A0F1C_100%)] sm:h-48 md:-mx-10 md:h-56 xl:-mx-16">
+            {/* Cobalt accent glow - top right, mirrors the owner profile cover */}
+            <div
+              className="pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-20"
+              style={{
+                background:
+                  "radial-gradient(ellipse at 80% 20%, #2C5BFF 0%, transparent 60%)",
+              }}
+            />
+          </div>
         </Reveal>
 
         <Reveal delay={0.1}>
-          <div className="-mt-16 flex flex-col gap-6 md:-mt-20 md:flex-row md:items-end md:justify-between">
-            <div className="flex flex-col items-start gap-4">
+          <div className="-mt-14 flex flex-col gap-6 sm:-mt-16 md:-mt-20 md:flex-row md:items-end md:justify-between">
+            <div className="flex min-w-0 flex-col items-start gap-4">
               <Avatar name={profile.name} src={profile.avatar_url ?? undefined} size="2xl" className="ring-4 ring-cream" />
-              <div>
-                <div className="flex flex-wrap items-baseline gap-3">
-                  <h1 className="font-serif text-4xl text-ink md:text-5xl">{profile.name}</h1>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h1 className="font-serif text-3xl text-ink wrap-break-word sm:text-4xl md:text-5xl">{profile.name}</h1>
                   {profile.verified ? <Tag variant="saffron">Verified</Tag> : null}
                 </div>
                 <p className="mt-1 text-sm text-ash">@{profile.handle}</p>
@@ -143,7 +152,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                         rel="noopener noreferrer"
                         aria-label={label}
                         title={label}
-                        className="flex size-9 items-center justify-center rounded-full border border-bone bg-paper text-ash transition-colors hover:border-saffron hover:text-saffron-dk"
+                        className="flex size-10 items-center justify-center rounded-full border border-bone bg-paper text-ash transition-all hover:-translate-y-0.5 hover:border-saffron hover:text-saffron-dk active:scale-95"
                       >
                         <Icon className="size-4" />
                       </a>
@@ -162,19 +171,28 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         </Reveal>
 
         <Reveal delay={0.2}>
-          <div className="mt-12 flex flex-col gap-6">
+          <div className="mt-12">
+            <div className="mb-5 flex items-center gap-2 border-b border-bone pb-3">
+              <h2 className="text-caption text-ash">Recent posts</h2>
+              {posts.length > 0 ? (
+                <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-semibold tabular-nums leading-none text-ash">
+                  {posts.length}
+                </span>
+              ) : null}
+            </div>
             {posts.length === 0 ? (
               <div className="rounded-xl border border-bone bg-paper p-10 text-center">
                 <p className="text-ash">No posts yet.</p>
               </div>
             ) : (
-              posts.map((p) => {
+              <Stagger className="flex flex-col gap-6" step={0.06}>
+              {posts.map((p) => {
                 const image = p.image_urls?.[0];
                 return (
                   <Link
                     key={p.id}
                     href={`/p/${p.short_id}`}
-                    className="group block overflow-hidden rounded-xl border border-bone bg-paper p-5 transition-all hover:border-saffron md:p-6"
+                    className="group block overflow-hidden rounded-xl border border-bone bg-paper p-5 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm md:p-6"
                   >
                     {p.is_pinned ? (
                       <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-ash">
@@ -214,13 +232,14 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                       <span className="flex items-center gap-1.5">
                         <MessageCircle className="size-4" /> {p.comment_count ?? 0}
                       </span>
-                      <span className="ml-auto flex items-center gap-1 text-xs text-ash opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="ml-auto flex items-center gap-1 text-xs text-ash opacity-70 transition-opacity group-hover:opacity-100 sm:opacity-0">
                         View post <ExternalLink className="size-3" />
                       </span>
                     </div>
                   </Link>
                 );
-              })
+              })}
+              </Stagger>
             )}
           </div>
         </Reveal>
@@ -228,11 +247,14 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         {verifiedProjects.length > 0 && (
           <Reveal delay={0.3}>
             <div className="mt-16">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 border-b border-bone pb-3">
                 <BadgeCheck className="size-4 text-saffron" />
                 <h2 className="text-caption text-ash">Verified contributions</h2>
+                <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-semibold tabular-nums leading-none text-ash">
+                  {verifiedProjects.length}
+                </span>
               </div>
-              <div className="mt-4 flex flex-col gap-3">
+              <div className="mt-5 flex flex-col gap-3">
                 {(verifiedProjects as unknown as Array<{
                   role: string;
                   project: {
@@ -246,7 +268,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                 }>).map((m) => (
                   <div
                     key={m.project.id}
-                    className="flex items-start justify-between gap-4 rounded-lg border border-bone bg-paper px-5 py-4"
+                    className="flex items-start justify-between gap-4 rounded-lg border border-bone bg-paper px-5 py-4 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm"
                   >
                     <div>
                       <div className="flex items-center gap-2">

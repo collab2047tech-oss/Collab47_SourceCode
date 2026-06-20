@@ -59,23 +59,23 @@ export function NotificationItem({
       href={item.href}
       onClick={handleClick}
       className={cn(
-        "flex items-start gap-4 rounded-md px-2 py-5 transition-colors hover:bg-paper",
+        "flex items-start gap-3 rounded-md px-2 py-4 transition-colors hover:bg-paper active:bg-bone/40 sm:gap-4 sm:py-5",
         unread ? "bg-saffron/5" : ""
       )}
     >
-      <div className="relative flex size-10 items-center justify-center rounded-full bg-bone">
+      <div className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-bone">
         {icon}
         {unread ? (
           <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-saffron ring-2 ring-cream" />
         ) : null}
       </div>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <p className="text-base text-ink">
           <span className="font-semibold">{item.who}</span> {item.text}
         </p>
         <p className="mt-1 text-xs text-ash">{item.when}</p>
       </div>
-      <Avatar name={item.who} size="sm" />
+      <Avatar name={item.who} size="sm" className="hidden shrink-0 sm:inline-flex" />
     </a>
   );
 }

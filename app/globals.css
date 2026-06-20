@@ -151,6 +151,51 @@ body {
 
 .tabular-nums { font-variant-numeric: tabular-nums; }
 
+/* ------------------------------------------------------------
+   SHARED COMPONENT UTILITIES (added for surface agents).
+   Canonical building blocks so every surface stays consistent.
+   These are additive — they do not touch the tokens above.
+   ------------------------------------------------------------ */
+
+/* Canonical card: hairline bone border on white paper, lg radius. */
+.card {
+  border: 1px solid var(--color-bone);
+  background: var(--color-paper);
+  border-radius: var(--radius-lg);
+}
+
+/* Card interaction: subtle lift + cobalt-tinted border on hover.
+   Pair with .card. Transform is disabled under reduced-motion below. */
+.card-hover {
+  transition: transform 0.2s var(--ease-out-soft),
+              border-color 0.2s var(--ease-out-soft),
+              box-shadow 0.2s var(--ease-out-soft);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-saffron) 40%, transparent);
+}
+
+/* Hairline dividers (editorial bone rules). */
+.hairline { border-color: var(--color-bone); }
+.hairline-t { border-top: 1px solid var(--color-bone); }
+.hairline-b { border-bottom: 1px solid var(--color-bone); }
+
+/* Minimum 44px tap target for mobile controls (>= the 40px floor). */
+.tap { min-height: 2.75rem; min-width: 2.75rem; }
+
+/* Trivial staggered-list helper: declare --stagger-i on each child
+   (e.g. style={{ "--stagger-i": i }}) to fan-in list items on mount.
+   No-op under reduced-motion (animation killed in the block below). */
+.stagger > * {
+  animation: c47-fade-up 0.6s var(--ease-out-soft) both;
+  animation-delay: calc(var(--stagger-i, 0) * 60ms);
+}
+@keyframes c47-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Container */
 .container-edit {
   width: 100%;
@@ -193,13 +238,17 @@ body {
   border-radius: 4px;
 }
 
-/* Reduced motion */
+/* Reduced motion — global safety net. Collapses animation/transition
+   timing AND neutralizes hover/stagger transforms so nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .card-hover:hover { transform: none !important; }
+  .stagger > * { animation: none !important; }
 }
 
 /* Hide scrollbar on smooth-scroll containers */

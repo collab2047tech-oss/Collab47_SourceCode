@@ -9,18 +9,18 @@ import Link from "next/link";
 export function Hero() {
   return (
     <section className="relative min-h-dvh overflow-hidden bg-cream">
-      <div className="container-edit pt-40 md:pt-56">
+      <div className="container-edit pt-32 sm:pt-40 md:pt-56">
         {/* Caption */}
         <Reveal>
-          <div className="rule-top mb-10 max-w-md">
+          <div className="rule-top mb-8 max-w-md sm:mb-10">
             <p className="text-caption">
               Built in India . For India&apos;s students
             </p>
           </div>
         </Reveal>
 
-        {/* Headline */}
-        <h1 className="text-display-lg md:text-display-xl text-ink">
+        {/* Headline — clamp down hard on phones so it never overflows at 360px */}
+        <h1 className="text-[2.65rem] leading-[1.04] tracking-tight font-serif text-ink sm:text-display-lg md:text-display-xl">
           <SplitWords text="The professional network" />
           <br />
           <SplitWords text="Indian students" delay={0.15} />{" "}
@@ -33,7 +33,7 @@ export function Hero() {
 
         {/* Sub */}
         <Reveal delay={0.6}>
-          <p className="mt-10 max-w-2xl text-body-lg text-ash">
+          <p className="mt-8 max-w-2xl text-body-lg text-ash sm:mt-10">
             Show what you build, follow the work that matters in your field, and
             find the few people you actually want to build with.
           </p>
@@ -41,19 +41,19 @@ export function Hero() {
 
         {/* CTAs */}
         <Reveal delay={0.75}>
-          <div className="mt-14 flex flex-wrap items-center gap-5">
-            <MagneticButton>
+          <div className="mt-10 flex flex-col items-stretch gap-4 sm:mt-14 sm:flex-row sm:flex-wrap sm:items-center sm:gap-5">
+            <MagneticButton className="w-full sm:w-auto">
               <Link
                 href="/signup"
-                className="inline-flex h-16 items-center gap-3 rounded-full bg-ink px-10 text-xl text-cream transition-colors hover:bg-saffron"
+                className="inline-flex h-14 w-full items-center justify-center gap-3 rounded-full bg-ink px-8 text-lg text-cream transition-colors hover:bg-saffron active:scale-[0.98] sm:h-16 sm:w-auto sm:justify-start sm:px-10 sm:text-xl"
               >
                 Build your portfolio
-                <ArrowRight className="size-6" />
+                <ArrowRight className="size-5 sm:size-6" />
               </Link>
             </MagneticButton>
             <Link
               href="#how-it-works"
-              className="inline-flex h-16 items-center gap-2 px-2 text-xl text-ink underline underline-offset-8 decoration-saffron decoration-2"
+              className="inline-flex h-12 items-center justify-center gap-2 px-2 text-lg text-ink underline underline-offset-8 decoration-saffron decoration-2 sm:h-16 sm:justify-start sm:text-xl"
             >
               How it works
             </Link>
@@ -62,8 +62,9 @@ export function Hero() {
 
         {/* Bottom row */}
         <Reveal delay={0.95}>
-          <div className="mt-32 flex flex-wrap items-end justify-end gap-6 border-t border-bone pt-8">
-            <p className="font-indic text-xl text-ink">
+          <div className="mt-20 flex flex-wrap items-end justify-between gap-6 border-t border-bone pt-8 sm:mt-32 sm:justify-end">
+            <p className="text-caption text-ash sm:hidden">Scroll</p>
+            <p className="font-indic text-lg text-ink sm:text-xl">
               भारत के विद्यार्थियों के लिए.
             </p>
           </div>

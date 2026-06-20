@@ -86,7 +86,7 @@ export function ChatMenu({
         onClick={() => setOpen((p) => !p)}
         disabled={isPending}
         aria-label="Conversation options"
-        className="rounded-full p-2 transition-colors hover:bg-bone disabled:opacity-50"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-bone active:scale-90 disabled:opacity-50"
       >
         <MoreHorizontal className="size-4 text-ash" />
       </button>

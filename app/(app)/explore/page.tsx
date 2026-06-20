@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
+import { CountUp } from "@/components/motion/CountUp";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { ExploreSearch } from "@/components/composite/ExploreSearch";
@@ -63,10 +64,14 @@ export default async function ExplorePage() {
       <Reveal>
         <div className="rule-top">
           <p className="text-caption">Discover</p>
-          <h1 className="mt-4 font-serif text-5xl text-ink">
+          <h1 className="mt-4 font-serif text-3xl leading-tight text-ink sm:text-4xl md:text-5xl">
             Find work, people, and{" "}
             <span className="italic text-saffron">your next project.</span>
           </h1>
+          <p className="mt-4 max-w-xl text-body-sm text-ash">
+            Search the network, follow what is trending, and meet builders from
+            every campus in one place.
+          </p>
         </div>
       </Reveal>
 
@@ -74,23 +79,30 @@ export default async function ExplorePage() {
         <ExploreSearch />
       </div>
 
-      <div className="mt-12 grid gap-6 lg:grid-cols-3">
+      <Reveal>
+        <div className="mt-4 flex items-center gap-3">
+          <p className="text-caption shrink-0">On the radar</p>
+          <span className="h-px flex-1 bg-bone" />
+        </div>
+      </Reveal>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Featured project */}
         <Reveal className="lg:col-span-2">
           {featured ? (
             <Link
               href={`/c/${featured.short_id}`}
-              className="group relative block h-80 overflow-hidden rounded-lg bg-ink"
+              className="group relative block h-72 overflow-hidden rounded-lg bg-ink sm:h-80"
             >
               <div className="absolute inset-0 bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)]" />
-              <div className="relative flex h-full flex-col justify-end p-8 text-cream">
+              <div className="relative flex h-full flex-col justify-end p-6 text-cream sm:p-8">
                 <Tag variant="saffron" className="self-start">
                   Featured project
                 </Tag>
-                <h2 className="mt-4 font-serif text-4xl">{featured.title}</h2>
-                <p className="mt-3 max-w-md text-sm text-cream/80 line-clamp-3">{featured.brief}</p>
-                <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-saffron px-5 py-2.5 text-sm text-cream transition-colors group-hover:bg-saffron-dk">
-                  View brief <ChevronRight className="size-4" />
+                <h2 className="mt-4 font-serif text-2xl leading-tight sm:text-3xl md:text-4xl">{featured.title}</h2>
+                <p className="mt-3 max-w-md text-sm text-cream/80 line-clamp-2 sm:line-clamp-3">{featured.brief}</p>
+                <span className="mt-5 inline-flex items-center gap-2 self-start rounded-full bg-saffron px-5 py-2.5 text-sm text-cream transition-all group-hover:bg-saffron-dk group-active:scale-95 sm:mt-6">
+                  View brief <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
                 </span>
               </div>
             </Link>
@@ -106,55 +118,62 @@ export default async function ExplorePage() {
 
         {/* Trending */}
         <Reveal delay={0.1}>
-          <article className="rounded-lg border border-bone bg-paper p-6">
+          <article className="card h-full p-6">
             <div className="flex items-center gap-2 text-caption">
               <TrendingUp className="size-3" /> Trending now
             </div>
             {trending.length > 0 ? (
-              <ul className="mt-6 space-y-4">
+              <ul className="mt-6 space-y-1">
                 {trending.map((t, i) => (
                   <li key={t.tag}>
                     <Link
                       href={`/t/${t.tag}`}
-                      className="group/tag flex items-baseline gap-3"
+                      className="group/tag -mx-2 flex items-baseline gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-cream"
                     >
                       <span className="font-serif text-2xl text-saffron tabular-nums">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-ink transition-colors group-hover/tag:text-saffron">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink transition-colors group-hover/tag:text-saffron">
                           #{t.tag}
                         </p>
-                        <p className="text-xs text-ash">{t.count} posts</p>
+                        <p className="text-xs text-ash tabular-nums">
+                          {t.count} {t.count === 1 ? "post" : "posts"}
+                        </p>
                       </div>
+                      <ChevronRight className="size-4 shrink-0 self-center text-ash opacity-0 transition-all group-hover/tag:translate-x-0.5 group-hover/tag:opacity-100" />
                     </Link>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-6 text-sm text-ash">No trends yet.</p>
+              <p className="mt-6 text-sm text-ash">No trends yet. Post something with a #hashtag to start one.</p>
             )}
           </article>
         </Reveal>
 
         {/* New people */}
         <Reveal>
-          <article className="rounded-lg border border-bone bg-paper p-6">
+          <article className="card h-full p-6">
             <div className="flex items-center gap-2 text-caption">
               <Sparkles className="size-3" /> People you may know
             </div>
             {suggested.length > 0 ? (
-              <ul className="mt-6 space-y-4">
+              <ul className="mt-6 space-y-1">
                 {suggested.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/u/${p.handle}`} className="flex items-center gap-3">
+                    <Link
+                      href={`/u/${p.handle}`}
+                      className="group/p -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-cream"
+                    >
                       <Avatar name={p.name} src={p.avatar_url ?? undefined} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink">{p.name}</p>
+                        <p className="truncate text-sm font-medium text-ink transition-colors group-hover/p:text-saffron">{p.name}</p>
                         <p className="truncate text-xs text-ash">
-                          {[p.branch, p.college].filter(Boolean).join(" . ")}
+                          {[p.branch, p.college].filter(Boolean).join(" . ") || "On Collab47"}
                         </p>
                       </div>
+                      <ChevronRight className="size-4 shrink-0 text-ash opacity-0 transition-all group-hover/p:translate-x-0.5 group-hover/p:opacity-100" />
                     </Link>
                   </li>
                 ))}
@@ -167,20 +186,26 @@ export default async function ExplorePage() {
 
         {/* College leaderboard */}
         <Reveal delay={0.1} className="lg:col-span-2">
-          <article className="rounded-lg border border-bone bg-paper p-6">
+          <article className="card h-full p-6">
             <div className="flex items-center gap-2 text-caption">
               <Trophy className="size-3" /> Colleges by members
             </div>
             {leaderboard.length > 0 ? (
-              <ul className="mt-6 divide-y divide-bone">
+              <ul className="mt-4 divide-y divide-bone">
                 {leaderboard.map((c, i) => (
-                  <li key={c.name} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-4">
-                      <span className="font-serif text-3xl text-ink tabular-nums">{i + 1}</span>
-                      <span className="text-sm font-medium text-ink">{c.name}</span>
+                  <li key={c.name} className="flex items-center justify-between gap-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                      <span
+                        className={`w-8 shrink-0 text-center font-serif text-2xl tabular-nums sm:text-3xl ${
+                          i === 0 ? "text-gold" : i < 3 ? "text-saffron" : "text-ink/40"
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="truncate text-sm font-medium text-ink">{c.name}</span>
                     </div>
-                    <span className="rounded-full bg-saffron/10 px-3 py-1 text-xs font-semibold tabular-nums text-saffron-dk">
-                      {c.count} {c.count === 1 ? "member" : "members"}
+                    <span className="shrink-0 rounded-full bg-saffron/10 px-3 py-1 text-xs font-semibold tabular-nums text-saffron-dk">
+                      <CountUp to={c.count} /> {c.count === 1 ? "member" : "members"}
                     </span>
                   </li>
                 ))}

@@ -60,57 +60,61 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
 
   if (variant === "row") {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron">
-        <Link href={`/u/${person.handle}`} className="shrink-0">
-          <Avatar
-            name={person.name}
-            src={person.avatar_url ?? undefined}
-            size="sm"
-          />
-        </Link>
-        <Link href={`/u/${person.handle}`} className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
-          <p className="truncate text-xs text-ash">@{person.handle}</p>
-          {(person.branch || person.college) && (
-            <p className="truncate text-xs text-ash">
-              {[person.branch, person.college].filter(Boolean).join(" . ")}
-            </p>
-          )}
-        </Link>
-        <div className="flex shrink-0 gap-2">
+      <div className="flex flex-col gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm sm:flex-row sm:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href={`/u/${person.handle}`} className="shrink-0">
+            <Avatar
+              name={person.name}
+              src={person.avatar_url ?? undefined}
+              size="sm"
+            />
+          </Link>
+          <Link href={`/u/${person.handle}`} className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
+            <p className="truncate text-xs text-ash">@{person.handle}</p>
+            {(person.branch || person.college) && (
+              <p className="truncate text-xs text-ash">
+                {[person.branch, person.college].filter(Boolean).join(" . ")}
+              </p>
+            )}
+          </Link>
+        </div>
+        <div className="flex shrink-0 gap-2 sm:ml-auto">
           <Button
             variant="secondary"
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={handleMessage}
             disabled={msgPending}
           >
-            <MessageSquare className="size-3.5" />
+            <MessageSquare className="size-3.5 shrink-0" />
             {msgPending ? "Opening..." : "Message"}
           </Button>
           {state.isConnected ? (
-            <Button variant="secondary" size="sm" disabled>
-              <UserCheck className="size-3.5" />
+            <Button variant="secondary" size="sm" className="flex-1 sm:flex-none" disabled>
+              <UserCheck className="size-3.5 shrink-0" />
               Connected
             </Button>
           ) : state.pending ? (
-            <Button variant="secondary" size="sm" disabled>
-              <CheckCircle className="size-3.5" />
+            <Button variant="secondary" size="sm" className="flex-1 sm:flex-none" disabled>
+              <CheckCircle className="size-3.5 shrink-0" />
               Pending
             </Button>
           ) : (
             <Button
               variant={optimisticFollowing ? "secondary" : "primary"}
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={handleFollow}
               disabled={isPending}
             >
               {optimisticFollowing ? (
                 <>
-                  <UserCheck className="size-3.5" /> Following
+                  <UserCheck className="size-3.5 shrink-0" /> Following
                 </>
               ) : (
                 <>
-                  <UserPlus className="size-3.5" /> Follow
+                  <UserPlus className="size-3.5 shrink-0" /> Follow
                 </>
               )}
             </Button>
@@ -124,7 +128,7 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
   return (
     <article
       className={cn(
-        "group rounded-lg border border-bone bg-paper p-6 transition-all hover:border-saffron"
+        "group flex h-full flex-col rounded-lg border border-bone bg-paper p-5 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm sm:p-6"
       )}
     >
       <div className="flex items-start gap-4">
@@ -136,48 +140,48 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
           />
         </Link>
         <Link href={`/u/${person.handle}`} className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-ink">{person.name}</p>
-          <p className="text-xs text-ash">@{person.handle}</p>
+          <p className="truncate text-base font-semibold text-ink transition-colors group-hover:text-saffron">{person.name}</p>
+          <p className="truncate text-xs text-ash">@{person.handle}</p>
           {(person.branch || person.college) && (
-            <p className="mt-1 text-sm text-ash">
+            <p className="mt-1 line-clamp-2 text-sm text-ash">
               {[person.branch, person.college].filter(Boolean).join(" . ")}
             </p>
           )}
         </Link>
       </div>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex gap-2 pt-1 sm:mt-auto">
         <Button
           variant="secondary"
           size="sm"
-          className="flex-1"
+          className="min-w-0 flex-1"
           onClick={handleMessage}
           disabled={msgPending}
         >
-          <MessageSquare className="size-4" /> {msgPending ? "Opening..." : "Message"}
+          <MessageSquare className="size-4 shrink-0" /> <span className="truncate">{msgPending ? "Opening..." : "Message"}</span>
         </Button>
         {state.isConnected ? (
-          <Button variant="secondary" size="sm" className="flex-1" disabled>
-            <UserCheck className="size-4" /> Connected
+          <Button variant="secondary" size="sm" className="min-w-0 flex-1" disabled>
+            <UserCheck className="size-4 shrink-0" /> <span className="truncate">Connected</span>
           </Button>
         ) : state.pending ? (
-          <Button variant="secondary" size="sm" className="flex-1" disabled>
-            <CheckCircle className="size-4" /> Pending
+          <Button variant="secondary" size="sm" className="min-w-0 flex-1" disabled>
+            <CheckCircle className="size-4 shrink-0" /> <span className="truncate">Pending</span>
           </Button>
         ) : (
           <Button
             variant={optimisticFollowing ? "secondary" : "primary"}
             size="sm"
-            className="flex-1"
+            className="min-w-0 flex-1"
             onClick={handleFollow}
             disabled={isPending}
           >
             {optimisticFollowing ? (
               <>
-                <UserCheck className="size-4" /> Following
+                <UserCheck className="size-4 shrink-0" /> <span className="truncate">Following</span>
               </>
             ) : (
               <>
-                <UserPlus className="size-4" /> Follow
+                <UserPlus className="size-4 shrink-0" /> <span className="truncate">Follow</span>
               </>
             )}
           </Button>

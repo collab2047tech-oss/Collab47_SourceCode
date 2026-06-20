@@ -42,15 +42,15 @@ export function MessagesShell({
     : items;
 
   return (
-    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
-      {/* Left rail */}
-      <aside className="flex flex-col border-r border-bone bg-paper">
-        <div className="p-5">
-          <div className="flex items-center justify-between">
+    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem-3.5rem)] md:h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden md:-mx-8 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
+      {/* Left rail — full width on mobile, fixed rail on md+ */}
+      <aside className="flex min-w-0 flex-col bg-paper md:border-r md:border-bone">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif text-2xl text-ink">Messages</h2>
             <button
               onClick={() => setGroupOpen(true)}
-              className="flex items-center gap-1.5 rounded-full border border-bone bg-cream px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-ink hover:bg-ink hover:text-cream"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-bone bg-cream px-3 py-2 text-xs font-medium text-ink transition-colors hover:border-ink hover:bg-ink hover:text-cream active:scale-95"
             >
               <Users className="size-3.5" />
               New group
@@ -62,18 +62,21 @@ export function MessagesShell({
             <button
               onClick={() => setTab("inbox")}
               className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors active:scale-[0.98]",
                 tab === "inbox"
                   ? "bg-paper text-ink shadow-sm"
                   : "text-ash hover:text-ink"
               )}
             >
               Inbox
+              {inboxItems.length > 0 && (
+                <span className="ml-1.5 text-xs text-ash">{inboxItems.length}</span>
+              )}
             </button>
             <button
               onClick={() => setTab("requests")}
               className={cn(
-                "relative flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "relative flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors active:scale-[0.98]",
                 tab === "requests"
                   ? "bg-paper text-ink shadow-sm"
                   : "text-ash hover:text-ink"
@@ -89,23 +92,27 @@ export function MessagesShell({
           </div>
 
           {/* Search */}
-          <div className="mt-3 flex items-center gap-2 rounded-full border border-bone bg-cream px-4 py-2">
+          <div className="mt-3 flex items-center gap-2 rounded-full border border-bone bg-cream px-4 py-2.5">
             <Search className="size-4 shrink-0 text-ash" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-ash"
+              className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-ash"
             />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
           {filtered.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
               <MessageSquare className="size-8 text-bone" />
               <p className="text-sm text-ash">
-                {tab === "inbox" ? "No conversations yet." : "No message requests."}
+                {search.trim()
+                  ? "No matches."
+                  : tab === "inbox"
+                  ? "No conversations yet."
+                  : "No message requests."}
               </p>
             </div>
           )}
@@ -113,7 +120,7 @@ export function MessagesShell({
             <Link
               key={item.id}
               href={item.href}
-              className="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-bone/40"
+              className="flex w-full items-start gap-3 border-b border-bone/60 px-4 py-4 text-left transition-colors hover:bg-bone/40 active:bg-bone/60 sm:px-5"
             >
               {item.isGroup ? (
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
@@ -139,9 +146,11 @@ export function MessagesShell({
         </div>
       </aside>
 
-      {/* Empty right pane placeholder */}
-      <section className="flex flex-col items-center justify-center gap-3 bg-cream">
-        <MessageSquare className="size-10 text-bone" />
+      {/* Empty right pane placeholder — hidden on mobile (list is the page) */}
+      <section className="hidden flex-col items-center justify-center gap-3 bg-cream px-6 text-center md:flex">
+        <span className="flex size-16 items-center justify-center rounded-full border border-bone bg-paper">
+          <MessageSquare className="size-7 text-ash" />
+        </span>
         <p className="text-sm text-ash">Select a conversation to read messages.</p>
       </section>
 

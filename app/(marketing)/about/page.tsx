@@ -75,14 +75,14 @@ export default function AboutPage() {
       <Nav />
 
       {/* HERO */}
-      <section className="section pt-40 md:pt-48">
+      <section className="section pt-32 sm:pt-40 md:pt-48">
         <div className="container-edit">
           <Reveal>
             <p className="text-caption rule-top inline-block">Who we are</p>
           </Reveal>
 
           <Reveal delay={0.1}>
-            <h1 className="text-display-xl mt-10 max-w-5xl text-ink">
+            <h1 className="mt-8 max-w-5xl text-[2.5rem] leading-[1.04] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-lg md:text-display-xl">
               <SplitWords text="Six founders." />
               <br />
               <SplitWords
@@ -170,7 +170,7 @@ export default function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <h2 className="text-display-lg mt-10 max-w-4xl text-ink">
+            <h2 className="mt-8 max-w-4xl text-[2.25rem] leading-[1.08] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md lg:text-display-lg">
               The six people <span className="italic text-saffron">on the hook</span> for this.
             </h2>
           </Reveal>
@@ -183,11 +183,11 @@ export default function AboutPage() {
             </p>
           </Reveal>
 
-          <div className="mt-20 grid grid-cols-1 gap-px bg-bone md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid grid-cols-1 gap-px bg-bone sm:mt-20 sm:grid-cols-2 lg:grid-cols-3">
             {founders.map((f, i) => (
               <Reveal key={f.name} delay={i * 0.05}>
-                <article className="group flex h-full flex-col gap-6 border border-transparent bg-paper p-8 transition-all duration-300 hover:-translate-y-1 hover:border-saffron hover:bg-cream">
-                  <div className="flex items-start justify-between">
+                <article className="group flex h-full flex-col gap-5 border border-transparent bg-paper p-7 transition-all duration-300 hover:-translate-y-1 hover:border-saffron hover:bg-cream sm:gap-6 sm:p-8">
+                  <div className="flex items-start justify-between gap-4">
                     <Avatar
                       name={f.name}
                       size="xl"
@@ -198,7 +198,7 @@ export default function AboutPage() {
                     </span>
                   </div>
                   <div>
-                    <p className="font-serif text-[2rem] leading-none text-ink">
+                    <p className="font-serif text-[1.75rem] leading-none text-ink sm:text-[2rem]">
                       {f.name}
                     </p>
                     <p className="mt-3 text-caption text-saffron">
@@ -223,17 +223,17 @@ export default function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <h2 className="text-display-lg mt-10 max-w-4xl">
+            <h2 className="mt-8 max-w-4xl text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:mt-10 sm:text-display-md lg:text-display-lg">
               Four rules we will not <span className="italic text-saffron">break</span>.
             </h2>
           </Reveal>
 
-          <div className="mt-20 grid grid-cols-1 gap-px bg-cream/15 md:grid-cols-2">
+          <div className="mt-14 grid grid-cols-1 gap-px bg-cream/15 sm:mt-20 md:grid-cols-2">
             {values.map((v, i) => (
               <Reveal key={v.n} delay={i * 0.1}>
-                <div className="flex h-full flex-col gap-6 bg-moss p-10 md:p-12">
+                <div className="flex h-full flex-col gap-5 bg-moss p-8 sm:gap-6 sm:p-10 md:p-12">
                   <p className="font-mono text-caption text-saffron">{v.n}</p>
-                  <h3 className="font-serif text-3xl text-cream md:text-4xl">
+                  <h3 className="font-serif text-2xl text-cream sm:text-3xl md:text-4xl">
                     {v.title}
                   </h3>
                   <p className="text-body-lg text-cream/75">{v.body}</p>
@@ -252,12 +252,12 @@ export default function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
-            <h2 className="text-display-md mt-10 max-w-3xl text-ink">
+            <h2 className="mt-8 max-w-3xl text-[2.1rem] leading-[1.1] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md">
               Small on purpose. <span className="italic text-saffron">For now.</span>
             </h2>
           </Reveal>
 
-          <div className="mt-20 grid grid-cols-2 gap-px bg-bone md:grid-cols-4">
+          <div className="mt-14 grid grid-cols-2 gap-px bg-bone sm:mt-20 md:grid-cols-4">
             {[
               { to: 6, label: "Founders, full-time" },
               { to: 24, label: "Founding-class colleges" },
@@ -265,8 +265,8 @@ export default function AboutPage() {
               { to: 0, label: "Ads on the platform, ever" },
             ].map((stat, i) => (
               <Reveal key={stat.label} delay={i * 0.1}>
-                <div className="flex h-full flex-col gap-4 bg-cream p-8 md:p-10">
-                  <p className="font-serif text-[4.5rem] leading-none text-ink md:text-[5.5rem]">
+                <div className="flex h-full flex-col gap-3 bg-cream p-6 sm:gap-4 sm:p-8 md:p-10">
+                  <p className="font-serif text-[3rem] leading-none text-ink sm:text-[4.5rem] md:text-[5.5rem]">
                     <CountUp to={stat.to} />
                   </p>
                   <p className="text-caption text-ash">{stat.label}</p>

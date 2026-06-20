@@ -2,8 +2,9 @@ import Link from "next/link";
 import { getNewsItem } from "@/lib/news/fetch";
 import { getMyNewsReaction, getNewsComments } from "@/lib/db/newsEngage";
 import { addNewsCommentAction } from "@/app/(app)/news/actions";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageCircle } from "lucide-react";
 import { NewsActions } from "@/components/composite/NewsActions";
+import { Reveal } from "@/components/motion/Reveal";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,12 @@ function timeAgo(iso: string): string {
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function readMinutes(text: string | null | undefined): number {
+  if (!text) return 1;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
 }
 
 export default async function NewsReaderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,20 +53,24 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
 
       <article className="mt-6">
         {item.image_url ? (
-          <div className="flex max-h-[60vh] items-center justify-center overflow-hidden rounded-xl border border-bone bg-ink">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.image_url} alt="" className="max-h-[60vh] w-full object-contain" />
-          </div>
+          <Reveal>
+            <div className="flex max-h-[60vh] items-center justify-center overflow-hidden rounded-xl border border-bone bg-ink">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.image_url} alt="" className="max-h-[60vh] w-full object-contain" />
+            </div>
+          </Reveal>
         ) : (
           <div className="flex h-40 items-end rounded-xl bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)] p-5">
             <span className="text-xs font-medium uppercase tracking-widest text-cream/90">{item.source}</span>
           </div>
         )}
 
-        <div className="mt-5 flex items-center gap-2 text-caption">
+        <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption">
           <span className="font-medium uppercase tracking-widest">{item.source}</span>
           <span className="text-ash">&#183;</span>
           <span className="text-ash">{timeAgo(item.published_at)}</span>
+          <span className="text-ash">&#183;</span>
+          <span className="text-ash">{readMinutes(item.excerpt)} min read</span>
         </div>
 
         <h1 className="mt-3 font-serif text-h1 leading-tight text-ink">{item.title}</h1>
@@ -105,25 +116,26 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
       </article>
 
       {/* Comments thread */}
-      <section id="comments" className="mt-10">
-        <h2 className="font-serif text-h3 text-ink">
+      <section id="comments" className="mt-12 border-t border-bone pt-10">
+        <h2 className="flex items-center gap-2 font-serif text-h3 text-ink">
+          <MessageCircle className="size-5 text-saffron" />
           Comments {comments.length > 0 ? `(${comments.length})` : ""}
         </h2>
 
         {/* Composer */}
-        <form action={postComment} className="mt-4">
+        <form action={postComment} className="mt-5">
           <textarea
             name="body"
             rows={3}
             maxLength={600}
             required
             placeholder="Add a comment (max 600 chars)..."
-            className="w-full rounded-lg border border-bone bg-paper p-3 text-sm text-ink placeholder:text-ash focus:border-ink focus:outline-none"
+            className="w-full resize-none rounded-lg border border-bone bg-paper p-3 text-sm text-ink placeholder:text-ash transition-colors focus:border-ink focus:outline-none"
           />
           <div className="mt-2 flex justify-end">
             <button
               type="submit"
-              className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron"
+              className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-cream transition-all hover:bg-saffron active:scale-95"
             >
               Post comment
             </button>
@@ -132,11 +144,14 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
 
         {/* List */}
         {comments.length === 0 ? (
-          <p className="mt-6 text-sm text-ash">No comments yet. Be the first.</p>
+          <div className="mt-8 rounded-lg border border-dashed border-bone bg-paper/50 px-6 py-10 text-center">
+            <p className="text-sm font-medium text-ink">No comments yet.</p>
+            <p className="mt-1 text-sm text-ash">Be the first to share your take.</p>
+          </div>
         ) : (
-          <div className="mt-6 space-y-4">
+          <div className="mt-6 space-y-3">
             {comments.map((c) => (
-              <div key={c.id} className="rounded-lg border border-bone bg-paper p-4">
+              <div key={c.id} className="card card-hover p-4">
                 <div className="flex items-center gap-2">
                   {c.author?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element

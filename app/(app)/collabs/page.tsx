@@ -55,16 +55,16 @@ export default async function CollabsPage({
     <div className="max-w-4xl">
       {/* Header */}
       <Reveal>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <p className="text-caption text-ash">Collab Projects</p>
-            <h1 className="mt-2 font-serif text-display-md text-ink leading-tight">
+            <h1 className="mt-2 font-serif text-3xl leading-tight text-ink sm:text-4xl md:text-display-md">
               Briefs from industry.{" "}
               <span className="italic text-saffron">Teams from campus.</span>
             </h1>
           </div>
-          <Link href="/collabs/new" className="mt-2 shrink-0">
-            <Button variant="primary" size="md">
+          <Link href="/collabs/new" className="shrink-0 sm:mt-2">
+            <Button variant="primary" size="md" className="w-full sm:w-auto">
               Post a brief
             </Button>
           </Link>
@@ -81,7 +81,7 @@ export default async function CollabsPage({
                 <Link
                   key={f.key}
                   href={buildHref({ filter: f.key })}
-                  className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                  className={`rounded-full border px-4 py-1.5 text-sm transition-all active:scale-95 ${
                     active
                       ? "border-ink bg-ink text-cream"
                       : "border-bone bg-paper text-ash hover:border-ink/30 hover:text-ink"
@@ -93,7 +93,7 @@ export default async function CollabsPage({
             })}
           </div>
 
-          <form action="/collabs" method="get" className="relative">
+          <form action="/collabs" method="get" className="relative w-full sm:w-auto">
             {filter !== "open" && (
               <input type="hidden" name="filter" value={filter} />
             )}
@@ -109,8 +109,21 @@ export default async function CollabsPage({
         </div>
       </Reveal>
 
+      {/* Result count */}
+      {projects.length > 0 && (
+        <Reveal delay={0.08}>
+          <div className="mt-8 flex items-center gap-3">
+            <p className="text-caption shrink-0 tabular-nums">
+              {projects.length} {projects.length === 1 ? "brief" : "briefs"}
+              {filter !== "all" ? ` · ${FILTERS.find((f) => f.key === filter)?.label}` : ""}
+            </p>
+            <span className="h-px flex-1 bg-bone" />
+          </div>
+        </Reveal>
+      )}
+
       {/* Projects grid */}
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {projects.map((project, i) => {
           const p = project as {
             id: string;
@@ -131,7 +144,7 @@ export default async function CollabsPage({
             <Reveal key={p.id} delay={i * 0.05}>
               <Link
                 href={`/c/${p.short_id}`}
-                className="group flex h-full flex-col rounded-lg border border-bone bg-paper p-5 transition-all duration-200 hover:border-ink/30 hover:shadow-sm"
+                className="group flex h-full flex-col rounded-lg border border-bone bg-paper p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-base font-semibold text-ink group-hover:text-saffron transition-colors line-clamp-2">

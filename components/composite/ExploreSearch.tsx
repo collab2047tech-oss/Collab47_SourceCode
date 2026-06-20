@@ -64,13 +64,13 @@ export function ExploreSearch() {
           {/* People */}
           {results.people.length > 0 && (
             <section>
-              <p className="mb-3 text-caption">People</p>
+              <p className="mb-3 text-caption">People · {results.people.length}</p>
               <ul className="space-y-2">
                 {results.people.map((p) => (
                   <li key={p.id}>
                     <Link
                       href={`/u/${p.handle}`}
-                      className="flex items-center gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron"
+                      className="card card-hover flex items-center gap-3 px-4 py-3"
                     >
                       <Avatar
                         name={p.name}
@@ -96,13 +96,13 @@ export function ExploreSearch() {
           {/* Posts */}
           {results.posts.length > 0 && (
             <section>
-              <p className="mb-3 text-caption">Posts</p>
+              <p className="mb-3 text-caption">Posts · {results.posts.length}</p>
               <ul className="space-y-2">
                 {results.posts.map((p) => (
                   <li key={p.id}>
                     <Link
                       href={`/p/${p.short_id}`}
-                      className="block rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron"
+                      className="card card-hover block px-4 py-3"
                     >
                       <p className="line-clamp-2 text-sm text-ink">{p.body}</p>
                     </Link>
@@ -115,13 +115,13 @@ export function ExploreSearch() {
           {/* Projects */}
           {results.projects.length > 0 && (
             <section>
-              <p className="mb-3 text-caption">Projects</p>
+              <p className="mb-3 text-caption">Projects · {results.projects.length}</p>
               <ul className="space-y-2">
                 {results.projects.map((p) => (
                   <li key={p.id}>
                     <Link
                       href={`/c/${p.short_id}`}
-                      className="block rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron"
+                      className="card card-hover block px-4 py-3"
                     >
                       <p className="text-sm font-semibold text-ink">{p.title}</p>
                       {p.brief && (
@@ -139,7 +139,7 @@ export function ExploreSearch() {
           {/* Hashtags */}
           {results.hashtags.length > 0 && (
             <section>
-              <p className="mb-3 text-caption">Hashtags</p>
+              <p className="mb-3 text-caption">Hashtags · {results.hashtags.length}</p>
               <div className="flex flex-wrap gap-2">
                 {results.hashtags.map((h) => (
                   <Link key={h.tag} href={`/t/${h.tag}`} className="transition-opacity hover:opacity-80">

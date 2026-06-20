@@ -88,12 +88,12 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-ink/40 sm:items-center sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-bone bg-paper shadow-xl">
+      <div className="flex h-full w-full flex-col overflow-hidden border-bone bg-paper shadow-xl sm:h-auto sm:max-h-[80vh] sm:max-w-md sm:rounded-2xl sm:border">
         <header className="flex items-center justify-between border-b border-bone px-5 py-4">
           <div className="flex items-center gap-2">
             <Users className="size-5 text-saffron" />
@@ -102,7 +102,7 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="rounded-full p-1.5 text-ash transition-colors hover:bg-bone hover:text-ink"
+            className="flex size-10 items-center justify-center rounded-full text-ash transition-colors hover:bg-bone hover:text-ink active:scale-90"
           >
             <X className="size-4" />
           </button>
@@ -153,7 +153,10 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
                 <button
                   key={c.id}
                   onClick={() => toggle(c.id)}
-                  className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-bone/40"
+                  className={cn(
+                    "flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-bone/40 active:bg-bone/60",
+                    isSelected && "bg-saffron/5"
+                  )}
                 >
                   <Avatar name={c.name} src={c.avatar_url ?? undefined} size="md" />
                   <div className="min-w-0 flex-1">

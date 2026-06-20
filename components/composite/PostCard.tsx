@@ -343,22 +343,23 @@ export function PostCard({
   return (
     <article
       className={cn(
-        "group relative border-b border-bone bg-paper transition-all duration-200",
+        "group relative border-b border-bone bg-paper transition-colors duration-200",
         "hover:bg-cream/60",
+        isPinned && "bg-saffron/2",
         isPending && "opacity-70"
       )}
     >
       {/* Pinned badge */}
       {isPinned ? (
-        <div className="flex items-center gap-1.5 px-5 pt-3 pb-0">
-          <Pin className="size-3 text-ash" />
-          <span className="text-[11px] font-medium uppercase tracking-widest text-ash">Pinned</span>
+        <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 sm:px-5">
+          <Pin className="size-3 text-saffron" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-saffron">Pinned</span>
         </div>
       ) : null}
 
       {/* Repost header: "{name} reposted" */}
       {isRepost ? (
-        <div className="flex items-center gap-1.5 px-5 pt-3 pb-0">
+        <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 sm:px-5">
           <Repeat2 className="size-3.5 text-ash" strokeWidth={1.75} />
           <span className="text-xs font-medium text-ash">
             <span className="text-ink/70">{post.author.name}</span> reposted
@@ -366,7 +367,7 @@ export function PostCard({
         </div>
       ) : null}
 
-      <div className="flex gap-3 px-5 py-5">
+      <div className="flex gap-3 px-4 py-5 sm:px-5">
         {/* Avatar - links to profile (plain span when no handle) */}
         {post.author.handle ? (
           <a
@@ -427,7 +428,7 @@ export function PostCard({
               </button>
 
               {menuOpen ? (
-                <div className="absolute right-0 top-8 z-50 min-w-44 rounded-xl border border-bone bg-paper py-1.5 shadow-xl shadow-ink/5">
+                <div className="absolute right-0 top-8 z-50 min-w-44 origin-top-right rounded-xl border border-bone bg-paper py-1.5 shadow-xl shadow-ink/5">
                   {isOwner && !isPinned ? (
                     <MenuItem icon={<Pin className="size-4" />} label="Pin to portfolio" onClick={handlePin} />
                   ) : null}
@@ -452,7 +453,7 @@ export function PostCard({
           {/* Reposter's own added body (optional thought above the original) */}
           {post.body ? (
             <Link href={`/p/${post.short_id}`} className="block">
-              <p className="mt-2.5 text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line">
+              <p className="mt-2.5 text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word">
                 {post.body}
               </p>
             </Link>
@@ -470,7 +471,7 @@ export function PostCard({
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {post.tags.map((t) => (
                     <Link key={t} href={`/t/${t}`}>
-                      <Tag variant="saffron" className="text-[11px] hover:bg-saffron/20">
+                      <Tag variant="saffron" className="text-[11px] transition-colors hover:bg-saffron/20">
                         #{t}
                       </Tag>
                     </Link>
@@ -487,7 +488,8 @@ export function PostCard({
                   <img
                     src={post.image}
                     alt=""
-                    className="size-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+                    loading="lazy"
+                    className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
                   />
                 </Link>
               ) : null}
@@ -505,7 +507,7 @@ export function PostCard({
           ) : null}
 
           {/* Action bar */}
-          <div className="mt-4 flex items-center gap-0 -ml-2">
+          <div className="mt-4 -ml-2 flex items-center justify-between sm:justify-start sm:gap-1">
             {/* Reaction control */}
             <div
               ref={reactionRef}
@@ -513,10 +515,11 @@ export function PostCard({
               onMouseEnter={openReactionPopover}
               onMouseLeave={cancelReactionPopover}
             >
-              {/* Reaction popover */}
+              {/* Reaction popover — left-anchored but clamped so it never spills
+                  past the viewport edge on phones. */}
               {reactionPopoverOpen ? (
                 <div
-                  className="absolute bottom-full left-0 mb-1.5 z-50 flex items-center gap-1 rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10"
+                  className="absolute bottom-full left-0 z-50 mb-1.5 flex max-w-[calc(100vw-2rem)] items-center gap-0.5 overflow-x-auto rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10 sm:gap-1 sm:overflow-visible"
                   onMouseEnter={() => {
                     cancelReactionPopover();
                     setReactionPopoverOpen(true);
@@ -531,9 +534,9 @@ export function PostCard({
                       aria-label={r.label}
                       title={r.label}
                       className={cn(
-                        "flex size-8 items-center justify-center rounded-full transition-all hover:scale-125",
+                        "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110 sm:size-8",
                         r.color,
-                        reaction === r.kind && "scale-125 bg-bone"
+                        reaction === r.kind && "scale-110 bg-bone"
                       )}
                     >
                       {r.icon}
@@ -553,7 +556,7 @@ export function PostCard({
                       disabled={isPending}
                       aria-label={liked ? `Remove ${meta.label}` : "Like"}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
+                        "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
                         "text-ash transition-all duration-150",
                         "hover:bg-bone hover:text-ink active:scale-95",
                         "disabled:cursor-not-allowed disabled:opacity-40",
@@ -580,7 +583,7 @@ export function PostCard({
                       }}
                       disabled={isPending}
                       aria-label="Choose a reaction"
-                      className="rounded-full p-1 text-ash transition-colors hover:text-ink disabled:opacity-40"
+                      className="flex min-h-10 items-center rounded-full px-1.5 text-ash transition-colors hover:text-ink disabled:opacity-40"
                     >
                       <span className="block size-0 border-x-[3px] border-t-4 border-x-transparent border-t-current" />
                     </button>
@@ -594,7 +597,7 @@ export function PostCard({
               href={`/p/${post.short_id}`}
               aria-label={`${post.stats.comments} comments`}
               className={cn(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
+                "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
                 "text-ash transition-all duration-150",
                 "hover:bg-bone hover:text-ink active:scale-95"
               )}
@@ -729,7 +732,7 @@ function EmbeddedOriginalCard({ original }: { original?: EmbeddedOriginal | null
       {/* Original image */}
       {original.image ? (
         <div className="mt-3 aspect-video w-full overflow-hidden rounded-lg border border-bone bg-bone/40">
-          <img src={original.image} alt="" className="size-full object-cover" />
+          <img src={original.image} alt="" loading="lazy" className="size-full object-cover" />
         </div>
       ) : null}
 
@@ -780,7 +783,7 @@ function ActionBtn({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
+        "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
         "text-ash transition-all duration-150",
         "hover:bg-bone hover:text-ink active:scale-95",
         "disabled:cursor-not-allowed disabled:opacity-40",

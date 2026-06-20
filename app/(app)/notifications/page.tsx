@@ -59,10 +59,17 @@ export default async function NotificationsPage() {
     <div className="mx-auto max-w-2xl">
       <Reveal>
         <div className="rule-top">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-caption">Inbox</p>
-              <h1 className="mt-4 font-serif text-5xl text-ink">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-caption">Inbox</p>
+                {hasUnread && (
+                  <span className="inline-flex items-center rounded-full bg-saffron/10 px-2 py-0.5 text-[10px] font-semibold text-saffron">
+                    {items.filter((n) => n.unread).length} new
+                  </span>
+                )}
+              </div>
+              <h1 className="mt-3 font-serif text-4xl leading-tight text-ink sm:mt-4 sm:text-5xl">
                 Activity. <span className="italic text-saffron">All in one place.</span>
               </h1>
             </div>
@@ -74,9 +81,14 @@ export default async function NotificationsPage() {
       </Reveal>
 
       <Reveal delay={0.1}>
-        <ul className="mt-12 divide-y divide-bone">
+        <ul className="mt-8 divide-y divide-bone sm:mt-12">
           {items.length === 0 ? (
-            <li className="py-12 text-center text-ash">Nothing yet. Make a post.</li>
+            <li className="flex flex-col items-center gap-2 py-16 text-center">
+              <span className="flex size-14 items-center justify-center rounded-full border border-bone bg-paper">
+                <Bell className="size-6 text-ash" />
+              </span>
+              <p className="text-ash">Nothing yet. Make a post.</p>
+            </li>
           ) : (
             items.map((n) => {
               const Icon = KIND_ICON[n.kind] ?? Bell;
@@ -91,6 +103,11 @@ export default async function NotificationsPage() {
             })
           )}
         </ul>
+        {items.length > 0 && (
+          <p className="mt-8 text-center text-caption">
+            {items.length} {items.length === 1 ? "notification" : "notifications"} · last 50
+          </p>
+        )}
       </Reveal>
     </div>
   );

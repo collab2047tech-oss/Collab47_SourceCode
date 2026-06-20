@@ -47,34 +47,37 @@ export function ConnectionRequests({ requests }: Props) {
       {visible.map((person) => (
         <li
           key={person.id}
-          className="flex items-center gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron"
+          className="flex flex-col gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm lg:flex-row lg:items-center"
         >
-          <Link href={`/u/${person.handle}`} className="shrink-0">
-            <Avatar name={person.name} src={person.avatar_url ?? undefined} size="md" />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <Link href={`/u/${person.handle}`} className="block">
-              <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
-              <p className="truncate text-xs text-ash">@{person.handle}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <Link href={`/u/${person.handle}`} className="shrink-0">
+              <Avatar name={person.name} src={person.avatar_url ?? undefined} size="md" />
             </Link>
-            {(person.branch || person.college) && (
-              <p className="truncate text-xs text-ash">
-                {[person.branch, person.college].filter(Boolean).join(" . ")}
-              </p>
-            )}
+            <div className="min-w-0 flex-1">
+              <Link href={`/u/${person.handle}`} className="block">
+                <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
+                <p className="truncate text-xs text-ash">@{person.handle}</p>
+              </Link>
+              {(person.branch || person.college) && (
+                <p className="truncate text-xs text-ash">
+                  {[person.branch, person.college].filter(Boolean).join(" . ")}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="flex shrink-0 gap-2">
-            <Button size="sm" onClick={() => accept(person)} disabled={isPending}>
-              <Check className="size-3.5" /> Accept
+          <div className="flex shrink-0 gap-2 lg:ml-auto">
+            <Button size="sm" className="flex-1 lg:flex-none" onClick={() => accept(person)} disabled={isPending}>
+              <Check className="size-3.5 shrink-0" /> Accept
             </Button>
             <Button
               variant="secondary"
               size="sm"
+              className="flex-1 lg:flex-none"
               onClick={() => reject(person)}
               disabled={isPending}
               aria-label="Ignore request"
             >
-              <X className="size-3.5" /> Ignore
+              <X className="size-3.5 shrink-0" /> Ignore
             </Button>
           </div>
         </li>

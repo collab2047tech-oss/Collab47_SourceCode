@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { NewsItem } from "@/lib/supabase/types";
-import { ChevronUp, ExternalLink, Heart } from "lucide-react";
+import { ChevronUp, ExternalLink, Heart, Newspaper } from "lucide-react";
 import {
   loadProfile,
   saveProfile,
@@ -88,9 +88,14 @@ export function InShortsFeed({ items }: Props) {
   return (
     <div className="fixed inset-x-0 bottom-16 top-16 z-30 flex flex-col bg-cream md:bottom-0 md:left-60">
       {order.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <p className="font-serif text-h2 text-ink">Nothing yet.</p>
-          <p className="mt-2 text-body-sm text-ash">The news engine runs hourly. Check back soon.</p>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full border border-bone bg-paper text-ash">
+            <Newspaper className="size-7" />
+          </div>
+          <p className="mt-5 font-serif text-h2 text-ink">Nothing yet.</p>
+          <p className="mt-2 max-w-xs text-body-sm text-ash">
+            The news engine runs hourly, pulling career stories for your branch. Check back soon.
+          </p>
         </div>
       ) : (
         <div
@@ -116,10 +121,16 @@ export function InShortsFeed({ items }: Props) {
                     <span className="absolute bottom-3 left-4 rounded-full bg-ink/80 px-3 py-1 text-xs font-medium uppercase tracking-widest text-cream">
                       {item.source}
                     </span>
+                    <span className="absolute bottom-3 right-4 rounded-full bg-cream/90 px-3 py-1 font-mono text-[11px] font-medium tabular-nums text-ink">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
                   </div>
                 ) : (
-                  <div className="flex h-20 w-full shrink-0 items-end bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)] p-5">
+                  <div className="flex h-24 w-full shrink-0 items-end justify-between bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)] p-5">
                     <span className="text-xs font-medium uppercase tracking-widest text-cream/90">{item.source}</span>
+                    <span className="font-mono text-[11px] font-medium tabular-nums text-cream/70">
+                      {String(idx + 1).padStart(2, "0")}
+                    </span>
                   </div>
                 )}
 
@@ -133,16 +144,16 @@ export function InShortsFeed({ items }: Props) {
                   )}
 
                   {item.branch_tags.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
+                    <div className="mt-4 flex flex-wrap gap-1.5">
                       {item.branch_tags.slice(0, 4).map((t) => (
-                        <span key={t} className="rounded-full bg-saffron/10 px-2.5 py-0.5 text-xs font-medium text-saffron">
+                        <span key={t} className="rounded-full bg-saffron/10 px-2.5 py-0.5 text-xs font-medium text-saffron-dk">
                           {t}
                         </span>
                       ))}
                     </div>
                   ) : null}
 
-                  <span className="mt-3 block text-caption">{timeAgo(item.published_at)}</span>
+                  <span className="mt-4 block text-caption">{timeAgo(item.published_at)}</span>
                 </div>
               </div>
 
@@ -174,7 +185,7 @@ export function InShortsFeed({ items }: Props) {
                       title="More like this"
                       aria-label="More like this"
                       className={[
-                        "inline-flex items-center justify-center rounded-full border p-2 transition-colors",
+                        "inline-flex items-center justify-center rounded-full border p-2 transition-all active:scale-95",
                         liked.has(item.id)
                           ? "border-saffron bg-saffron/10 text-saffron"
                           : "border-bone text-ash hover:border-ink hover:text-ink",
@@ -190,7 +201,7 @@ export function InShortsFeed({ items }: Props) {
                       rel="noopener noreferrer"
                       title={`Open on ${item.source}`}
                       aria-label={`Open on ${item.source}`}
-                      className="inline-flex items-center justify-center rounded-full border border-bone p-2 text-ash transition-colors hover:border-ink hover:text-ink"
+                      className="inline-flex items-center justify-center rounded-full border border-bone p-2 text-ash transition-all hover:border-ink hover:text-ink active:scale-95"
                     >
                       <ExternalLink className="size-4" />
                     </a>
@@ -198,7 +209,7 @@ export function InShortsFeed({ items }: Props) {
                     {/* In-app reader */}
                     <Link
                       href={`/news/${item.id}`}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-medium text-cream transition-all hover:bg-saffron active:scale-95"
                     >
                       Read in app
                     </Link>

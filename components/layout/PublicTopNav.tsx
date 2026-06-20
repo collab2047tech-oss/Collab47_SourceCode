@@ -4,6 +4,7 @@ import { Nav } from "@/components/landing/Nav";
 import { getMyProfile } from "@/lib/db/profiles";
 import { getUnreadCount } from "@/lib/db/notifications";
 import { Home, Compass, Users, Briefcase, MessageSquare, Newspaper, Bell } from "lucide-react";
+import { PublicMobileMenu } from "./PublicTopNavMobile";
 
 const LINKS = [
   { href: "/home", label: "Home", icon: Home },
@@ -32,8 +33,11 @@ export async function PublicTopNav() {
   return (
     <header className="fixed top-0 z-50 w-full border-b border-bone bg-cream/85 backdrop-blur-md">
       <div className="container-edit flex h-16 items-center justify-between gap-4">
-        <div className="flex items-center gap-8">
-          <Link href="/home" className="font-serif text-2xl font-normal tracking-tight text-ink">
+        <div className="flex min-w-0 items-center gap-6 lg:gap-8">
+          <Link
+            href="/home"
+            className="shrink-0 font-serif text-2xl font-normal tracking-tight text-ink transition-opacity hover:opacity-80"
+          >
             Collab47.
           </Link>
           <nav className="hidden items-center gap-6 lg:flex">
@@ -50,11 +54,11 @@ export async function PublicTopNav() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link
             href="/notifications"
             aria-label="Notifications"
-            className="relative rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone"
+            className="relative rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone active:scale-95"
           >
             <Bell className="size-4 text-ink" />
             {badge ? (
@@ -71,6 +75,8 @@ export async function PublicTopNav() {
               className="ring-2 ring-bone transition-all hover:ring-saffron/40"
             />
           </Link>
+          {/* Mobile menu: exposes app navigation on small screens. */}
+          <PublicMobileMenu links={LINKS} />
         </div>
       </div>
     </header>

@@ -45,20 +45,20 @@ export default async function NetworkPage() {
       <Reveal>
         <div className="rule-top">
           <p className="text-caption">Your Network</p>
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
-            <h1 className="font-serif text-5xl text-ink">
+          <div className="mt-4 flex flex-col items-start justify-between gap-5 sm:flex-row sm:flex-wrap sm:items-end sm:gap-6">
+            <h1 className="font-serif text-4xl text-ink wrap-break-word sm:text-5xl">
               {connections.length} people{" "}
               <span className="italic text-saffron">in your orbit.</span>
             </h1>
-            <div className="flex gap-3">
+            <div className="flex w-full gap-3 sm:w-auto">
               {/* Invite - copies the app origin as an invite link */}
-              <ShareButton path="/" label="Invite" className="border-bone bg-paper text-ink" />
+              <ShareButton path="/" label="Invite" className="flex-1 justify-center sm:flex-none border-bone bg-paper text-ink" />
 
               {/* Find from college - jumps to the college-affinity Suggested
                   section (real data) or Explore when there is nothing to show. */}
               <Link
                 href={findFromCollegeHref}
-                className="inline-flex items-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron/90 active:scale-95"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron/90 active:scale-95 sm:flex-none"
               >
                 Find from college
               </Link>
@@ -93,11 +93,18 @@ export default async function NetworkPage() {
       {/* Suggested */}
       <Reveal delay={0.1}>
         <div id="suggested-cluster" className="mt-20 scroll-mt-24">
-          <p className="text-caption mb-6">
-            {profile?.college
-              ? `Suggested from ${profile.college}`
-              : "Suggested from your cluster"}
-          </p>
+          <div className="mb-6 flex items-center gap-2 border-b border-bone pb-3">
+            <p className="text-caption">
+              {profile?.college
+                ? `Suggested from ${profile.college}`
+                : "Suggested from your cluster"}
+            </p>
+            {suggested.length > 0 ? (
+              <span className="rounded-full bg-bone px-2 py-0.5 text-[10px] font-semibold tabular-nums leading-none text-ash">
+                {suggested.length}
+              </span>
+            ) : null}
+          </div>
           {suggested.length === 0 ? (
             <p className="rounded-lg border border-dashed border-bone bg-paper/60 py-10 text-center text-sm text-ash">
               No new suggestions right now. Check back as more people join.

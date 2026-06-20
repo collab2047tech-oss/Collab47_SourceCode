@@ -215,11 +215,12 @@ export function PostComposer({ action }: PostComposerProps) {
 
   const charsLeft = MAX_BODY - body.length;
   const canPost = body.trim().length > 0 && !isPending && !isDemo;
+  const overWarn = body.length > BODY_WARN;
 
   return (
     <div
       className={cn(
-        "rounded-lg border border-bone bg-paper p-6",
+        "rounded-lg border border-bone bg-paper p-4 transition-colors focus-within:border-saffron/40 sm:p-6",
         isDemo && "opacity-60"
       )}
     >
@@ -230,7 +231,7 @@ export function PostComposer({ action }: PostComposerProps) {
       <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* Author row */}
         <div className="flex items-start gap-3">
-          <Avatar name="You" size="md" />
+          <Avatar name="You" size="md" className="shrink-0" />
 
           {/* Textarea */}
           <div className="relative min-w-0 flex-1">
@@ -241,28 +242,29 @@ export function PostComposer({ action }: PostComposerProps) {
               rows={3}
               disabled={isDemo || isPending}
               className={cn(
-                "w-full resize-none rounded-md border border-bone bg-cream px-4 py-3 text-body text-ink placeholder:text-ash",
-                "focus:border-saffron focus:outline-none transition-colors",
+                "w-full resize-none rounded-md border border-bone bg-cream px-4 py-3 pb-7 text-body text-ink placeholder:text-ash",
+                "transition-colors focus:border-saffron focus:bg-paper focus:outline-none focus:ring-2 focus:ring-saffron/15",
                 "disabled:cursor-not-allowed"
               )}
             />
-            {/* Char counter */}
-            <span
-              className={cn(
-                "absolute bottom-2 right-3 tabular-nums",
-                "text-caption",
-                body.length > BODY_WARN ? "text-ember" : "text-ash"
-              )}
-              style={{ fontSize: "0.75rem" }}
-            >
-              {charsLeft}
-            </span>
+            {/* Char counter — only surfaces once the user starts typing. */}
+            {body.length > 0 ? (
+              <span
+                className={cn(
+                  "pointer-events-none absolute bottom-2.5 right-3 tabular-nums",
+                  "text-[0.72rem] font-medium transition-colors",
+                  overWarn ? "text-ember" : charsLeft < 200 ? "text-gold" : "text-ash"
+                )}
+              >
+                {charsLeft}
+              </span>
+            ) : null}
           </div>
         </div>
 
         {/* Hashtag chips */}
         {hashtags.length > 0 ? (
-          <div className="ml-11 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sm:ml-11">
             {hashtags.map((t) => (
               <button
                 key={t}
@@ -281,9 +283,9 @@ export function PostComposer({ action }: PostComposerProps) {
 
         {/* Image thumbnails */}
         {images.length > 0 ? (
-          <div className="ml-11 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 sm:ml-11">
             {images.map((p, i) => (
-              <div key={p.objectUrl} className="relative size-20 shrink-0">
+              <div key={p.objectUrl} className="group relative size-20 shrink-0">
                 <img
                   src={p.objectUrl}
                   alt=""
@@ -292,7 +294,8 @@ export function PostComposer({ action }: PostComposerProps) {
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
-                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-ink text-cream shadow"
+                  aria-label="Remove image"
+                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-ink text-cream shadow transition-transform hover:scale-110 active:scale-95"
                 >
                   <X className="size-3" />
                 </button>
@@ -303,10 +306,10 @@ export function PostComposer({ action }: PostComposerProps) {
 
         {/* Video preview */}
         {videoFile ? (
-          <div className="ml-11 flex items-center gap-3 rounded-md border border-bone bg-cream px-3 py-2">
+          <div className="flex items-center gap-3 rounded-md border border-bone bg-cream px-3 py-2 sm:ml-11">
             <Video className="size-4 shrink-0 text-ash" />
             <span className="min-w-0 flex-1 truncate text-sm text-ink">{videoFile.name}</span>
-            <button type="button" onClick={removeVideo} className="shrink-0 text-ash hover:text-ember">
+            <button type="button" onClick={removeVideo} aria-label="Remove video" className="shrink-0 text-ash transition-colors hover:text-ember active:scale-95">
               <X className="size-4" />
             </button>
           </div>
@@ -314,25 +317,26 @@ export function PostComposer({ action }: PostComposerProps) {
 
         {/* Video error */}
         {videoError ? (
-          <p className="ml-11 text-sm text-ember">{videoError}</p>
+          <p className="text-sm text-ember sm:ml-11">{videoError}</p>
         ) : null}
 
         {/* Server error */}
         {serverError ? (
-          <p className="ml-11 text-sm text-ember">{serverError}</p>
+          <p className="text-sm text-ember sm:ml-11">{serverError}</p>
         ) : null}
 
-        {/* Action row */}
-        <div className="ml-11 flex flex-wrap items-center gap-2">
+        {/* Action row — wraps cleanly at 360px; media + tag controls sit on one
+            row, the Post button anchors to the right (drops below on tiny widths). */}
+        <div className="flex flex-wrap items-center gap-2 sm:ml-11">
           {/* Image trigger */}
           <button
             type="button"
             disabled={isDemo || isPending || videoFile !== null || images.length >= MAX_IMAGES}
             onClick={() => imageInputRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-ash transition-colors hover:bg-bone hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex min-h-10 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ash transition-colors hover:bg-bone hover:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
             title="Add images"
           >
-            <ImagePlus className="size-4" />
+            <ImagePlus className="size-4 shrink-0" />
             <span>Photo</span>
           </button>
 
@@ -341,15 +345,15 @@ export function PostComposer({ action }: PostComposerProps) {
             type="button"
             disabled={isDemo || isPending || images.length > 0}
             onClick={() => videoInputRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-ash transition-colors hover:bg-bone hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex min-h-10 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-ash transition-colors hover:bg-bone hover:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
             title="Add video"
           >
-            <Video className="size-4" />
+            <Video className="size-4 shrink-0" />
             <span>Video</span>
           </button>
 
           {/* Hashtag input */}
-          <div className="flex items-center gap-1 rounded-md border border-bone bg-cream px-3 py-1.5">
+          <div className="flex min-h-10 items-center gap-1 rounded-md border border-bone bg-cream px-3 py-1.5 transition-colors focus-within:border-saffron">
             <Hash className="size-4 shrink-0 text-ash" />
             <input
               type="text"
@@ -358,12 +362,12 @@ export function PostComposer({ action }: PostComposerProps) {
               onKeyDown={handleHashKeyDown}
               placeholder="tag"
               disabled={isDemo || isPending}
-              className="w-20 bg-transparent text-sm text-ink placeholder:text-ash focus:outline-none disabled:cursor-not-allowed"
+              className="w-16 bg-transparent text-sm text-ink placeholder:text-ash focus:outline-none disabled:cursor-not-allowed sm:w-20"
             />
           </div>
 
-          {/* Spacer */}
-          <div className="flex-1" />
+          {/* Spacer pushes Post to the right when the row has room */}
+          <div className="ml-auto" />
 
           {/* Submit */}
           <Button
@@ -371,10 +375,10 @@ export function PostComposer({ action }: PostComposerProps) {
             variant="primary"
             size="md"
             disabled={!canPost}
-            className="group h-11"
+            className="group h-11 shrink-0 transition-transform active:scale-95"
           >
-            {isPending ? "Posting..." : "Post"}
-            <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            {isPending ? "Posting…" : "Post"}
+            <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:translate-x-0" />
           </Button>
         </div>
 

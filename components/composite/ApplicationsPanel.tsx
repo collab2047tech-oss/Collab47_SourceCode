@@ -108,18 +108,18 @@ export function ApplicationsPanel({
           return (
             <div
               key={app.id}
-              className="rounded-lg border border-bone bg-paper p-5"
+              className="rounded-lg border border-bone bg-paper p-5 transition-colors hover:border-ink/20"
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <Avatar
                     name={app.applicant.name}
                     src={app.applicant.avatar_url ?? undefined}
                     size="md"
                   />
-                  <div>
-                    <p className="font-medium text-ink">{app.applicant.name}</p>
-                    <p className="text-sm text-ash">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-ink">{app.applicant.name}</p>
+                    <p className="truncate text-sm text-ash">
                       @{app.applicant.handle}
                       {app.applicant.college
                         ? ` . ${app.applicant.college}`
@@ -141,19 +141,19 @@ export function ApplicationsPanel({
                 </Tag>
               </div>
 
-              <p className="mt-4 line-clamp-3 text-sm text-ink">
+              <p className="mt-4 line-clamp-3 break-words text-sm text-ink">
                 {app.pitch}
               </p>
 
               {app.links.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-col gap-1.5">
                   {app.links.map((link) => (
                     <a
                       key={link}
                       href={link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="truncate text-xs text-saffron underline underline-offset-2 hover:text-saffron-dk"
+                      className="max-w-full truncate text-xs text-saffron underline underline-offset-2 hover:text-saffron-dk"
                     >
                       {link}
                     </a>

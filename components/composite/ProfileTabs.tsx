@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/primitives/Tag";
-import { Reveal } from "@/components/motion/Reveal";
+import { Reveal, Stagger } from "@/components/motion/Reveal";
 import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info, Trash2 } from "lucide-react";
 import { Avatar } from "@/components/primitives/Avatar";
 import type { PostWithAuthor, RepostedOriginal } from "@/lib/db/posts";
@@ -108,7 +108,7 @@ function RepostCard({ post }: { post: PostWithAuthor }) {
   return (
     <Link
       href={href}
-      className="group flex flex-col rounded-xl border border-bone bg-paper p-5 transition-all duration-200 hover:border-saffron hover:shadow-sm"
+      className="group flex flex-col rounded-xl border border-bone bg-paper p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm"
     >
       {/* Reposted header */}
       <div className="mb-3 flex items-center gap-1.5 text-xs text-ash">
@@ -233,7 +233,7 @@ function PostCard({ post }: { post: PostWithAuthor }) {
   return (
     <Link
       href={`/p/${post.short_id}`}
-      className="group block overflow-hidden rounded-xl border border-bone bg-paper transition-all duration-200 hover:border-saffron hover:shadow-sm"
+      className="group block overflow-hidden rounded-xl border border-bone bg-paper transition-all duration-200 hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm"
     >
       {/* Image - full bleed if present */}
       {(post.image_urls?.length ?? 0) > 0 ? (
@@ -290,7 +290,7 @@ function ProjectCard({ project }: { project: ProfileProject }) {
   return (
     <Link
       href={`/c/${project.short_id}`}
-      className="group flex flex-col rounded-xl border border-bone bg-paper p-5 transition-all duration-200 hover:border-saffron hover:shadow-sm"
+      className="group flex flex-col rounded-xl border border-bone bg-paper p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-semibold leading-snug text-ink group-hover:text-saffron transition-colors">
@@ -367,14 +367,14 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
       {/* ------------------------------------------------------------------ */}
       {/* TAB BAR                                                             */}
       {/* ------------------------------------------------------------------ */}
-      <div className="mt-10 border-b border-bone">
+      <div className="mt-10 overflow-x-auto border-b border-bone no-scrollbar">
         <div className="flex items-center gap-0.5">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "group relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors duration-150",
+                "group relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-medium transition-colors duration-150 sm:px-4",
                 tab === t.id ? "text-ink" : "text-ash hover:text-ink"
               )}
             >
@@ -422,7 +422,7 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
               message="Nothing posted yet. Share what you are working on."
             />
           ) : (
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <Stagger className="mt-8 grid gap-4 sm:grid-cols-2" step={0.05}>
               {posts.map((p) => (
                 <ManagedPostCard
                   key={p.id}
@@ -430,7 +430,7 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
                   canManage={!!currentUserId && currentUserId === p.author_id}
                 />
               ))}
-            </div>
+            </Stagger>
           )}
         </Reveal>
       )}
@@ -455,11 +455,11 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
               }
             />
           ) : (
-            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <Stagger className="mt-8 grid gap-4 sm:grid-cols-2" step={0.05}>
               {projects.map((pr) => (
                 <ProjectCard key={pr.id} project={pr} />
               ))}
-            </div>
+            </Stagger>
           )}
         </Reveal>
       )}
@@ -486,12 +486,12 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
               </div>
 
               {/* Full cards below the bubbles */}
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <Stagger className="mt-8 grid gap-4 sm:grid-cols-2 md:grid-cols-3" step={0.05}>
                 {highlights.map((p) => (
                   <Link
                     key={p.id}
                     href={`/p/${p.short_id}`}
-                    className="group flex flex-col overflow-hidden rounded-xl border border-bone bg-paper transition-all duration-200 hover:border-saffron hover:shadow-sm"
+                    className="group flex flex-col overflow-hidden rounded-xl border border-bone bg-paper transition-all duration-200 hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm"
                   >
                     {(p.image_urls?.length ?? 0) > 0 ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -534,7 +534,7 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
                     </div>
                   </Link>
                 ))}
-              </div>
+              </Stagger>
             </>
           )}
         </Reveal>

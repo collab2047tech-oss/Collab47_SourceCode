@@ -47,13 +47,17 @@ export function ShareButton({ path, label = "Share", shareTitle, shareText, clas
       onClick={handleShare}
       aria-label={copied ? "Link copied!" : label}
       className={cn(
-        "relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
-        "border border-bone bg-paper text-ink transition-all hover:bg-bone",
+        "relative inline-flex min-h-10 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium",
+        "border border-bone bg-paper text-ink transition-all duration-150 hover:border-saffron/40 hover:bg-bone",
         "active:scale-95",
+        copied && "border-moss/40 text-moss",
         className
       )}
     >
-      <Share2 className="size-4" strokeWidth={1.75} />
+      <Share2
+        className={cn("size-4 transition-transform duration-200", copied && "scale-110")}
+        strokeWidth={1.75}
+      />
       {copied ? (
         <span className="text-moss">Copied!</span>
       ) : (

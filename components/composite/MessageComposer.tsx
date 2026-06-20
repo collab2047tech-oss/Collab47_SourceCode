@@ -155,7 +155,7 @@ export function MessageComposer({
 
   if (!canCompose) {
     return (
-      <footer className="border-t border-bone bg-paper px-6 py-4">
+      <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
         <p className="text-center text-sm text-ash">
           {cannotComposeReason ?? "You cannot message this person."}
         </p>
@@ -165,14 +165,14 @@ export function MessageComposer({
 
   if (localBlockedReason && !body && !imageFile) {
     return (
-      <footer className="border-t border-bone bg-paper px-6 py-4">
+      <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
         <p className="text-center text-sm text-ember">{localBlockedReason}</p>
       </footer>
     );
   }
 
   return (
-    <footer className="border-t border-bone bg-paper px-6 py-4">
+    <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
       {localBlockedReason && (
         <p className="mb-2 text-sm text-ember">{localBlockedReason}</p>
       )}
@@ -215,12 +215,13 @@ export function MessageComposer({
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="flex items-center gap-3 rounded-full border border-bone bg-cream px-4 py-2">
+        <div className="flex items-center gap-2 rounded-full border border-bone bg-cream py-1.5 pl-3 pr-1.5 sm:gap-3 sm:py-2 sm:pl-4 sm:pr-2">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-ash transition-colors hover:text-ink"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:text-ink active:scale-90"
             title="Attach image"
+            aria-label="Attach image"
           >
             <Paperclip className="size-4" />
           </button>
@@ -235,7 +236,7 @@ export function MessageComposer({
             value={body}
             onChange={handleBodyChange}
             placeholder="Write a message"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-ash"
+            className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-ash"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -246,9 +247,10 @@ export function MessageComposer({
           <button
             type="submit"
             disabled={isPending || (!body.trim() && !imageFile)}
+            aria-label="Send message"
             className={cn(
-              "rounded-full bg-saffron p-2 text-cream transition-colors hover:bg-saffron-dk",
-              "disabled:cursor-not-allowed disabled:opacity-40"
+              "flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron text-cream transition-all hover:bg-saffron-dk active:scale-90",
+              "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             )}
           >
             <Send className="size-4" />

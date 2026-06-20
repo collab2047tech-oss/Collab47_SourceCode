@@ -154,22 +154,24 @@ export function ProfileEditForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
       {/* Cover upload */}
-      <div className="rounded-lg border border-bone bg-paper p-6">
+      <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Cover photo</h2>
         <p className="mt-1 text-sm text-ash">Displayed at the top of your profile.</p>
-        <div
-          className="mt-4 relative h-40 w-full rounded-lg border border-bone bg-cream overflow-hidden cursor-pointer"
+        <button
+          type="button"
+          className="group mt-4 relative block h-36 w-full rounded-lg border border-bone bg-cream overflow-hidden cursor-pointer sm:h-40"
           onClick={() => coverInputRef.current?.click()}
+          aria-label="Change cover photo"
         >
           {coverPreview ? (
             <img src={coverPreview} alt="Cover preview" className="size-full object-cover" />
           ) : (
-            <div className="size-full bg-[linear-gradient(135deg,#1F3A2C_0%,#0A0A0B_100%)]" />
+            <div className="size-full bg-[linear-gradient(135deg,#0B1220_0%,#1a2744_55%,#0A0F1C_100%)]" />
           )}
-          <div className="absolute inset-0 flex items-center justify-center bg-ink/30 opacity-0 hover:opacity-100 transition-opacity">
-            <span className="text-sm font-medium text-cream">Change cover</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-ink/30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+            <span className="rounded-full border border-cream/30 bg-ink/40 px-3 py-1 text-sm font-medium text-cream backdrop-blur">Change cover</span>
           </div>
-        </div>
+        </button>
         <input
           ref={coverInputRef}
           type="file"
@@ -181,7 +183,7 @@ export function ProfileEditForm({
       </div>
 
       {/* Avatar + name + handle */}
-      <div className="rounded-lg border border-bone bg-paper p-6">
+      <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Avatar</h2>
         <p className="mt-1 text-sm text-ash">Square images work best.</p>
         <div className="mt-6 flex items-center gap-6">
@@ -225,7 +227,7 @@ export function ProfileEditForm({
       </div>
 
       {/* Basic info */}
-      <div className="rounded-lg border border-bone bg-paper p-6">
+      <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Basic info</h2>
         <p className="mt-1 text-sm text-ash">Your name and handle are public.</p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -270,7 +272,7 @@ export function ProfileEditForm({
       </div>
 
       {/* Academic info */}
-      <div className="rounded-lg border border-bone bg-paper p-6">
+      <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Academic</h2>
         <p className="mt-1 text-sm text-ash">Used by the feed ranker and college leaderboard.</p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -312,7 +314,7 @@ export function ProfileEditForm({
       </div>
 
       {/* Links */}
-      <div className="rounded-lg border border-bone bg-paper p-6">
+      <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Links</h2>
         <p className="mt-1 text-sm text-ash">
           Add your website and socials. Paste a full URL or just your handle.

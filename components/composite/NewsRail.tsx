@@ -6,6 +6,7 @@
 import { getNewsForUser } from "@/lib/news/fetch";
 import type { NewsItem } from "@/lib/supabase/types";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -40,7 +41,7 @@ export async function NewsRail({ branch, city }: NewsRailProps) {
           <Link
             key={item.id}
             href={`/news/${item.id}`}
-            className="group block rounded-lg border border-bone bg-paper p-4 transition-colors hover:border-saffron"
+            className="card card-hover group block p-4"
           >
             <div className="flex gap-3">
               {item.image_url && (
@@ -72,9 +73,10 @@ export async function NewsRail({ branch, city }: NewsRailProps) {
         <div className="mt-4">
           <Link
             href="/news"
-            className="text-caption font-medium text-saffron hover:underline"
+            className="group inline-flex items-center gap-1 text-caption font-medium text-saffron"
           >
             See all news
+            <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
       )}

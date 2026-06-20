@@ -52,41 +52,54 @@ export function NetworkTabs({
   return (
     <>
       {/* Tab bar */}
-      <div className="mt-12 flex items-center gap-1 border-b border-bone">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "flex items-center gap-2 px-5 py-3 text-sm transition-colors",
-              tab === t.id
-                ? "border-b-2 border-saffron text-ink"
-                : "text-ash hover:text-ink"
-            )}
-          >
-            {t.label}
-            <span className="tabular-nums text-xs text-ash">{t.data.length}</span>
-          </button>
-        ))}
+      <div className="mt-12 overflow-x-auto border-b border-bone no-scrollbar">
+        <div className="flex items-center gap-1">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 px-4 py-3 text-sm transition-colors sm:px-5",
+                tab === t.id
+                  ? "border-b-2 border-saffron text-ink"
+                  : "text-ash hover:text-ink"
+              )}
+            >
+              {t.label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none transition-colors",
+                  tab === t.id ? "bg-saffron/10 text-saffron-dk" : "bg-bone text-ash"
+                )}
+              >
+                {t.data.length}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid */}
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {activeData.length === 0 ? (
-          <p className="col-span-full py-10 text-center text-ash">
-            Nothing here yet.
-          </p>
-        ) : (
-          activeData.map((person) => (
-            <PersonCard
-              key={person.id}
-              person={person}
-              variant="grid"
-              state={stateFor(person.id)}
-            />
-          ))
-        )}
-      </div>
+      {activeData.length === 0 ? (
+        <p className="mt-10 rounded-lg border border-dashed border-bone bg-paper/60 py-12 text-center text-sm text-ash">
+          Nothing here yet.
+        </p>
+      ) : (
+        <div
+          key={tab}
+          className="stagger mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {activeData.map((person, i) => (
+            <div key={person.id} className="h-full" style={{ "--stagger-i": i } as React.CSSProperties}>
+              <PersonCard
+                person={person}
+                variant="grid"
+                state={stateFor(person.id)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

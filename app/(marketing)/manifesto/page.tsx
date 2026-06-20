@@ -13,7 +13,7 @@ export default function ManifestoPage() {
       {/* ============================================================
           TITLE BLOCK
           ============================================================ */}
-      <section className="section pt-32 md:pt-40">
+      <section className="section pt-28 sm:pt-32 md:pt-40">
         <div className="container-edit">
           <Reveal>
             <p className="text-caption">
@@ -22,7 +22,7 @@ export default function ManifestoPage() {
           </Reveal>
 
           <Reveal delay={0.08}>
-            <h1 className="mt-8 max-w-5xl text-display-xl">
+            <h1 className="mt-6 max-w-5xl text-[2.5rem] leading-[1.05] tracking-tight font-serif sm:mt-8 sm:text-display-lg md:text-display-xl">
               Built where the next 40 million Indians{" "}
               <span className="italic text-saffron">actually are.</span>
             </h1>
@@ -104,9 +104,9 @@ export default function ManifestoPage() {
 
             {/* PULL QUOTE 1 */}
             <Reveal delay={0.05}>
-              <figure className="my-16 rule-top">
+              <figure className="my-12 rule-top sm:my-16">
                 <blockquote
-                  className="text-display-md italic text-saffron"
+                  className="text-[1.85rem] leading-[1.12] tracking-tight font-serif italic text-saffron sm:text-display-md"
                   style={{ maxWidth: "22ch" }}
                 >
                   The cost of being invisible at eighteen is not an
@@ -173,9 +173,9 @@ export default function ManifestoPage() {
 
             {/* PULL QUOTE 2 */}
             <Reveal delay={0.05}>
-              <figure className="my-16 rule-top">
+              <figure className="my-12 rule-top sm:my-16">
                 <blockquote
-                  className="text-display-md italic text-saffron"
+                  className="text-[1.85rem] leading-[1.12] tracking-tight font-serif italic text-saffron sm:text-display-md"
                   style={{ maxWidth: "24ch" }}
                 >
                   We surface merit, not pedigree. The rest is footnote.
@@ -220,7 +220,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-10 font-indic text-display-md text-ink"
+                className="mt-10 font-indic text-[2.25rem] leading-tight text-ink sm:text-display-md"
                 style={{ maxWidth: "65ch" }}
               >
                 शुभम् भवतु.
@@ -240,7 +240,7 @@ export default function ManifestoPage() {
               <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p
-                    className="font-serif text-5xl italic text-ink"
+                    className="font-serif text-4xl italic text-ink sm:text-5xl"
                     style={{ fontFamily: "var(--font-serif)" }}
                   >
                     Akshpreet
@@ -270,7 +270,7 @@ export default function ManifestoPage() {
             <div className="flex flex-col items-start gap-10 md:flex-row md:items-end md:justify-between">
               <div className="max-w-3xl">
                 <p className="text-caption text-cream/60">Closing note</p>
-                <h2 className="mt-6 text-display-lg">
+                <h2 className="mt-6 text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:text-display-md lg:text-display-lg">
                   If this resonates,{" "}
                   <span className="italic text-saffron">
                     you belong here.
@@ -280,7 +280,7 @@ export default function ManifestoPage() {
 
               <Link
                 href="/signup"
-                className="group inline-flex items-center gap-3 rounded-full bg-saffron px-8 py-4 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk"
+                className="group inline-flex h-12 items-center gap-3 rounded-full bg-saffron px-8 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-[0.98]"
               >
                 Claim your handle
                 <span

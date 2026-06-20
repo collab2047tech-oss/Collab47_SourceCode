@@ -31,8 +31,8 @@ export function DeclineRequestButton({
       onClick={handleDecline}
       disabled={isPending}
       className={cn(
-        "flex items-center gap-1.5 rounded-md border border-bone px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-bone",
-        "disabled:cursor-not-allowed disabled:opacity-50"
+        "flex items-center gap-1.5 rounded-md border border-bone px-3 py-2 text-xs font-medium text-ink transition-all hover:bg-bone active:scale-95",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
       )}
     >
       <X className="size-3" />

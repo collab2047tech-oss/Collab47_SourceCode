@@ -1,6 +1,8 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { createProjectAction } from "./actions";
@@ -25,7 +27,13 @@ export default function NewProjectPage() {
 
   return (
     <div className="max-w-2xl">
-      <p className="text-caption text-ash">Collab Projects</p>
+      <Link
+        href="/collabs"
+        className="inline-flex items-center gap-2 text-sm text-ash transition-colors hover:text-ink"
+      >
+        <ArrowLeft className="size-4" /> Back to Collabs
+      </Link>
+      <p className="mt-6 text-caption text-ash">Collab Projects</p>
       <h1 className="mt-2 font-serif text-h1 text-ink">
         Post a{" "}
         <span className="italic text-saffron">brief.</span>
@@ -78,7 +86,7 @@ export default function NewProjectPage() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Deadline"
             name="deadline"

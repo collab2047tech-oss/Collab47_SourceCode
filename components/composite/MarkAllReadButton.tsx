@@ -33,14 +33,19 @@ export function MarkAllReadButton({ hasUnread }: Props) {
       onClick={handleClick}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-all",
         disabled
           ? "cursor-default text-ash"
-          : "text-saffron hover:bg-saffron/10 hover:text-saffron-dk"
+          : "text-saffron hover:bg-saffron/10 hover:text-saffron-dk active:scale-95"
       )}
     >
-      <CheckCheck className="size-4" />
-      {isPending ? "Marking..." : "Mark all as read"}
+      <CheckCheck className="size-4 shrink-0" />
+      <span className="hidden sm:inline">
+        {isPending ? "Marking..." : "Mark all as read"}
+      </span>
+      <span className="sm:hidden">
+        {isPending ? "Marking..." : "Mark read"}
+      </span>
     </button>
   );
 }

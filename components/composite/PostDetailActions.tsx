@@ -195,7 +195,7 @@ export function PostDetailActions({
 
   return (
     <div className="mt-10 border-t border-bone pt-6">
-    <div className={cn("flex items-center gap-6 text-sm text-ash", isPending && "opacity-70")}>
+    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ash sm:gap-6", isPending && "opacity-70")}>
       {/* Reaction control */}
       <div
         ref={reactionRef}
@@ -203,10 +203,10 @@ export function PostDetailActions({
         onMouseEnter={openReactionPopover}
         onMouseLeave={cancelReactionPopover}
       >
-        {/* Reaction popover */}
+        {/* Reaction popover — clamped so it never spills past the viewport edge. */}
         {reactionPopoverOpen ? (
           <div
-            className="absolute bottom-full left-0 mb-1.5 z-50 flex items-center gap-1 rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10"
+            className="absolute bottom-full left-0 z-50 mb-1.5 flex max-w-[calc(100vw-2rem)] items-center gap-0.5 overflow-x-auto rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10 sm:gap-1 sm:overflow-visible"
             onMouseEnter={() => {
               cancelReactionPopover();
               setReactionPopoverOpen(true);
@@ -221,9 +221,9 @@ export function PostDetailActions({
                 aria-label={r.label}
                 title={r.label}
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-full transition-all hover:scale-125",
+                  "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110 sm:size-8",
                   r.color,
-                  reaction === r.kind && "scale-125 bg-bone"
+                  reaction === r.kind && "scale-110 bg-bone"
                 )}
               >
                 {r.icon}
@@ -240,7 +240,7 @@ export function PostDetailActions({
             disabled={isPending}
             aria-label={liked ? `Remove ${meta.label}` : "Like"}
             className={cn(
-              "flex items-center gap-1.5 transition-colors hover:text-saffron disabled:opacity-40",
+              "flex min-h-10 items-center gap-1.5 transition-colors hover:text-saffron active:scale-95 disabled:opacity-40",
               liked ? meta.color : ""
             )}
           >
@@ -262,7 +262,7 @@ export function PostDetailActions({
             }}
             disabled={isPending}
             aria-label="Choose a reaction"
-            className="rounded-full px-1 py-0.5 text-ash transition-colors hover:text-ink disabled:opacity-40"
+            className="flex min-h-10 items-center rounded-full px-1.5 text-ash transition-colors hover:text-ink disabled:opacity-40"
           >
             <span className="block size-0 border-x-[3px] border-t-4 border-x-transparent border-t-current" />
           </button>
@@ -270,7 +270,7 @@ export function PostDetailActions({
       </div>
 
       {/* Comment count (static display - thread is below) */}
-      <span className="flex items-center gap-1.5 text-ash">
+      <span className="flex min-h-10 items-center gap-1.5 text-ash">
         <MessageCircle className="size-4" />
         {commentCount}
       </span>
@@ -282,7 +282,7 @@ export function PostDetailActions({
         disabled={isPending}
         aria-label={saved ? "Remove bookmark" : "Bookmark"}
         className={cn(
-          "flex items-center gap-1.5 transition-colors hover:text-ink disabled:opacity-40",
+          "flex min-h-10 items-center gap-1.5 transition-colors hover:text-ink active:scale-95 disabled:opacity-40",
           saved && "text-saffron"
         )}
       >
@@ -299,7 +299,7 @@ export function PostDetailActions({
         disabled={isPending}
         aria-label="Repost"
         className={cn(
-          "flex items-center gap-1.5 transition-colors hover:text-ink disabled:opacity-40",
+          "flex min-h-10 items-center gap-1.5 transition-colors hover:text-ink active:scale-95 disabled:opacity-40",
           repostToast && "text-moss"
         )}
       >
@@ -312,18 +312,18 @@ export function PostDetailActions({
         type="button"
         onClick={handleShare}
         aria-label="Copy link"
-        className="flex items-center gap-1.5 transition-colors hover:text-ink"
+        className="flex min-h-10 items-center gap-1.5 transition-colors hover:text-ink active:scale-95"
       >
         <Share2 className="size-4" />
         {copied ? <span className="text-xs font-medium text-moss">Copied!</span> : null}
       </button>
 
-      {/* Report */}
+      {/* Report — pushed to the far end of the row */}
       <button
         type="button"
         onClick={() => setReportOpen(true)}
         aria-label="Report this post"
-        className="flex items-center gap-1.5 transition-colors hover:text-ember"
+        className="flex min-h-10 items-center gap-1.5 transition-colors hover:text-ember active:scale-95 sm:ml-auto"
       >
         <Flag className="size-4" />
       </button>

@@ -4,8 +4,9 @@ import {
   getMyConversations,
 } from "@/lib/db/messages";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import Link from "next/link";
 import { Avatar } from "@/components/primitives/Avatar";
-import { Users } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { MessageThread } from "@/components/composite/MessageThread";
 import { MessageComposer } from "@/components/composite/MessageComposer";
 import { ChatMenu } from "@/components/composite/ChatMenu";
@@ -91,10 +92,10 @@ export default async function ChatPage({ params }: PageProps) {
     : header.blockedReason;
 
   return (
-    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
-      {/* Left rail (conversation list) */}
-      <aside className="flex flex-col border-r border-bone bg-paper">
-        <div className="p-5">
+    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem-3.5rem)] md:h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden md:-mx-8 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
+      {/* Left rail (conversation list) — hidden on mobile; the thread is the page */}
+      <aside className="hidden min-w-0 flex-col border-r border-bone bg-paper md:flex">
+        <div className="p-4 sm:p-5">
           <h2 className="font-serif text-2xl text-ink">Messages</h2>
           <div className="mt-4 flex gap-1 rounded-lg bg-cream p-1">
             <a
@@ -116,12 +117,12 @@ export default async function ChatPage({ params }: PageProps) {
             </a>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
           {inboxItems.map((item) => (
             <a
               key={item.id}
               href={item.href}
-              className={`flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-bone/40 ${
+              className={`flex w-full items-start gap-3 border-b border-bone/60 px-5 py-4 text-left transition-colors hover:bg-bone/40 ${
                 item.id === chatId ? "bg-bone/60" : ""
               }`}
             >
@@ -147,38 +148,49 @@ export default async function ChatPage({ params }: PageProps) {
         </div>
       </aside>
 
-      {/* Right pane */}
-      <section className="flex flex-col bg-cream">
-        <header className="flex items-center justify-between border-b border-bone bg-paper px-6 py-4">
-          {isGroup ? (
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-full bg-moss/15 text-moss">
-                <Users className="size-5" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-ink">{groupTitle}</p>
-                <p className="text-xs text-ash">
-                  {header.memberCount ?? 0} members
-                </p>
+      {/* Right pane — full width on mobile */}
+      <section className="flex min-w-0 flex-col bg-cream">
+        <header className="flex items-center justify-between gap-2 border-b border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {/* Mobile-only back arrow to the conversation list */}
+            <Link
+              href="/messages"
+              aria-label="Back to messages"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:bg-bone hover:text-ink active:scale-95 md:hidden"
+            >
+              <ArrowLeft className="size-5" />
+            </Link>
+            {isGroup ? (
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
+                  <Users className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{groupTitle}</p>
+                  <p className="text-xs text-ash">
+                    {header.memberCount ?? 0} members
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : otherUser ? (
-            <div className="flex items-center gap-3">
-              <Avatar
-                name={otherUser.name}
-                src={otherUser.avatar_url ?? undefined}
-                size="md"
-              />
-              <div>
-                <p className="text-sm font-semibold text-ink">{otherUser.name}</p>
-                {otherUser.college && (
-                  <p className="text-xs text-ash">{otherUser.college}</p>
-                )}
+            ) : otherUser ? (
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar
+                  name={otherUser.name}
+                  src={otherUser.avatar_url ?? undefined}
+                  size="md"
+                  className="shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{otherUser.name}</p>
+                  {otherUser.college && (
+                    <p className="truncate text-xs text-ash">{otherUser.college}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="h-9" />
-          )}
+            ) : (
+              <div className="h-9" />
+            )}
+          </div>
           <ChatMenu
             conversationId={chatId}
             otherUserId={isGroup ? null : (otherUser as { id?: string } | null)?.id ?? null}
@@ -191,7 +203,7 @@ export default async function ChatPage({ params }: PageProps) {
             Lets the recipient accept (moves it to the main inbox) or decline
             (deletes the request) right from the open thread. */}
         {!isGroup && header.isRequest && !header.isRequestSender && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bone bg-saffron/5 px-6 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bone bg-saffron/5 px-3 py-3 sm:px-6">
             <p className="text-sm text-ink">
               <span className="font-semibold">{otherUser?.name ?? "This person"}</span>{" "}
               wants to message you.

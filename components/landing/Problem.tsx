@@ -31,18 +31,22 @@ export function Problem() {
       <div className="container-edit">
         <Reveal>
           <p className="text-caption mb-6">The Problem</p>
-          <h2 className="text-display-md max-w-4xl text-ink">
+          <h2 className="text-[2.1rem] leading-[1.1] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
             Indian students juggle five platforms. None of them integrate.{" "}
             <span className="text-ash">None of them were built for them.</span>
           </h2>
         </Reveal>
 
-        <div className="mt-20 grid gap-px bg-bone md:grid-cols-2">
+        <div className="mt-14 grid gap-px bg-bone sm:mt-20 md:grid-cols-2">
           {items.map((it, i) => (
             <Reveal key={it.n} delay={i * 0.06} className="bg-cream">
-              <div className="flex h-full flex-col gap-6 p-8 md:p-12">
-                <span className="font-serif text-5xl text-saffron">{it.n}</span>
-                <h3 className="font-serif text-3xl text-ink">{it.h}</h3>
+              <div className="group flex h-full flex-col gap-5 p-7 transition-colors hover:bg-paper sm:gap-6 sm:p-8 md:p-12">
+                <span className="font-serif text-4xl text-saffron transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-5xl">
+                  {it.n}
+                </span>
+                <h3 className="font-serif text-2xl text-ink sm:text-3xl">
+                  {it.h}
+                </h3>
                 <p className="max-w-md text-body text-ash">{it.p}</p>
               </div>
             </Reveal>

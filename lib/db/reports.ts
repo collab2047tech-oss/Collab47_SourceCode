@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "@/lib/supabase/env";
+import { isCurrentUserAdmin } from "@/lib/auth/admin";
 
 export type ReportCategory = "spam" | "hate" | "sexual" | "other";
 
@@ -51,6 +52,8 @@ function serviceClient() {
 }
 
 export async function getModerationQueue(limit = 50): Promise<QueueItem[]> {
+  // Admin-only: this exposes reporter identities + reported content.
+  if (!(await isCurrentUserAdmin())) return [];
   const sc = serviceClient();
   if (!sc) return [];
   const { data } = await sc.from("moderation_queue").select("*").limit(limit);
@@ -61,6 +64,9 @@ export async function resolveReport(
   reportId: string,
   action: "dismiss" | "remove_post" | "suspend_user"
 ): Promise<{ ok: boolean; error?: string }> {
+  // CRITICAL: admin gate. This runs with the service-role client and can delete
+  // posts / suspend users — it must never be reachable by a non-admin caller.
+  if (!(await isCurrentUserAdmin())) return { ok: false, error: "Not authorized." };
   const sc = serviceClient();
   if (!sc) return { ok: false, error: "Server not configured." };
 

@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/messages";
 import { getMyConnections, type MiniProfile } from "@/lib/db/social";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { SUPABASE_URL } from "@/lib/supabase/env";
 import type { DMPermission } from "@/lib/supabase/types";
 
 export async function sendMessageAction(formData: FormData) {
@@ -21,7 +22,13 @@ export async function sendMessageAction(formData: FormData) {
   const body = formData.get("body") as string;
   // Image is uploaded client-side directly to Storage; we only receive the URL
   // (so files never hit the Server Action's 1MB body limit).
-  const imageUrl = (formData.get("image_url") as string | null)?.trim() || undefined;
+  let imageUrl = (formData.get("image_url") as string | null)?.trim() || undefined;
+
+  // Only accept media URLs that point at OUR Supabase Storage public path —
+  // never persist an arbitrary attacker-supplied URL onto a message row.
+  if (imageUrl && !imageUrl.startsWith(`${SUPABASE_URL}/storage/v1/object/public/`)) {
+    imageUrl = undefined;
+  }
 
   if (!conversationId || (!body?.trim() && !imageUrl)) {
     return { ok: false, error: "Missing fields" };

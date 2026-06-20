@@ -63,8 +63,7 @@ export default async function ProfilePage() {
       {/* ------------------------------------------------------------------ */}
       <Reveal y={0}>
         <div
-          className="relative w-full overflow-hidden"
-          style={{ height: "260px" }}
+          className="relative h-40 w-full overflow-hidden sm:h-52 md:h-65"
         >
           {/* Cover: the user's uploaded image when present, else the brand gradient */}
           {p.cover_url ? (
@@ -107,12 +106,12 @@ export default async function ProfilePage() {
       {/* ------------------------------------------------------------------ */}
       <div className="mx-auto max-w-5xl px-4 md:px-8">
         <Reveal delay={0.05}>
-          <div className="-mt-20 flex flex-col gap-6 md:-mt-24 md:flex-row md:items-end md:justify-between">
+          <div className="-mt-14 flex flex-col gap-5 sm:-mt-16 md:-mt-24 md:flex-row md:items-end md:justify-between md:gap-6">
             {/* LEFT: avatar + identity */}
-            <div className="flex flex-col gap-5 md:flex-row md:items-end md:gap-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
               {/* Avatar with gradient ring (story-bubble effect) */}
               <div
-                className="relative shrink-0 rounded-full p-0.75"
+                className="relative shrink-0 self-start rounded-full p-0.75"
                 style={{
                   background:
                     "linear-gradient(135deg, #2C5BFF 0%, #5a7dff 50%, #2C5BFF 100%)",
@@ -131,7 +130,7 @@ export default async function ProfilePage() {
               <div className="pb-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1
-                    className="font-serif text-4xl leading-tight tracking-tight text-ink md:text-5xl"
+                    className="font-serif text-3xl leading-tight tracking-tight text-ink wrap-break-word sm:text-4xl md:text-5xl"
                     style={{ letterSpacing: "-0.02em" }}
                   >
                     {p.name}
@@ -190,9 +189,9 @@ export default async function ProfilePage() {
             </div>
 
             {/* RIGHT: action buttons */}
-            <div className="flex shrink-0 items-center gap-3">
-              <Link href="/profile/edit">
-                <Button variant="secondary" size="md" className="gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-3">
+              <Link href="/profile/edit" className="flex-1 sm:flex-none">
+                <Button variant="secondary" size="md" className="w-full gap-2 active:scale-95 sm:w-auto">
                   <Pencil className="size-4" strokeWidth={1.75} />
                   Edit profile
                 </Button>

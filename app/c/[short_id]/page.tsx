@@ -4,7 +4,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Button } from "@/components/primitives/Button";
 import { Reveal } from "@/components/motion/Reveal";
-import { Calendar, Users, Briefcase, ExternalLink } from "lucide-react";
+import { Calendar, Users, Briefcase, ExternalLink, ArrowLeft, BadgeCheck } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import {
   getProjectByShortId,
@@ -33,10 +33,13 @@ export default async function ProjectPage({
       <main className="min-h-dvh bg-cream">
         <Nav />
         <div className="container-edit pt-40">
-          <h1 className="font-serif text-5xl text-ink">
+          <h1 className="font-serif text-4xl text-ink sm:text-5xl">
             Project{" "}
             <span className="italic text-saffron">not found.</span>
           </h1>
+          <Link href="/collabs" className="mt-6 inline-block text-saffron underline">
+            Browse open briefs
+          </Link>
         </div>
       </main>
     );
@@ -79,10 +82,16 @@ export default async function ProjectPage({
   return (
     <main className="min-h-dvh bg-cream">
       <Nav />
-      <div className="container-edit max-w-3xl pt-32 pb-20">
+      <div className="container-edit max-w-3xl pt-28 pb-20 md:pt-32">
         <Reveal>
-          <p className="text-caption text-ash">Collab Project</p>
-          <h1 className="mt-4 font-serif text-5xl text-ink">
+          <Link
+            href="/collabs"
+            className="inline-flex items-center gap-2 text-sm text-ash transition-colors hover:text-ink"
+          >
+            <ArrowLeft className="size-4" /> Back to Collabs
+          </Link>
+          <p className="mt-6 text-caption text-ash">Collab Project</p>
+          <h1 className="mt-4 font-serif text-3xl leading-tight text-ink sm:text-4xl md:text-5xl">
             {project.title}
           </h1>
         </Reveal>
@@ -116,7 +125,11 @@ export default async function ProjectPage({
             </span>
             <span className="flex items-center gap-2">
               <Users className="size-4" />
-              {project.slot_count} slots
+              {project.status === "open"
+                ? openSlots > 0
+                  ? `${openSlots} of ${project.slot_count} slots open`
+                  : "Team full"
+                : `${project.slot_count} slots`}
             </span>
             <span className="flex items-center gap-2">
               <Briefcase className="size-4" />
@@ -149,7 +162,7 @@ export default async function ProjectPage({
         <Reveal delay={0.2}>
           <section className="mt-10">
             <h2 className="text-caption text-ash">Brief</h2>
-            <p className="mt-2 whitespace-pre-wrap text-body text-ink">
+            <p className="mt-2 whitespace-pre-wrap break-words text-body text-ink">
               {project.brief}
             </p>
           </section>
@@ -254,7 +267,7 @@ export default async function ProjectPage({
                   <Link
                     key={m.user_id}
                     href={`/u/${m.profile.handle}`}
-                    className="flex items-center gap-2 rounded-lg border border-bone bg-paper px-3 py-2 transition-colors hover:border-ink/30"
+                    className="flex items-center gap-2 rounded-lg border border-bone bg-paper px-3 py-2 transition-all hover:-translate-y-0.5 hover:border-ink/30"
                   >
                     <Avatar
                       name={m.profile.name}
@@ -265,9 +278,15 @@ export default async function ProjectPage({
                       <p className="text-sm font-medium text-ink">
                         {m.profile.name}
                       </p>
-                      <p className="text-xs text-ash">
-                        {m.is_verified ? "Verified contributor" : m.role === "owner" ? "Author" : "Member"}
-                      </p>
+                      {m.is_verified ? (
+                        <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-moss">
+                          <BadgeCheck className="size-3.5" /> Verified contributor
+                        </span>
+                      ) : (
+                        <p className="text-xs text-ash">
+                          {m.role === "owner" ? "Author" : "Member"}
+                        </p>
+                      )}
                     </div>
                   </Link>
                 ))}
@@ -301,9 +320,9 @@ export default async function ProjectPage({
                 }>).map((post) => (
                   <div
                     key={post.id}
-                    className="rounded-lg border border-bone bg-paper px-5 py-4"
+                    className="rounded-lg border border-bone bg-paper px-5 py-4 transition-colors hover:border-ink/20"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Avatar
                         name={post.author.name}
                         src={post.author.avatar_url ?? undefined}
@@ -323,7 +342,7 @@ export default async function ProjectPage({
                         })}
                       </span>
                     </div>
-                    <p className="mt-3 whitespace-pre-wrap text-sm text-ink">
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm text-ink">
                       {post.body}
                     </p>
                   </div>

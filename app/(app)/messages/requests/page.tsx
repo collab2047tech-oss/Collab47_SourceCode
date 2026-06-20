@@ -22,10 +22,10 @@ export default async function RequestsPage() {
   const requests = await getMyConversations("requests");
 
   return (
-    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
-      {/* Left rail */}
-      <aside className="flex flex-col border-r border-bone bg-paper">
-        <div className="p-5">
+    <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem-3.5rem)] md:h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden md:-mx-8 md:grid-cols-[300px_1fr] lg:grid-cols-[340px_1fr]">
+      {/* Left rail — full width on mobile */}
+      <aside className="flex min-w-0 flex-col bg-paper md:border-r md:border-bone">
+        <div className="p-4 sm:p-5">
           <div className="flex items-center gap-3">
             <Link
               href="/messages"
@@ -42,7 +42,7 @@ export default async function RequestsPage() {
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
           {requests.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-16 text-center">
               <MessageSquare className="size-8 text-bone" />
@@ -52,7 +52,7 @@ export default async function RequestsPage() {
           {requests.map((req) => (
             <div
               key={req.id}
-              className="flex w-full items-start gap-3 border-b border-bone px-5 py-4 last:border-0"
+              className="flex w-full items-start gap-3 border-b border-bone px-4 py-4 last:border-0 sm:px-5"
             >
               <Avatar
                 name={req.otherUser.name}
@@ -88,12 +88,14 @@ export default async function RequestsPage() {
         </div>
       </aside>
 
-      {/* Right pane placeholder */}
-      <section className="flex flex-col items-center justify-center gap-3 bg-cream">
+      {/* Right pane placeholder — hidden on mobile (list is the page) */}
+      <section className="hidden flex-col items-center justify-center gap-3 bg-cream px-6 md:flex">
         <Reveal>
           <div className="text-center">
-            <MessageSquare className="mx-auto size-10 text-bone" />
-            <p className="mt-2 text-sm text-ash">Select a request to preview the conversation.</p>
+            <span className="mx-auto flex size-16 items-center justify-center rounded-full border border-bone bg-paper">
+              <MessageSquare className="size-7 text-ash" />
+            </span>
+            <p className="mt-3 text-sm text-ash">Select a request to preview the conversation.</p>
           </div>
         </Reveal>
       </section>

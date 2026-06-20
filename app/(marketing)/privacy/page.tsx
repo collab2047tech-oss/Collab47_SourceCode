@@ -15,10 +15,12 @@ export default function PrivacyPage() {
     <main className="min-h-screen bg-cream text-ink">
       <Nav />
 
-      <section className="section pt-40 md:pt-48">
+      <section className="section pt-32 sm:pt-40 md:pt-48">
         <div className="container-edit max-w-3xl">
           <p className="text-caption rule-top inline-block">Legal</p>
-          <h1 className="text-display-md mt-10 text-ink">Privacy Policy</h1>
+          <h1 className="mt-8 text-[2.5rem] leading-[1.08] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md">
+            Privacy Policy
+          </h1>
           <p className="mt-6 text-body text-ash">Last updated {updated}.</p>
 
           <div className="prose-legal mt-14 space-y-10 text-body text-ink/85">
