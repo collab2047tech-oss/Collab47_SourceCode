@@ -41,6 +41,26 @@ export async function getFollowState(targetUserId: string) {
   };
 }
 
+export async function getConnectionStatus(
+  targetUserId: string
+): Promise<"none" | "pending" | "connected"> {
+  const sb = await getSupabaseServer();
+  if (!sb) return "none";
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user || user.id === targetUserId) return "none";
+
+  const [a, b] = canonical(user.id, targetUserId);
+  const { data } = await sb
+    .from("connections")
+    .select("status")
+    .eq("user_a_id", a)
+    .eq("user_b_id", b)
+    .maybeSingle();
+
+  if (!data) return "none";
+  return data.status === "accepted" ? "connected" : "pending";
+}
+
 export async function followUser(targetUserId: string): Promise<Result> {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: true };

@@ -8,6 +8,15 @@ export type DMPermission = "everyone" | "connections" | "nobody";
 export type ReportCategory = "spam" | "hate" | "sexual" | "other";
 export type ConversationType = "one_to_one" | "group";
 export type ProjectStatus = "open" | "team_formed" | "in_progress" | "delivered" | "closed";
+export interface ProfileLinks {
+  website?: string;
+  github?: string;
+  linkedin?: string;
+  instagram?: string;
+  twitter?: string;
+  youtube?: string;
+}
+
 export type NotificationKind =
   | "follow"
   | "like"
@@ -42,6 +51,7 @@ export interface Profile {
   feed_prefs: Record<string, unknown> | null;
   privacy: Record<string, boolean> | null;
   notification_prefs: Record<string, { email: boolean; push: boolean }> | null;
+  links: ProfileLinks | null;
   created_at: string;
   updated_at: string;
 }

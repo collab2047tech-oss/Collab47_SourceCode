@@ -136,6 +136,13 @@ export function MessageThread({
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8 no-scrollbar">
+      {messages.length === 0 && (
+        <div className="flex h-full flex-col items-center justify-center text-center">
+          <p className="text-sm text-ash">No messages yet.</p>
+          <p className="mt-1 text-sm text-ash">Start the conversation.</p>
+        </div>
+      )}
+
       {groups.map((group) => (
         <div key={group.label}>
           <p className="text-caption mb-4 mt-2 text-center">{group.label}</p>

@@ -11,14 +11,19 @@ import {
   Bookmark,
   Share2,
   MessageCircle,
+  Repeat2,
+  Flag,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { ReportModal } from "./ReportModal";
+import { submitReportAction } from "@/app/(app)/home/report-actions";
 import {
   likePostAction,
   unlikePostAction,
   reactToPostAction,
   bookmarkPostAction,
   unbookmarkPostAction,
+  repostPostAction,
 } from "@/app/(app)/home/engagement-actions";
 import type { ReactionKind } from "@/lib/db/engagement";
 
@@ -70,6 +75,8 @@ export function PostDetailActions({
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [repostToast, setRepostToast] = useState(false);
   const reactionRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -134,11 +141,21 @@ export function PostDetailActions({
   }
 
   function openReactionPopover() {
-    hoverTimerRef.current = setTimeout(() => setReactionPopoverOpen(true), 400);
+    hoverTimerRef.current = setTimeout(() => setReactionPopoverOpen(true), 120);
   }
 
   function cancelReactionPopover() {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+  }
+
+  function handleRepost() {
+    startTransition(async () => {
+      const res = await repostPostAction(postId);
+      if (res.ok) {
+        setRepostToast(true);
+        setTimeout(() => setRepostToast(false), 2500);
+      }
+    });
   }
 
   function toggleSave() {
@@ -199,25 +216,40 @@ export function PostDetailActions({
         ) : null}
 
         {/* Main reaction button */}
-        <button
-          type="button"
-          onClick={toggleLike}
-          disabled={isPending}
-          aria-label={liked ? `Remove ${meta.label}` : "Like"}
-          className={cn(
-            "flex items-center gap-1.5 transition-colors hover:text-saffron disabled:opacity-40",
-            liked ? meta.color : ""
-          )}
-        >
-          {liked ? (
-            <span className={cn("size-4 transition-all scale-110", meta.color)}>
-              {meta.icon}
-            </span>
-          ) : (
-            <ThumbsUp className="size-4 stroke-current" />
-          )}
-          {likes}
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={toggleLike}
+            disabled={isPending}
+            aria-label={liked ? `Remove ${meta.label}` : "Like"}
+            className={cn(
+              "flex items-center gap-1.5 transition-colors hover:text-saffron disabled:opacity-40",
+              liked ? meta.color : ""
+            )}
+          >
+            {liked ? (
+              <span className={cn("size-4 transition-all scale-110", meta.color)}>
+                {meta.icon}
+              </span>
+            ) : (
+              <ThumbsUp className="size-4 stroke-current" />
+            )}
+            {likes}
+          </button>
+          {/* Caret: click opens the reaction picker instantly (touch-friendly) */}
+          <button
+            type="button"
+            onClick={() => {
+              cancelReactionPopover();
+              setReactionPopoverOpen((o) => !o);
+            }}
+            disabled={isPending}
+            aria-label="Choose a reaction"
+            className="rounded-full px-1 py-0.5 text-ash transition-colors hover:text-ink disabled:opacity-40"
+          >
+            <span className="block size-0 border-x-[3px] border-t-4 border-x-transparent border-t-current" />
+          </button>
+        </div>
       </div>
 
       {/* Comment count (static display - thread is below) */}
@@ -243,6 +275,21 @@ export function PostDetailActions({
         {bookmarkCount}
       </button>
 
+      {/* Repost */}
+      <button
+        type="button"
+        onClick={handleRepost}
+        disabled={isPending}
+        aria-label="Repost"
+        className={cn(
+          "flex items-center gap-1.5 transition-colors hover:text-ink disabled:opacity-40",
+          repostToast && "text-moss"
+        )}
+      >
+        <Repeat2 className={cn("size-4 transition-all", repostToast && "scale-110")} />
+        {repostToast ? <span className="text-xs font-medium text-moss">Reposted</span> : null}
+      </button>
+
       {/* Share */}
       <button
         type="button"
@@ -253,6 +300,24 @@ export function PostDetailActions({
         <Share2 className="size-4" />
         {copied ? <span className="text-xs font-medium text-moss">Copied!</span> : null}
       </button>
+
+      {/* Report */}
+      <button
+        type="button"
+        onClick={() => setReportOpen(true)}
+        aria-label="Report this post"
+        className="flex items-center gap-1.5 transition-colors hover:text-ember"
+      >
+        <Flag className="size-4" />
+      </button>
+
+      <ReportModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="post"
+        targetId={postId}
+        onSubmit={submitReportAction}
+      />
     </div>
   );
 }

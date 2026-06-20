@@ -25,6 +25,18 @@ export interface MessageWithSender extends Message {
   sender: MiniProfile;
 }
 
+export interface ConversationHeader {
+  otherUser: MiniProfile | null;
+  /** True if this thread is currently a pending request. */
+  isRequest: boolean;
+  /** True if the current user is the one who initiated the request. */
+  isRequestSender: boolean;
+  /** True if messaging the other user is blocked (block or applicant->author rule). */
+  blocked: boolean;
+  /** Reason for the block, if any. */
+  blockedReason?: string;
+}
+
 export interface PermissionResult {
   blocked?: boolean;
   reason?: string;
@@ -162,6 +174,75 @@ export async function getConversationMessages(
 
   // Return in ascending order for display
   return (data as MessageWithSender[]).reverse();
+}
+
+/**
+ * Resolve the other member's profile for ANY conversation the current user
+ * belongs to — even one with zero messages. Also reports whether the thread is
+ * currently a pending request, whether the current user is the request SENDER,
+ * and whether composing is blocked (block list or applicant->author rule).
+ */
+export async function getConversationHeader(
+  conversationId: string
+): Promise<ConversationHeader> {
+  const empty: ConversationHeader = {
+    otherUser: null,
+    isRequest: false,
+    isRequestSender: false,
+    blocked: false,
+  };
+
+  const sb = await getSupabaseServer();
+  if (!sb) return empty;
+
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return empty;
+
+  // Confirm the caller is a member, and pull every member's profile.
+  const { data: members } = await sb
+    .from("conversation_members")
+    .select(
+      `user_id,
+       profiles:profiles!conversation_members_user_id_fkey(id, handle, name, avatar_url, college)`
+    )
+    .eq("conversation_id", conversationId);
+
+  if (!members || members.length === 0) return empty;
+
+  const isMember = members.some((m) => m.user_id === user.id);
+  if (!isMember) return empty;
+
+  const otherMember = members.find((m) => m.user_id !== user.id);
+  const otherUser = (otherMember?.profiles as unknown as MiniProfile) ?? null;
+  if (!otherUser) return empty;
+
+  // Is this thread currently a pending request, and who sent it?
+  const { data: requestMsg } = await sb
+    .from("messages")
+    .select("sender_id")
+    .eq("conversation_id", conversationId)
+    .eq("is_request", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const isRequest = !!requestMsg;
+  const isRequestSender = requestMsg?.sender_id === user.id;
+
+  // Would the current user be blocked from messaging the other? This covers
+  // both the block list and the applicant->author gate. Note: for an empty
+  // thread this also previews how the first message will be routed.
+  const perm = await computeIsRequest(user.id, otherUser.id);
+
+  return {
+    otherUser,
+    isRequest,
+    isRequestSender,
+    blocked: !!perm.blocked,
+    blockedReason: perm.reason,
+  };
 }
 
 export async function getOrCreate1to1Conversation(

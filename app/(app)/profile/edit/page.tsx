@@ -27,6 +27,7 @@ export default async function ProfileEditPage() {
           city={p.city ?? ""}
           avatar_url={p.avatar_url ?? null}
           cover_url={p.cover_url ?? null}
+          links={p.links ?? null}
         />
       </div>
     </div>

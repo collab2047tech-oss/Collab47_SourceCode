@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Nav } from "@/components/landing/Nav";
+import { PublicTopNav } from "@/components/layout/PublicTopNav";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
@@ -15,12 +15,12 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
   if (!post) {
     return (
       <main className="min-h-dvh bg-cream">
-        <Nav />
+        <PublicTopNav />
         <div className="container-edit pt-40">
           <h1 className="font-serif text-5xl text-ink">
             Post <span className="italic text-saffron">not found.</span>
           </h1>
-          <p className="mt-4 text-body text-ash">It may have expired (24-hour ephemeral) or been removed.</p>
+          <p className="mt-4 text-body text-ash">This post may have been removed, or the link is broken.</p>
           <Link href="/" className="mt-8 inline-block underline text-saffron">Back home</Link>
         </div>
       </main>
@@ -37,7 +37,7 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
 
   return (
     <main className="min-h-dvh bg-cream">
-      <Nav />
+      <PublicTopNav />
       <article className="container-edit max-w-2xl pt-32 pb-20">
         <Reveal>
           <div className="flex items-center gap-3">
@@ -84,6 +84,7 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
             shortId={post.short_id}
             initialLiked={initialLiked}
             initialSaved={initialSaved}
+            initialReaction={engagement.reactions.get(post.id)}
             likeCount={post.like_count}
             commentCount={post.comment_count}
             bookmarkCount={post.bookmark_count}

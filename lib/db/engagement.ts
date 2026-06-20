@@ -102,7 +102,8 @@ export async function addComment(args: {
     .single();
   if (error) return { ok: false, error: error.message };
 
-  // Fire-and-forget notification to the post author (skip if commenter == author).
+  // Fire-and-forget notifications: notify the post author about the comment and,
+  // for a reply, also notify the parent comment's author.
   void (async () => {
     try {
       const { data: post } = await sb
@@ -110,16 +111,55 @@ export async function addComment(args: {
         .select("author_id, short_id")
         .eq("id", args.postId)
         .maybeSingle();
-      if (!post || post.author_id === user.id) return;
+      if (!post) return;
+      const shortId = post.short_id as string;
+      const postAuthorId = post.author_id as string;
+
+      // Resolve the parent comment's author (if this is a reply).
+      let parentAuthorId: string | null = null;
+      if (args.parentCommentId) {
+        const { data: parent } = await sb
+          .from("comments")
+          .select("author_id")
+          .eq("id", args.parentCommentId)
+          .maybeSingle();
+        parentAuthorId = (parent?.author_id as string | undefined) ?? null;
+      }
+
+      // We only need the actor's display info if there's at least one recipient.
+      const needsActor =
+        (postAuthorId && postAuthorId !== user.id) ||
+        (parentAuthorId && parentAuthorId !== user.id);
+      if (!needsActor) return;
       const actor = await getActorDisplayInfo(user.id);
       if (!actor) return;
-      await createNotification({
-        userId: post.author_id as string,
-        kind: "comment",
-        actorName: actor.name,
-        text: `${actor.name} commented on your post`,
-        href: `/p/${post.short_id as string}`,
-      });
+
+      // Notify the post author (skip if commenter is the author).
+      if (postAuthorId && postAuthorId !== user.id) {
+        await createNotification({
+          userId: postAuthorId,
+          kind: "comment",
+          actorName: actor.name,
+          text: `${actor.name} commented on your post`,
+          href: `/p/${shortId}`,
+        });
+      }
+
+      // Notify the parent comment's author about the reply (skip self, and skip
+      // if they're the post author who was already notified above).
+      if (
+        parentAuthorId &&
+        parentAuthorId !== user.id &&
+        parentAuthorId !== postAuthorId
+      ) {
+        await createNotification({
+          userId: parentAuthorId,
+          kind: "comment_reply",
+          actorName: actor.name,
+          text: `${actor.name} replied to your comment`,
+          href: `/p/${shortId}`,
+        });
+      }
     } catch { /* best-effort */ }
   })();
 
@@ -205,6 +245,28 @@ export async function bookmarkPost(postId: string): Promise<Result> {
   if (!user) return { ok: false, error: "Not signed in" };
   const { error } = await sb.from("bookmarks").insert({ post_id: postId, user_id: user.id });
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
+
+  // Fire-and-forget notification to the post author (skip if saver == author).
+  void (async () => {
+    try {
+      const { data: post } = await sb
+        .from("posts")
+        .select("author_id, short_id")
+        .eq("id", postId)
+        .maybeSingle();
+      if (!post || post.author_id === user.id) return;
+      const actor = await getActorDisplayInfo(user.id);
+      if (!actor) return;
+      await createNotification({
+        userId: post.author_id as string,
+        kind: "bookmark",
+        actorName: actor.name,
+        text: `${actor.name} saved your post`,
+        href: `/p/${post.short_id as string}`,
+      });
+    } catch { /* best-effort */ }
+  })();
+
   return { ok: true };
 }
 

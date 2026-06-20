@@ -8,6 +8,7 @@ import { Input } from "@/components/primitives/Input";
 import { updateProfileAction } from "@/app/(app)/profile/edit/actions";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { compressImage } from "@/lib/media/compress";
+import type { ProfileLinks } from "@/lib/supabase/types";
 
 const BRANCHES = [
   "CSE",
@@ -47,6 +48,7 @@ interface ProfileEditFormProps {
   city: string;
   avatar_url: string | null;
   cover_url: string | null;
+  links?: ProfileLinks | null;
 }
 
 export function ProfileEditForm({
@@ -59,6 +61,7 @@ export function ProfileEditForm({
   city,
   avatar_url,
   cover_url,
+  links,
 }: ProfileEditFormProps) {
   const [isPending, startTransition] = useTransition();
   const [bioLen, setBioLen] = useState(bio.length);
@@ -289,6 +292,52 @@ export function ProfileEditForm({
               ))}
             </select>
           </div>
+        </div>
+      </div>
+
+      {/* Links */}
+      <div className="rounded-lg border border-bone bg-paper p-6">
+        <h2 className="font-serif text-2xl text-ink">Links</h2>
+        <p className="mt-1 text-sm text-ash">
+          Add your website and socials. Paste a full URL or just your handle.
+        </p>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <Input
+            label="Website"
+            name="link_website"
+            defaultValue={links?.website ?? ""}
+            placeholder="yoursite.com"
+          />
+          <Input
+            label="GitHub"
+            name="link_github"
+            defaultValue={links?.github ?? ""}
+            placeholder="username"
+          />
+          <Input
+            label="LinkedIn"
+            name="link_linkedin"
+            defaultValue={links?.linkedin ?? ""}
+            placeholder="username"
+          />
+          <Input
+            label="Instagram"
+            name="link_instagram"
+            defaultValue={links?.instagram ?? ""}
+            placeholder="@username"
+          />
+          <Input
+            label="Twitter / X"
+            name="link_twitter"
+            defaultValue={links?.twitter ?? ""}
+            placeholder="@username"
+          />
+          <Input
+            label="YouTube"
+            name="link_youtube"
+            defaultValue={links?.youtube ?? ""}
+            placeholder="@channel"
+          />
         </div>
       </div>
 

@@ -65,6 +65,8 @@ export async function updateProfile(payload: {
   city?: string;
   avatar_url?: string;
   cover_url?: string;
+  /** Optional: social links keyed by platform (website/github/linkedin/...). */
+  links?: Record<string, string>;
   /** Optional: new handle. Validated for format and uniqueness before saving. */
   handle?: string;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -77,8 +79,18 @@ export async function updateProfile(payload: {
   if (!user) return { ok: false, error: "Not authenticated" };
 
   // Validate and check uniqueness of handle if provided.
-  const { handle, ...rest } = payload;
+  const { handle, links, ...rest } = payload;
   const updateFields: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
+
+  // Store only non-empty link values; an empty object clears all links.
+  if (links !== undefined) {
+    const cleaned: Record<string, string> = {};
+    for (const [key, value] of Object.entries(links)) {
+      const v = typeof value === "string" ? value.trim() : "";
+      if (v) cleaned[key] = v;
+    }
+    updateFields.links = cleaned;
+  }
 
   if (handle !== undefined) {
     if (!/^[a-z0-9_]{3,32}$/.test(handle)) {

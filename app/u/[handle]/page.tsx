@@ -3,13 +3,68 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
-import { Nav } from "@/components/landing/Nav";
-import { MapPin, GraduationCap, ExternalLink, BadgeCheck } from "lucide-react";
+import { PublicTopNav } from "@/components/layout/PublicTopNav";
+import { MapPin, GraduationCap, ExternalLink, BadgeCheck, MessageCircle, Heart, Pin, Globe, Github, Linkedin, Instagram, Twitter, Youtube } from "lucide-react";
 import { getProfileByHandle } from "@/lib/db/profiles";
 import { getProfilePosts } from "@/lib/db/posts";
-import { getFollowState } from "@/lib/db/social";
+import { getFollowState, getConnectionStatus } from "@/lib/db/social";
+import type { ProfileLinks } from "@/lib/supabase/types";
 import { ProfileActions } from "@/components/composite/ProfileActions";
 import { getVerifiedProjectsForUser } from "@/lib/db/projects";
+
+type SocialPlatform = "website" | "github" | "linkedin" | "instagram" | "twitter" | "youtube";
+
+const SOCIAL_ICONS: Record<SocialPlatform, typeof Globe> = {
+  website: Globe,
+  github: Github,
+  linkedin: Linkedin,
+  instagram: Instagram,
+  twitter: Twitter,
+  youtube: Youtube,
+};
+
+const SOCIAL_LABELS: Record<SocialPlatform, string> = {
+  website: "Website",
+  github: "GitHub",
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  twitter: "Twitter / X",
+  youtube: "YouTube",
+};
+
+const SOCIAL_ORDER: SocialPlatform[] = ["website", "github", "linkedin", "instagram", "twitter", "youtube"];
+
+function buildSocialHref(platform: SocialPlatform, raw: string): string {
+  const value = raw.trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  switch (platform) {
+    case "website":
+      return `https://${value}`;
+    case "github":
+      return `https://github.com/${value.replace(/^@/, "")}`;
+    case "linkedin":
+      return `https://linkedin.com/in/${value.replace(/^@/, "")}`;
+    case "instagram":
+      return `https://instagram.com/${value.replace(/^@/, "")}`;
+    case "twitter":
+      return `https://twitter.com/${value.replace(/^@/, "")}`;
+    case "youtube":
+      return `https://youtube.com/@${value.replace(/^@/, "")}`;
+  }
+}
+
+function buildSocialLinks(links: ProfileLinks | null | undefined) {
+  if (!links) return [];
+  return SOCIAL_ORDER.filter((p) => {
+    const v = links[p];
+    return typeof v === "string" && v.trim() !== "";
+  }).map((platform) => ({
+    platform,
+    label: SOCIAL_LABELS[platform],
+    Icon: SOCIAL_ICONS[platform],
+    href: buildSocialHref(platform, links[platform] as string),
+  }));
+}
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
@@ -19,7 +74,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     // Real "not found" state: handle is unclaimed or user not signed up.
     return (
       <main className="min-h-dvh bg-cream">
-        <Nav />
+        <PublicTopNav />
         <div className="container-edit pt-40">
           <p className="text-caption">@{handle}</p>
           <h1 className="mt-4 font-serif text-5xl text-ink">
@@ -36,15 +91,18 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     );
   }
 
-  const [posts, followState, verifiedProjects] = await Promise.all([
+  const [posts, followState, connectionStatus, verifiedProjects] = await Promise.all([
     getProfilePosts(profile.id, 12),
     getFollowState(profile.id),
+    getConnectionStatus(profile.id),
     getVerifiedProjectsForUser(profile.id),
   ]);
 
+  const socialLinks = buildSocialLinks(profile.links);
+
   return (
     <main className="min-h-dvh bg-cream">
-      <Nav />
+      <PublicTopNav />
       <div className="container-edit pt-32 pb-20">
         <Reveal>
           <div className="-mx-4 h-40 bg-[linear-gradient(135deg,#0B1220_0%,#0A0F1C_100%)] md:-mx-8 md:h-56" />
@@ -75,30 +133,94 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                     </span>
                   ) : null}
                 </div>
+                {socialLinks.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    {socialLinks.map(({ platform, label, Icon, href }) => (
+                      <a
+                        key={platform}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={label}
+                        title={label}
+                        className="flex size-9 items-center justify-center rounded-full border border-bone bg-paper text-ash transition-colors hover:border-saffron hover:text-saffron-dk"
+                      >
+                        <Icon className="size-4" />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
             <ProfileActions
               handle={profile.handle}
               targetUserId={profile.id}
               initialState={{ isFollowing: followState.isFollowing }}
+              initialConnection={followState.isConnected ? "connected" : connectionStatus}
             />
           </div>
         </Reveal>
 
         <Reveal delay={0.2}>
-          <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="mt-12 flex flex-col gap-6">
             {posts.length === 0 ? (
-              <p className="col-span-full text-center text-ash">No posts yet.</p>
+              <div className="rounded-xl border border-bone bg-paper p-10 text-center">
+                <p className="text-ash">No posts yet.</p>
+              </div>
             ) : (
-              posts.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/p/${p.short_id}`}
-                  className="group aspect-square overflow-hidden rounded-lg bg-paper border border-bone p-5 transition-all hover:border-saffron"
-                >
-                  <p className="line-clamp-6 text-sm text-ink">{p.body}</p>
-                </Link>
-              ))
+              posts.map((p) => {
+                const image = p.image_urls?.[0];
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/p/${p.short_id}`}
+                    className="group block overflow-hidden rounded-xl border border-bone bg-paper p-5 transition-all hover:border-saffron md:p-6"
+                  >
+                    {p.is_pinned ? (
+                      <div className="mb-3 flex items-center gap-1.5 text-xs font-medium text-ash">
+                        <Pin className="size-3.5 text-saffron" /> Pinned
+                      </div>
+                    ) : null}
+
+                    {p.body ? (
+                      <p className="whitespace-pre-line text-body text-ink line-clamp-6">{p.body}</p>
+                    ) : null}
+
+                    {image ? (
+                      <div className="mt-4 overflow-hidden rounded-lg border border-bone bg-cream">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={image}
+                          alt=""
+                          className="max-h-112 w-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+
+                    {p.hashtags && p.hashtags.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {p.hashtags.slice(0, 6).map((tag) => (
+                          <Tag key={tag} variant="outline" className="text-xs">
+                            #{tag.replace(/^#/, "")}
+                          </Tag>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 flex items-center gap-5 border-t border-bone pt-4 text-sm text-ash">
+                      <span className="flex items-center gap-1.5">
+                        <Heart className="size-4" /> {p.like_count ?? 0}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <MessageCircle className="size-4" /> {p.comment_count ?? 0}
+                      </span>
+                      <span className="ml-auto flex items-center gap-1 text-xs text-ash opacity-0 transition-opacity group-hover:opacity-100">
+                        View post <ExternalLink className="size-3" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })
             )}
           </div>
         </Reveal>

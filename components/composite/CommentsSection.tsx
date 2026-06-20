@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition, useOptimistic } from "react";
+import { useState, useTransition } from "react";
 import { Avatar } from "@/components/primitives/Avatar";
-import { Send } from "lucide-react";
+import { Send, ChevronDown, ChevronUp } from "lucide-react";
 import type { CommentWithAuthor } from "@/lib/db/posts";
 import { addCommentOnPostAction } from "@/app/p/[short_id]/actions";
 
@@ -26,8 +26,30 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
   const [comments, setComments] = useState<CommentWithAuthor[]>(initialComments);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // replyTo.id is always the TOP-LEVEL ancestor (1-level threading, YouTube-style);
+  // replyTo.name is the person being replied to (for the @mention + label).
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Start a reply that flattens onto the given top-level ancestor. */
+  function startReply(topLevelId: string, name: string) {
+    setReplyTo({ id: topLevelId, name });
+    setExpanded((prev) => new Set(prev).add(topLevelId));
+    setBody((b) => {
+      const mention = `@${name} `;
+      return b.startsWith("@") ? b : mention;
+    });
+  }
 
   const tops = comments.filter((c) => !c.parent_comment_id);
   const repliesMap = new Map<string, CommentWithAuthor[]>();
@@ -53,6 +75,7 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
       author: { handle: "", name: currentUserName, avatar_url: null },
     };
     setComments((prev) => [...prev, optimistic]);
+    if (replyTo) setExpanded((prev) => new Set(prev).add(replyTo.id));
     setBody("");
     setReplyTo(null);
 
@@ -79,50 +102,87 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
         {tops.length === 0 ? (
           <li className="py-4 text-center text-xs text-ash">No comments yet. Be first.</li>
         ) : (
-          tops.map((c) => (
-            <li key={c.id} className="py-4">
-              <article className="flex items-start gap-3">
-                <Avatar name={c.author.name} src={c.author.avatar_url ?? undefined} size="sm" />
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-semibold text-ink">{c.author.name}</span>
-                    {c.author.handle ? (
-                      <span className="text-xs text-ash">@{c.author.handle}</span>
-                    ) : null}
-                    <span className="text-xs text-ash">{relativeTime(c.created_at)}</span>
+          tops.map((c) => {
+            const replies = repliesMap.get(c.id) ?? [];
+            const isExpanded = expanded.has(c.id);
+            return (
+              <li key={c.id} className="py-4">
+                <article className="flex items-start gap-3">
+                  <Avatar name={c.author.name} src={c.author.avatar_url ?? undefined} size="sm" />
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm font-semibold text-ink">{c.author.name}</span>
+                      {c.author.handle ? (
+                        <span className="text-xs text-ash">@{c.author.handle}</span>
+                      ) : null}
+                      <span className="text-xs text-ash">{relativeTime(c.created_at)}</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed text-ink">{c.body}</p>
+                    <button
+                      type="button"
+                      onClick={() => startReply(c.id, c.author.name)}
+                      className="mt-1.5 text-xs font-medium text-ash hover:text-ink transition-colors"
+                    >
+                      Reply
+                    </button>
                   </div>
-                  <p className="mt-1 text-sm leading-relaxed text-ink">{c.body}</p>
-                  <button
-                    type="button"
-                    onClick={() => setReplyTo({ id: c.id, name: c.author.name })}
-                    className="mt-1 text-xs text-ash hover:text-ink transition-colors"
-                  >
-                    Reply
-                  </button>
-                </div>
-              </article>
+                </article>
 
-              {/* Replies */}
-              {repliesMap.get(c.id)?.length ? (
-                <ul className="ml-10 mt-3 space-y-3 border-l border-bone pl-4">
-                  {repliesMap.get(c.id)!.map((r) => (
-                    <li key={r.id}>
-                      <article className="flex items-start gap-2">
-                        <Avatar name={r.author.name} src={r.author.avatar_url ?? undefined} size="xs" />
-                        <div className="flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-xs font-semibold text-ink">{r.author.name}</span>
-                            <span className="text-xs text-ash">{relativeTime(r.created_at)}</span>
+                {/* View / Hide replies toggle */}
+                {replies.length > 0 ? (
+                  <div className="ml-11 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(c.id)}
+                      className="flex items-center gap-1 text-xs font-semibold text-saffron hover:text-saffron-dk transition-colors"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="size-3.5" />
+                          Hide replies
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="size-3.5" />
+                          {replies.length} {replies.length === 1 ? "reply" : "replies"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Replies (flattened to 1 level) */}
+                {replies.length > 0 && isExpanded ? (
+                  <ul className="ml-5 mt-3 space-y-3 border-l-2 border-bone pl-5">
+                    {replies.map((r) => (
+                      <li key={r.id}>
+                        <article className="flex items-start gap-2.5">
+                          <Avatar name={r.author.name} src={r.author.avatar_url ?? undefined} size="xs" />
+                          <div className="flex-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs font-semibold text-ink">{r.author.name}</span>
+                              {r.author.handle ? (
+                                <span className="text-[11px] text-ash">@{r.author.handle}</span>
+                              ) : null}
+                              <span className="text-[11px] text-ash">{relativeTime(r.created_at)}</span>
+                            </div>
+                            <p className="mt-0.5 text-sm leading-relaxed text-ink">{r.body}</p>
+                            <button
+                              type="button"
+                              onClick={() => startReply(c.id, r.author.name)}
+                              className="mt-1 text-[11px] font-medium text-ash hover:text-ink transition-colors"
+                            >
+                              Reply
+                            </button>
                           </div>
-                          <p className="mt-0.5 text-xs leading-relaxed text-ink">{r.body}</p>
-                        </div>
-                      </article>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </li>
-          ))
+                        </article>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })
         )}
       </ul>
 

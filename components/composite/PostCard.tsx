@@ -169,7 +169,7 @@ export function PostCard({
   }
 
   function openReactionPopover() {
-    hoverTimerRef.current = setTimeout(() => setReactionPopoverOpen(true), 400);
+    hoverTimerRef.current = setTimeout(() => setReactionPopoverOpen(true), 120);
   }
 
   function cancelReactionPopover() {
@@ -441,30 +441,45 @@ export function PostCard({
               {(() => {
                 const meta = getReactionMeta(liked ? reaction : undefined);
                 return (
-                  <button
-                    type="button"
-                    onClick={toggleLike}
-                    disabled={isPending}
-                    aria-label={liked ? `Remove ${meta.label}` : "Like"}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
-                      "text-ash transition-all duration-150",
-                      "hover:bg-bone hover:text-ink active:scale-95",
-                      "disabled:cursor-not-allowed disabled:opacity-40",
-                      liked && meta.color
-                    )}
-                  >
-                    {liked ? (
-                      <span className={cn("size-4 transition-all scale-110", meta.color)}>
-                        {meta.icon}
-                      </span>
-                    ) : (
-                      <ThumbsUp className="size-4 transition-all stroke-current" />
-                    )}
-                    {likes > 0 ? (
-                      <span className="tabular-nums text-xs">{likes}</span>
-                    ) : null}
-                  </button>
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={toggleLike}
+                      disabled={isPending}
+                      aria-label={liked ? `Remove ${meta.label}` : "Like"}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium",
+                        "text-ash transition-all duration-150",
+                        "hover:bg-bone hover:text-ink active:scale-95",
+                        "disabled:cursor-not-allowed disabled:opacity-40",
+                        liked && meta.color
+                      )}
+                    >
+                      {liked ? (
+                        <span className={cn("size-4 transition-all scale-110", meta.color)}>
+                          {meta.icon}
+                        </span>
+                      ) : (
+                        <ThumbsUp className="size-4 transition-all stroke-current" />
+                      )}
+                      {likes > 0 ? (
+                        <span className="tabular-nums text-xs">{likes}</span>
+                      ) : null}
+                    </button>
+                    {/* Caret: click opens the reaction picker instantly (touch-friendly) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cancelReactionPopover();
+                        setReactionPopoverOpen((o) => !o);
+                      }}
+                      disabled={isPending}
+                      aria-label="Choose a reaction"
+                      className="rounded-full p-1 text-ash transition-colors hover:text-ink disabled:opacity-40"
+                    >
+                      <span className="block size-0 border-x-[3px] border-t-4 border-x-transparent border-t-current" />
+                    </button>
+                  </div>
                 );
               })()}
             </div>

@@ -20,7 +20,10 @@ export async function unfollowUserAction(targetUserId: string) {
 
 export async function requestConnectionAction(targetUserId: string) {
   const res = await requestConnection(targetUserId);
-  if (res.ok) revalidatePath("/network");
+  if (res.ok) {
+    revalidatePath("/network");
+    revalidatePath("/u/[handle]", "page");
+  }
   return res;
 }
 
@@ -32,6 +35,9 @@ export async function acceptConnectionAction(otherUserId: string) {
 
 export async function cancelConnectionAction(otherUserId: string) {
   const res = await cancelConnection(otherUserId);
-  if (res.ok) revalidatePath("/network");
+  if (res.ok) {
+    revalidatePath("/network");
+    revalidatePath("/u/[handle]", "page");
+  }
   return res;
 }

@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { Avatar } from "@/components/primitives/Avatar";
-import { Heart, MessageCircle, UserPlus, Briefcase, Bell, AtSign, Repeat2 } from "lucide-react";
+import {
+  Heart, MessageCircle, MessageSquare, CornerDownRight, UserPlus, UserCheck,
+  Briefcase, Bell, AtSign, Repeat2, Bookmark, Mail,
+} from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 
 const KIND_ICON: Record<string, React.ElementType> = {
   follow: UserPlus,
   like: Heart,
   comment: MessageCircle,
+  comment_reply: CornerDownRight,
   repost: Repeat2,
+  bookmark: Bookmark,
   mention: AtSign,
-  dm: MessageCircle,
-  dm_request: MessageCircle,
+  connection_request: UserCheck,
+  dm: Mail,
+  dm_request: MessageSquare,
   project_invite: Briefcase,
   project_accepted: Briefcase,
   system: Bell,

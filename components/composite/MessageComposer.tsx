@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { sendMessageAction } from "@/app/(app)/messages/actions";
 import { compressImage } from "@/lib/media/compress";
@@ -11,6 +12,8 @@ interface MessageComposerProps {
   conversationId: string;
   canCompose?: boolean;
   blockedReason?: string;
+  /** Reason shown when canCompose is false (e.g. you blocked / were blocked). */
+  cannotComposeReason?: string;
 }
 
 const TYPING_DEBOUNCE_MS = 800;
@@ -19,7 +22,9 @@ export function MessageComposer({
   conversationId,
   canCompose = true,
   blockedReason,
+  cannotComposeReason,
 }: MessageComposerProps) {
+  const router = useRouter();
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -113,6 +118,10 @@ export function MessageComposer({
           setHint(null);
         }
         setLocalBlockedReason(null);
+        // Fallback in case realtime is unavailable: re-fetch the server
+        // component so the just-sent message renders. Realtime INSERT handler
+        // in MessageThread dedupes by id, so this never double-renders.
+        router.refresh();
       }
     });
   }
@@ -121,7 +130,7 @@ export function MessageComposer({
     return (
       <footer className="border-t border-bone bg-paper px-6 py-4">
         <p className="text-center text-sm text-ash">
-          You cannot initiate this conversation.
+          {cannotComposeReason ?? "You cannot message this person."}
         </p>
       </footer>
     );

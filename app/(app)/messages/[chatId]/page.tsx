@@ -1,4 +1,8 @@
-import { getConversationMessages, getMyConversations } from "@/lib/db/messages";
+import {
+  getConversationHeader,
+  getConversationMessages,
+  getMyConversations,
+} from "@/lib/db/messages";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { Avatar } from "@/components/primitives/Avatar";
 import { MessagesShell } from "@/components/composite/MessagesShell";
@@ -30,10 +34,11 @@ export default async function ChatPage({ params }: PageProps) {
     ? (await sb.auth.getUser()).data.user?.id ?? null
     : null;
 
-  const [messages, mainConvs, requestConvs] = await Promise.all([
+  const [messages, mainConvs, requestConvs, header] = await Promise.all([
     getConversationMessages(chatId),
     getMyConversations("main"),
     getMyConversations("requests"),
+    getConversationHeader(chatId),
   ]);
 
   const inboxItems = mainConvs.map((c) => ({
@@ -58,18 +63,19 @@ export default async function ChatPage({ params }: PageProps) {
     href: `/messages/requests`,
   }));
 
-  // Find the other participant from the active conversation
+  // Resolve the other participant from the conversation header, which works
+  // even for a freshly created thread with zero messages. Fall back to the
+  // inbox/request previews if present.
   const activeConv =
     mainConvs.find((c) => c.id === chatId) ||
     requestConvs.find((c) => c.id === chatId);
 
-  const otherUser = activeConv?.otherUser ?? null;
+  const otherUser = header.otherUser ?? activeConv?.otherUser ?? null;
 
-  // Determine if this is a request conversation - check if latest message is a request
-  const isRequestConv = activeConv?.isRequest ?? false;
-
-  // Project applicant cannot send to project author - for now we use is_request
-  const canCompose = !isRequestConv || activeConv === undefined;
+  // The user can always compose in a conversation they belong to. The only
+  // hard stop is being blocked (block list or the applicant->author gate) —
+  // a request thread the user themselves initiated stays composable for them.
+  const canCompose = !header.blocked;
 
   return (
     <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
@@ -157,6 +163,7 @@ export default async function ChatPage({ params }: PageProps) {
         <MessageComposer
           conversationId={chatId}
           canCompose={canCompose}
+          cannotComposeReason={header.blockedReason}
         />
       </section>
     </div>
