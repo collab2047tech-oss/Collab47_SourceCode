@@ -10,7 +10,6 @@ import type { MiniProfile } from "@/lib/db/social";
 import {
   followUserAction,
   unfollowUserAction,
-  acceptConnectionAction,
 } from "@/app/(app)/network/actions";
 
 export interface PersonCardState {
@@ -30,7 +29,6 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
   const [optimisticFollowing, setOptimisticFollowing] = useState(
     state.isFollowing ?? false
   );
-  const [accepted, setAccepted] = useState(false);
 
   function handleFollow() {
     const next = !optimisticFollowing;
@@ -41,13 +39,6 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
       } else {
         await unfollowUserAction(person.id);
       }
-    });
-  }
-
-  function handleAccept() {
-    startTransition(async () => {
-      await acceptConnectionAction(person.id);
-      setAccepted(true);
     });
   }
 
@@ -75,14 +66,10 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
               Message
             </Button>
           </Link>
-          {state.pending && !accepted ? (
-            <Button
-              size="sm"
-              onClick={handleAccept}
-              disabled={isPending}
-            >
+          {state.pending ? (
+            <Button variant="secondary" size="sm" disabled>
               <CheckCircle className="size-3.5" />
-              Accept
+              Pending
             </Button>
           ) : (
             <Button
@@ -136,14 +123,9 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
             <MessageSquare className="size-4" /> Message
           </Button>
         </Link>
-        {state.pending && !accepted ? (
-          <Button
-            size="sm"
-            className="flex-1"
-            onClick={handleAccept}
-            disabled={isPending}
-          >
-            <CheckCircle className="size-4" /> Accept
+        {state.pending ? (
+          <Button variant="secondary" size="sm" className="flex-1" disabled>
+            <CheckCircle className="size-4" /> Pending
           </Button>
         ) : (
           <Button

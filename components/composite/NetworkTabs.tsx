@@ -26,7 +26,7 @@ export function NetworkTabs({
     { id: "connections", label: "Connections", data: connections },
     { id: "followers", label: "Followers", data: followers },
     { id: "following", label: "Following", data: following },
-    { id: "pending", label: "Pending", data: pending },
+    { id: "pending", label: "Pending sent", data: pending },
   ];
 
   const activeData = tabs.find((t) => t.id === tab)?.data ?? [];

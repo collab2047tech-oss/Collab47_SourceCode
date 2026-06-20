@@ -62,6 +62,17 @@ function getReactionMeta(kind?: string): ReactionMeta {
   return REACTIONS.find((r) => r.kind === kind) ?? REACTIONS[0];
 }
 
+/** The original post embedded inside a repost (LinkedIn-style nested card). */
+export interface EmbeddedOriginal {
+  short_id: string;
+  author: { name: string; handle: string; college: string };
+  time: string;
+  body: string;
+  tags?: string[];
+  image?: string;
+  stats: { likes: number; comments: number };
+}
+
 export interface Post {
   id: string;
   short_id: string;
@@ -75,6 +86,11 @@ export interface Post {
   variant?: "standard" | "project" | "news";
   is_pinned?: boolean;
   is_repost?: boolean;
+  /**
+   * For reposts: the original post embedded inside. Null when the original is
+   * no longer available (deleted/expired).
+   */
+  repostOf?: EmbeddedOriginal | null;
   liked?: boolean;
   saved?: boolean;
   /** The viewer's current reaction kind, undefined if no reaction. */
@@ -279,11 +295,13 @@ export function PostCard({
         </div>
       ) : null}
 
-      {/* Repost badge */}
+      {/* Repost header: "{name} reposted" */}
       {isRepost ? (
         <div className="flex items-center gap-1.5 px-5 pt-3 pb-0">
-          <Repeat2 className="size-3 text-ash" />
-          <span className="text-[11px] font-medium uppercase tracking-widest text-ash">Reposted</span>
+          <Repeat2 className="size-3.5 text-ash" strokeWidth={1.75} />
+          <span className="text-xs font-medium text-ash">
+            <span className="text-ink/70">{post.author.name}</span> reposted
+          </span>
         </div>
       ) : null}
 
@@ -360,39 +378,50 @@ export function PostCard({
             </div>
           </div>
 
-          {/* Body (click opens the post, LinkedIn-style) */}
-          <Link href={`/p/${post.short_id}`} className="block">
-            <p className="mt-2.5 text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line">
-              {post.body}
-            </p>
-          </Link>
-
-          {/* Tags */}
-          {post.tags && post.tags.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {post.tags.map((t) => (
-                <Link key={t} href={`/t/${t}`}>
-                  <Tag variant="saffron" className="text-[11px] hover:bg-saffron/20">
-                    #{t}
-                  </Tag>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-
-          {/* Image (click opens the post) */}
-          {post.image ? (
-            <Link
-              href={`/p/${post.short_id}`}
-              className="mt-4 block aspect-video w-full overflow-hidden rounded-xl border border-bone bg-bone/40"
-            >
-              <img
-                src={post.image}
-                alt=""
-                className="size-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
-              />
+          {/* Reposter's own added body (optional thought above the original) */}
+          {post.body ? (
+            <Link href={`/p/${post.short_id}`} className="block">
+              <p className="mt-2.5 text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line">
+                {post.body}
+              </p>
             </Link>
           ) : null}
+
+          {isRepost ? (
+            /* Embedded ORIGINAL post (LinkedIn-style nested card) */
+            <div className="mt-3">
+              <EmbeddedOriginalCard original={post.repostOf} />
+            </div>
+          ) : (
+            <>
+              {/* Tags */}
+              {post.tags && post.tags.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {post.tags.map((t) => (
+                    <Link key={t} href={`/t/${t}`}>
+                      <Tag variant="saffron" className="text-[11px] hover:bg-saffron/20">
+                        #{t}
+                      </Tag>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+
+              {/* Image (click opens the post) */}
+              {post.image ? (
+                <Link
+                  href={`/p/${post.short_id}`}
+                  className="mt-4 block aspect-video w-full overflow-hidden rounded-xl border border-bone bg-bone/40"
+                >
+                  <img
+                    src={post.image}
+                    alt=""
+                    className="size-full object-cover transition-transform duration-700 group-hover:scale-[1.02]"
+                  />
+                </Link>
+              ) : null}
+            </>
+          )}
 
           {/* Menu error */}
           {menuError ? (
@@ -549,6 +578,85 @@ export function PostCard({
         onSubmit={submitReportAction}
       />
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Embedded original (the reposted post, nested LinkedIn-style)
+// ---------------------------------------------------------------------------
+
+function EmbeddedOriginalCard({ original }: { original?: EmbeddedOriginal | null }) {
+  if (!original) {
+    return (
+      <div className="rounded-xl border border-bone bg-cream/40 p-4 text-sm text-ash italic">
+        Original post is no longer available.
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={`/p/${original.short_id}`}
+      className="block rounded-xl border border-bone bg-cream/40 p-4 transition-colors hover:border-saffron/40"
+    >
+      {/* Original author row */}
+      <div className="flex items-center gap-2.5">
+        <Avatar name={original.author.name} size="sm" className="shrink-0 ring-1 ring-bone" />
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+          <span className="text-sm font-semibold text-ink truncate">{original.author.name}</span>
+          {original.author.handle ? (
+            <span className="text-xs text-ash truncate">@{original.author.handle}</span>
+          ) : null}
+          {original.author.college ? (
+            <>
+              <span className="text-xs text-bone select-none">&middot;</span>
+              <span className="text-xs text-ash truncate">{original.author.college}</span>
+            </>
+          ) : null}
+          <span className="text-xs text-bone select-none">&middot;</span>
+          <span className="text-xs text-ash">{original.time}</span>
+        </div>
+      </div>
+
+      {/* Original body */}
+      {original.body ? (
+        <p className="mt-2.5 line-clamp-6 whitespace-pre-line text-sm leading-relaxed text-ink/90">
+          {original.body}
+        </p>
+      ) : null}
+
+      {/* Original hashtags */}
+      {original.tags && original.tags.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {original.tags.map((t) => (
+            <Tag key={t} variant="saffron" className="text-[11px]">
+              #{t}
+            </Tag>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Original image */}
+      {original.image ? (
+        <div className="mt-3 aspect-video w-full overflow-hidden rounded-lg border border-bone bg-bone/40">
+          <img src={original.image} alt="" className="size-full object-cover" />
+        </div>
+      ) : null}
+
+      {/* Original engagement counts */}
+      {(original.stats.likes > 0 || original.stats.comments > 0) ? (
+        <div className="mt-3 flex items-center gap-4 text-xs text-ash">
+          <span className="flex items-center gap-1.5">
+            <ThumbsUp className="size-3.5" strokeWidth={1.75} />
+            {original.stats.likes.toLocaleString("en-IN")}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <MessageCircle className="size-3.5" strokeWidth={1.75} />
+            {original.stats.comments.toLocaleString("en-IN")}
+          </span>
+        </div>
+      ) : null}
+    </Link>
   );
 }
 

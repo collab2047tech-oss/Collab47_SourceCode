@@ -4,7 +4,8 @@ import { scorePost, diversifyTopK, type ScoredPost } from "@/lib/ranker/score";
 import { checkContent } from "@/lib/moderation/guardrail";
 
 const SELECT =
-  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,verified)";
+  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,verified), " +
+  "reposted_from:posts!posts_reposted_from_post_id_fkey(*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college))";
 
 // Live filter: not soft-deleted, not expired (unless pinned/highlight keep null).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,7 +189,7 @@ export async function getRecentFeed(limit = 12): Promise<PostWithAuthor[]> {
     .in("author_id", ids)
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data as PostWithAuthor[]) ?? [];
+  return (data as unknown as PostWithAuthor[]) ?? [];
 }
 
 /** Popular — last 24h, ranked by engagement-per-impression. */
@@ -199,7 +200,7 @@ export async function getPopularFeed(limit = 12): Promise<PostWithAuthor[]> {
   const { data } = await liveFilter(sb.from("posts").select(SELECT))
     .gte("created_at", since)
     .limit(120);
-  const rows = (data as PostWithAuthor[]) ?? [];
+  const rows = (data as unknown as PostWithAuthor[]) ?? [];
   return rows.sort((a, b) => engagementScore(b) - engagementScore(a)).slice(0, limit);
 }
 
@@ -219,7 +220,7 @@ export async function getTrendingFeed(limit = 12): Promise<PostWithAuthor[]> {
   const { data } = await liveFilter(sb.from("posts").select(SELECT))
     .gte("created_at", since)
     .limit(120);
-  let rows = (data as PostWithAuthor[]) ?? [];
+  let rows = (data as unknown as PostWithAuthor[]) ?? [];
   if (rows.length === 0) return getPopularFeed(limit);
 
   const boost = (p: PostWithAuthor) => {

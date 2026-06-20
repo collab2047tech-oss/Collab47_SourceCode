@@ -36,6 +36,26 @@ export function toCardPost(p: PostWithAuthor): CardPost {
     variant: "standard",
     is_pinned: p.is_pinned,
     is_repost: p.is_repost,
+    repostOf: p.is_repost
+      ? p.reposted_from && !p.reposted_from.deleted_at
+        ? {
+            short_id: p.reposted_from.short_id,
+            author: {
+              name: p.reposted_from.author?.name ?? "Unknown",
+              handle: p.reposted_from.author?.handle ?? "",
+              college: p.reposted_from.author?.college ?? "",
+            },
+            time: relativeTime(p.reposted_from.created_at),
+            body: p.reposted_from.body,
+            tags: p.reposted_from.hashtags ?? [],
+            image: p.reposted_from.image_urls?.[0],
+            stats: {
+              likes: p.reposted_from.like_count ?? 0,
+              comments: p.reposted_from.comment_count ?? 0,
+            },
+          }
+        : null
+      : undefined,
     reaction: undefined,
   };
 }

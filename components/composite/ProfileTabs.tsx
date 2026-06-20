@@ -6,7 +6,8 @@ import { cn } from "@/lib/cn";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
 import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info } from "lucide-react";
-import type { PostWithAuthor } from "@/lib/db/posts";
+import { Avatar } from "@/components/primitives/Avatar";
+import type { PostWithAuthor, RepostedOriginal } from "@/lib/db/posts";
 
 type TabId = "posts" | "projects" | "highlights" | "about";
 
@@ -97,7 +98,89 @@ function HighlightBubble({ post }: { post: PostWithAuthor }) {
 // Post Card
 // ---------------------------------------------------------------------------
 
+function RepostCard({ post }: { post: PostWithAuthor }) {
+  const original = post.reposted_from && !post.reposted_from.deleted_at ? post.reposted_from : null;
+  const href = original ? `/p/${original.short_id}` : `/p/${post.short_id}`;
+
+  return (
+    <Link
+      href={href}
+      className="group flex flex-col rounded-xl border border-bone bg-paper p-5 transition-all duration-200 hover:border-saffron hover:shadow-sm"
+    >
+      {/* Reposted header */}
+      <div className="mb-3 flex items-center gap-1.5 text-xs text-ash">
+        <Repeat2 className="size-3.5" strokeWidth={1.75} />
+        <span>You reposted</span>
+        <span className="text-bone">&middot;</span>
+        <span>{timeAgo(post.created_at)}</span>
+      </div>
+
+      {/* Reposter's optional added body */}
+      {post.body ? (
+        <p className="mb-3 line-clamp-2 whitespace-pre-line text-sm leading-relaxed text-ink">
+          {post.body}
+        </p>
+      ) : null}
+
+      {/* Embedded original */}
+      <EmbeddedOriginal original={original} />
+    </Link>
+  );
+}
+
+function EmbeddedOriginal({ original }: { original: RepostedOriginal | null }) {
+  if (!original) {
+    return (
+      <div className="rounded-xl border border-bone bg-cream/40 p-4 text-sm italic text-ash">
+        Original post is no longer available.
+      </div>
+    );
+  }
+  const img = original.image_urls?.[0];
+  return (
+    <div className="rounded-xl border border-bone bg-cream/40 p-4">
+      <div className="flex items-center gap-2.5">
+        <Avatar name={original.author?.name ?? "Unknown"} size="sm" className="shrink-0 ring-1 ring-bone" />
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+          <span className="truncate text-sm font-semibold text-ink">{original.author?.name ?? "Unknown"}</span>
+          {original.author?.handle ? (
+            <span className="truncate text-xs text-ash">@{original.author.handle}</span>
+          ) : null}
+          <span className="text-xs text-bone select-none">&middot;</span>
+          <span className="text-xs text-ash">{timeAgo(original.created_at)}</span>
+        </div>
+      </div>
+
+      {original.body ? (
+        <p className="mt-2.5 line-clamp-4 whitespace-pre-line text-sm leading-relaxed text-ink/90">
+          {original.body}
+        </p>
+      ) : null}
+
+      {img ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={img} alt="" className="mt-3 h-44 w-full rounded-lg border border-bone object-cover" />
+      ) : null}
+
+      <div className="mt-3 flex items-center gap-4 text-xs text-ash">
+        <span className="flex items-center gap-1.5">
+          <Heart className="size-3.5" strokeWidth={1.75} />
+          {(original.like_count ?? 0).toLocaleString("en-IN")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <MessageCircle className="size-3.5" strokeWidth={1.75} />
+          {(original.comment_count ?? 0).toLocaleString("en-IN")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function PostCard({ post }: { post: PostWithAuthor }) {
+  if (post.is_repost) {
+    return <RepostCard post={post} />;
+  }
+
   return (
     <Link
       href={`/p/${post.short_id}`}
@@ -114,16 +197,6 @@ function PostCard({ post }: { post: PostWithAuthor }) {
       ) : null}
 
       <div className="px-5 py-4">
-        {/* Repost badge */}
-        {post.is_repost ? (
-          <div className="mb-2 flex items-center gap-1.5 text-xs text-ash">
-            <Repeat2 className="size-3.5" strokeWidth={1.75} />
-            <span>Repost</span>
-            <span className="text-bone">&middot;</span>
-            <span>{timeAgo(post.created_at)}</span>
-          </div>
-        ) : null}
-
         {/* Pin badge */}
         {post.is_pinned ? (
           <div className="mb-2 flex items-center gap-1.5 text-xs" style={{ color: "#2C5BFF" }}>
@@ -146,11 +219,9 @@ function PostCard({ post }: { post: PostWithAuthor }) {
             <MessageCircle className="size-3.5" strokeWidth={1.75} />
             {post.comment_count.toLocaleString("en-IN")}
           </span>
-          {!post.is_repost ? (
-            <span className="ml-auto text-[11px] text-bone">
-              {timeAgo(post.created_at)}
-            </span>
-          ) : null}
+          <span className="ml-auto text-[11px] text-bone">
+            {timeAgo(post.created_at)}
+          </span>
         </div>
       </div>
     </Link>

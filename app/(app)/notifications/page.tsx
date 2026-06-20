@@ -6,6 +6,7 @@ import {
   Briefcase, Bell, AtSign, Repeat2, Bookmark, Mail,
 } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { MarkAllReadButton } from "@/components/composite/MarkAllReadButton";
 
 const KIND_ICON: Record<string, React.ElementType> = {
   follow: UserPlus,
@@ -30,6 +31,7 @@ interface NotificationItem {
   who: string;
   when: string;
   href: string;
+  unread: boolean;
 }
 
 export const dynamic = "force-dynamic";
@@ -54,18 +56,28 @@ export default async function NotificationsPage() {
         who: typeof n.payload === "object" && n.payload && "who" in n.payload ? String(n.payload.who) : "Someone",
         when: new Date(n.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }),
         href: typeof n.payload === "object" && n.payload && "href" in n.payload ? String(n.payload.href) : "/home",
+        unread: n.read_at === null,
       }));
     }
   }
+
+  const hasUnread = items.some((n) => n.unread);
 
   return (
     <div className="mx-auto max-w-2xl">
       <Reveal>
         <div className="rule-top">
-          <p className="text-caption">Inbox</p>
-          <h1 className="mt-4 font-serif text-5xl text-ink">
-            Activity. <span className="italic text-saffron">All in one place.</span>
-          </h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-caption">Inbox</p>
+              <h1 className="mt-4 font-serif text-5xl text-ink">
+                Activity. <span className="italic text-saffron">All in one place.</span>
+              </h1>
+            </div>
+            <div className="shrink-0 pt-1">
+              <MarkAllReadButton hasUnread={hasUnread} />
+            </div>
+          </div>
         </div>
       </Reveal>
 
@@ -78,9 +90,15 @@ export default async function NotificationsPage() {
               const Icon = KIND_ICON[n.kind] ?? Bell;
               return (
                 <li key={n.id}>
-                  <Link href={n.href} className="flex items-start gap-4 py-5 transition-colors hover:bg-paper rounded-md px-2">
-                    <div className="flex size-10 items-center justify-center rounded-full bg-bone">
+                  <Link
+                    href={n.href}
+                    className={`flex items-start gap-4 py-5 transition-colors hover:bg-paper rounded-md px-2 ${n.unread ? "bg-saffron/5" : ""}`}
+                  >
+                    <div className="relative flex size-10 items-center justify-center rounded-full bg-bone">
                       <Icon className="size-4 text-ink" />
+                      {n.unread ? (
+                        <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-saffron ring-2 ring-cream" />
+                      ) : null}
                     </div>
                     <div className="flex-1">
                       <p className="text-base text-ink">

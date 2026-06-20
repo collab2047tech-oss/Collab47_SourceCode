@@ -1,9 +1,34 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Post } from "@/lib/supabase/types";
 
+export interface PostAuthor {
+  handle: string;
+  name: string;
+  avatar_url: string | null;
+  college: string | null;
+}
+
+/**
+ * The original post embedded inside a repost. Carries the original's author and
+ * content so a repost can be rendered LinkedIn-style (the original nested inside).
+ */
+export interface RepostedOriginal extends Post {
+  author: PostAuthor | null;
+}
+
 export interface PostWithAuthor extends Post {
   author: { handle: string; name: string; avatar_url: string | null; college: string | null };
+  /**
+   * For reposts (is_repost = true): the original post + its author. Null when the
+   * original was deleted/expired or could not be resolved.
+   */
+  reposted_from?: RepostedOriginal | null;
 }
+
+// Embedded-select fragment: pull the original post (via the self-FK) WITH its
+// author for any repost row in one round-trip.
+const REPOST_EMBED =
+  "reposted_from:posts!posts_reposted_from_post_id_fkey(*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college))";
 
 // ---------------------------------------------------------------------------
 // Read helpers
@@ -14,10 +39,10 @@ export async function getPostByShortId(shortId: string): Promise<PostWithAuthor 
   if (!sb) return null;
   const { data } = await sb
     .from("posts")
-    .select("*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)")
+    .select(`*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college), ${REPOST_EMBED}`)
     .eq("short_id", shortId)
     .maybeSingle();
-  return (data as PostWithAuthor) ?? null;
+  return (data as unknown as PostWithAuthor) ?? null;
 }
 
 export async function getProfilePosts(profileId: string, limit = 24): Promise<PostWithAuthor[]> {
@@ -25,13 +50,13 @@ export async function getProfilePosts(profileId: string, limit = 24): Promise<Po
   if (!sb) return [];
   const { data } = await sb
     .from("posts")
-    .select("*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)")
+    .select(`*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college), ${REPOST_EMBED}`)
     .eq("author_id", profileId)
     .or("expires_at.is.null,expires_at.gt.now(),is_pinned.eq.true")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data as PostWithAuthor[]) ?? [];
+  return (data as unknown as PostWithAuthor[]) ?? [];
 }
 
 // ---------------------------------------------------------------------------

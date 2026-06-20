@@ -4,6 +4,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
 import { getPostByShortId, getPostComments } from "@/lib/db/posts";
+import { getCommentLikeState } from "@/lib/db/comments";
 import { getMyEngagementState } from "@/lib/db/engagement";
 import { PostDetailActions } from "@/components/composite/PostDetailActions";
 import { CommentsSection } from "@/components/composite/CommentsSection";
@@ -34,6 +35,12 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
 
   const initialLiked = engagement.likes.has(post.id);
   const initialSaved = engagement.bookmarks.has(post.id);
+
+  const likeState = await getCommentLikeState(comments.map((c) => c.id));
+  const initialLikes = {
+    counts: likeState.counts,
+    liked: Array.from(likeState.liked),
+  };
 
   return (
     <main className="min-h-dvh bg-cream">
@@ -96,6 +103,7 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
           <CommentsSection
             postId={post.id}
             initialComments={comments}
+            initialLikes={initialLikes}
           />
         </Reveal>
       </article>

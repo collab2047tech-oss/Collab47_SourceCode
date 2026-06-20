@@ -2,20 +2,23 @@ import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { PersonCard } from "@/components/composite/PersonCard";
 import { NetworkTabs } from "@/components/composite/NetworkTabs";
-import { getMyConnections, getSuggestedConnections } from "@/lib/db/social";
+import { getMyConnections, getPendingConnections, getSuggestedConnections } from "@/lib/db/social";
 import { getMyProfile } from "@/lib/db/profiles";
 import { ShareButton } from "@/components/composite/ShareButton";
+import { ConnectionRequests } from "@/components/composite/ConnectionRequests";
 
 export default async function NetworkPage() {
-  const [connections, followers, following, pending, suggested, profile] =
+  const [connections, followers, following, pendingSplit, suggested, profile] =
     await Promise.all([
       getMyConnections("all"),
       getMyConnections("followers"),
       getMyConnections("following"),
-      getMyConnections("pending"),
+      getPendingConnections(),
       getSuggestedConnections(8),
       getMyProfile(),
     ]);
+
+  const { incoming, outgoing } = pendingSplit;
 
   const collegeQuery = profile?.college
     ? `?college=${encodeURIComponent(profile.college)}`
@@ -48,13 +51,25 @@ export default async function NetworkPage() {
         </div>
       </Reveal>
 
+      {/* Incoming invitations — Accept / Reject */}
+      {incoming.length > 0 ? (
+        <Reveal delay={0.04}>
+          <div className="mt-12">
+            <p className="text-caption mb-4">
+              Invitations <span className="text-saffron">({incoming.length})</span>
+            </p>
+            <ConnectionRequests requests={incoming} />
+          </div>
+        </Reveal>
+      ) : null}
+
       {/* Tabs + Grid (client island) */}
       <Reveal delay={0.05}>
         <NetworkTabs
           connections={connections}
           followers={followers}
           following={following}
-          pending={pending}
+          pending={outgoing}
         />
       </Reveal>
 

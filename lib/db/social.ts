@@ -103,7 +103,9 @@ export async function requestConnection(targetUserId: string): Promise<Result> {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
   const [a, b] = canonical(user.id, targetUserId);
-  const { error } = await sb.from("connections").insert({ user_a_id: a, user_b_id: b, status: "pending" });
+  const { error } = await sb
+    .from("connections")
+    .insert({ user_a_id: a, user_b_id: b, status: "pending", requested_by: user.id });
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
 
   // Notify the recipient of the pending connection request.
@@ -215,6 +217,56 @@ export async function getMyConnections(
   if (otherIds.length === 0) return [];
   const { data: profs } = await sb.from("profiles").select(cols).in("id", otherIds);
   return (profs as MiniProfile[]) ?? [];
+}
+
+export interface PendingConnections {
+  /** Requests OTHERS sent to me — show Accept / Reject. */
+  incoming: MiniProfile[];
+  /** Requests I sent that are still pending — show as "Pending". */
+  outgoing: MiniProfile[];
+}
+
+/**
+ * Split pending connection requests into INCOMING (the other user initiated —
+ * I can Accept/Reject) and OUTGOING (I initiated — still waiting).
+ * Uses connections.requested_by to determine the initiator. If requested_by is
+ * null on a legacy row, the request is treated as incoming so it never gets
+ * silently hidden from the recipient.
+ */
+export async function getPendingConnections(): Promise<PendingConnections> {
+  const empty: PendingConnections = { incoming: [], outgoing: [] };
+  const sb = await getSupabaseServer();
+  if (!sb) return empty;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return empty;
+
+  const cols = "id, handle, name, avatar_url, college, branch";
+
+  const { data: rows } = await sb
+    .from("connections")
+    .select("user_a_id, user_b_id, requested_by")
+    .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+    .eq("status", "pending");
+
+  if (!rows || rows.length === 0) return empty;
+
+  const incomingIds: string[] = [];
+  const outgoingIds: string[] = [];
+  for (const c of rows) {
+    const otherId = c.user_a_id === user.id ? (c.user_b_id as string) : (c.user_a_id as string);
+    if (c.requested_by === user.id) outgoingIds.push(otherId);
+    else incomingIds.push(otherId);
+  }
+
+  const allIds = [...incomingIds, ...outgoingIds];
+  const { data: profs } = await sb.from("profiles").select(cols).in("id", allIds);
+  const byId = new Map<string, MiniProfile>();
+  for (const p of (profs as MiniProfile[]) ?? []) byId.set(p.id, p);
+
+  return {
+    incoming: incomingIds.map((id) => byId.get(id)).filter(Boolean) as MiniProfile[],
+    outgoing: outgoingIds.map((id) => byId.get(id)).filter(Boolean) as MiniProfile[],
+  };
 }
 
 export async function getSuggestedConnections(limit = 10): Promise<MiniProfile[]> {

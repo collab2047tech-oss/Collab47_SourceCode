@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/primitives/Avatar";
-import { Send, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/lib/cn";
+import { Send, ChevronDown, ChevronUp, Heart } from "lucide-react";
 import type { CommentWithAuthor } from "@/lib/db/posts";
 import { addCommentOnPostAction } from "@/app/p/[short_id]/actions";
+import { likeCommentAction, unlikeCommentAction } from "@/app/p/[short_id]/comment-like-actions";
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -16,16 +18,24 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
+interface InitialLikes {
+  counts: Record<string, number>;
+  liked: string[];
+}
+
 interface Props {
   postId: string;
   initialComments: CommentWithAuthor[];
+  initialLikes?: InitialLikes;
   currentUserName?: string;
 }
 
-export function CommentsSection({ postId, initialComments, currentUserName = "You" }: Props) {
+export function CommentsSection({ postId, initialComments, initialLikes, currentUserName = "You" }: Props) {
   const [comments, setComments] = useState<CommentWithAuthor[]>(initialComments);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>(initialLikes?.counts ?? {});
+  const [likedSet, setLikedSet] = useState<Set<string>>(new Set(initialLikes?.liked ?? []));
   // replyTo.id is always the TOP-LEVEL ancestor (1-level threading, YouTube-style);
   // replyTo.name is the person being replied to (for the @mention + label).
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
@@ -49,6 +59,63 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
       const mention = `@${name} `;
       return b.startsWith("@") ? b : mention;
     });
+  }
+
+  function toggleLike(commentId: string) {
+    // Optimistic devices are not available for not-yet-persisted optimistic comments.
+    if (commentId.startsWith("optimistic-")) return;
+    const isLiked = likedSet.has(commentId);
+    // Optimistic update
+    setLikedSet((prev) => {
+      const next = new Set(prev);
+      if (isLiked) next.delete(commentId);
+      else next.add(commentId);
+      return next;
+    });
+    setLikeCounts((prev) => ({
+      ...prev,
+      [commentId]: Math.max(0, (prev[commentId] ?? 0) + (isLiked ? -1 : 1)),
+    }));
+
+    startTransition(async () => {
+      const res = isLiked
+        ? await unlikeCommentAction(commentId)
+        : await likeCommentAction(commentId);
+      if (!res.ok) {
+        // Roll back
+        setLikedSet((prev) => {
+          const next = new Set(prev);
+          if (isLiked) next.add(commentId);
+          else next.delete(commentId);
+          return next;
+        });
+        setLikeCounts((prev) => ({
+          ...prev,
+          [commentId]: Math.max(0, (prev[commentId] ?? 0) + (isLiked ? 1 : -1)),
+        }));
+      }
+    });
+  }
+
+  function LikeButton({ commentId, size = "sm" }: { commentId: string; size?: "sm" | "xs" }) {
+    const liked = likedSet.has(commentId);
+    const count = likeCounts[commentId] ?? 0;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleLike(commentId)}
+        aria-pressed={liked}
+        aria-label={liked ? "Unlike comment" : "Like comment"}
+        className={cn(
+          "inline-flex items-center gap-1 font-medium transition-colors",
+          size === "sm" ? "text-xs" : "text-[11px]",
+          liked ? "text-ember" : "text-ash hover:text-ink"
+        )}
+      >
+        <Heart className={cn(size === "sm" ? "size-3.5" : "size-3", liked && "fill-current")} />
+        {count > 0 ? <span className="tabular-nums">{count}</span> : null}
+      </button>
+    );
   }
 
   const tops = comments.filter((c) => !c.parent_comment_id);
@@ -118,13 +185,16 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
                       <span className="text-xs text-ash">{relativeTime(c.created_at)}</span>
                     </div>
                     <p className="mt-1 text-sm leading-relaxed text-ink">{c.body}</p>
-                    <button
-                      type="button"
-                      onClick={() => startReply(c.id, c.author.name)}
-                      className="mt-1.5 text-xs font-medium text-ash hover:text-ink transition-colors"
-                    >
-                      Reply
-                    </button>
+                    <div className="mt-1.5 flex items-center gap-4">
+                      <LikeButton commentId={c.id} size="sm" />
+                      <button
+                        type="button"
+                        onClick={() => startReply(c.id, c.author.name)}
+                        className="text-xs font-medium text-ash hover:text-ink transition-colors"
+                      >
+                        Reply
+                      </button>
+                    </div>
                   </div>
                 </article>
 
@@ -167,13 +237,16 @@ export function CommentsSection({ postId, initialComments, currentUserName = "Yo
                               <span className="text-[11px] text-ash">{relativeTime(r.created_at)}</span>
                             </div>
                             <p className="mt-0.5 text-sm leading-relaxed text-ink">{r.body}</p>
-                            <button
-                              type="button"
-                              onClick={() => startReply(c.id, r.author.name)}
-                              className="mt-1 text-[11px] font-medium text-ash hover:text-ink transition-colors"
-                            >
-                              Reply
-                            </button>
+                            <div className="mt-1 flex items-center gap-3">
+                              <LikeButton commentId={r.id} size="xs" />
+                              <button
+                                type="button"
+                                onClick={() => startReply(c.id, r.author.name)}
+                                className="text-[11px] font-medium text-ash hover:text-ink transition-colors"
+                              >
+                                Reply
+                              </button>
+                            </div>
                           </div>
                         </article>
                       </li>
