@@ -36,6 +36,11 @@ import {
   markNotInterestedAction,
   markShowFewerLikeThisAction,
 } from "@/app/(app)/home/feedback-actions";
+import {
+  deletePostAction,
+  pinPostAction,
+  unpinPostAction,
+} from "@/app/(app)/home/actions";
 import type { ReactionKind } from "@/lib/db/engagement";
 
 // ---------------------------------------------------------------------------
@@ -125,6 +130,7 @@ export function PostCard({
   const [reportOpen, setReportOpen] = useState(false);
   const [repostToast, setRepostToast] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,13 +251,23 @@ export function PostCard({
   }
 
   function handlePin() {
-    if (onPin) runAction(() => onPin(post.id));
+    runAction(() => (onPin ? onPin(post.id) : pinPostAction(post.id)));
   }
   function handleUnpin() {
-    if (onUnpin) runAction(() => onUnpin(post.id));
+    runAction(() => (onUnpin ? onUnpin(post.id) : unpinPostAction(post.id)));
   }
   function handleDelete() {
-    if (onDelete) runAction(() => onDelete(post.id));
+    setMenuError(null);
+    setMenuOpen(false);
+    startTransition(async () => {
+      const result = onDelete ? await onDelete(post.id) : await deletePostAction(post.id);
+      if (result.ok) {
+        setDeleted(true);
+        setHidden(true);
+      } else {
+        setMenuError(result.error ?? "Could not delete post.");
+      }
+    });
   }
   function handleSaveHighlight() {
     if (onSaveHighlight) runAction(() => onSaveHighlight(post.id));
@@ -274,7 +290,7 @@ export function PostCard({
   if (hidden) {
     return (
       <div className="border-b border-bone py-4 px-5 text-sm text-ash italic">
-        Removed from your feed.
+        {deleted ? "Post deleted." : "Removed from your feed."}
       </div>
     );
   }

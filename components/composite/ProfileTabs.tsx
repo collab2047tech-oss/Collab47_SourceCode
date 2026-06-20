@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
-import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info, Trash2 } from "lucide-react";
 import { Avatar } from "@/components/primitives/Avatar";
 import type { PostWithAuthor, RepostedOriginal } from "@/lib/db/posts";
+import { deletePostAction } from "@/app/(app)/home/actions";
 
 type TabId = "posts" | "projects" | "highlights" | "about";
 
@@ -26,6 +27,8 @@ interface ProfileTabsProps {
   bio?: string | null;
   college?: string | null;
   branch?: string | null;
+  /** The viewing user's id. When it matches a post's author, delete is shown. */
+  currentUserId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +179,52 @@ function EmbeddedOriginal({ original }: { original: RepostedOriginal | null }) {
   );
 }
 
+/**
+ * Wraps a profile post/repost card with an owner-only delete control. The card
+ * itself is a full-card <Link>, so the delete button stops propagation and
+ * prevents navigation, then deletes via the server action and hides on success.
+ */
+function ManagedPostCard({ post, canManage }: { post: PostWithAuthor; canManage: boolean }) {
+  const [removed, setRemoved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (removed) return null;
+
+  function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this post? This cannot be undone.")) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await deletePostAction(post.id);
+      if (res.ok) setRemoved(true);
+      else setError(res.error ?? "Could not delete.");
+    });
+  }
+
+  return (
+    <div className="relative">
+      <PostCard post={post} />
+      {canManage ? (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={pending}
+          aria-label="Delete post"
+          title="Delete post"
+          className="absolute right-3 top-3 z-10 flex size-8 items-center justify-center rounded-full border border-bone bg-paper/90 text-ash backdrop-blur transition-colors hover:border-ember hover:text-ember disabled:opacity-40"
+        >
+          <Trash2 className="size-4" strokeWidth={1.75} />
+        </button>
+      ) : null}
+      {error ? (
+        <p className="absolute inset-x-3 bottom-3 z-10 rounded-md bg-ember/10 px-2 py-1 text-xs text-ember">{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function PostCard({ post }: { post: PostWithAuthor }) {
   if (post.is_repost) {
     return <RepostCard post={post} />;
@@ -302,7 +351,7 @@ const TAB_ICONS: Record<TabId, React.ReactNode> = {
   about: <Info className="size-3.5" strokeWidth={1.75} />,
 };
 
-export function ProfileTabs({ posts, projects = [], bio, college, branch }: ProfileTabsProps) {
+export function ProfileTabs({ posts, projects = [], bio, college, branch, currentUserId }: ProfileTabsProps) {
   const [tab, setTab] = useState<TabId>("posts");
   const highlights = posts.filter((p) => p.is_pinned || p.is_highlight);
 
@@ -375,7 +424,11 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch }: Prof
           ) : (
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {posts.map((p) => (
-                <PostCard key={p.id} post={p} />
+                <ManagedPostCard
+                  key={p.id}
+                  post={p}
+                  canManage={!!currentUserId && currentUserId === p.author_id}
+                />
               ))}
             </div>
           )}

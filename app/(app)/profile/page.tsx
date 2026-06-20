@@ -230,6 +230,7 @@ export default async function ProfilePage() {
           bio={p.bio}
           college={p.college}
           branch={p.branch}
+          currentUserId={p.id}
         />
       </div>
 

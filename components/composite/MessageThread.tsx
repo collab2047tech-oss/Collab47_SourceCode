@@ -48,6 +48,20 @@ export function MessageThread({
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Merge fresh server data when the page revalidates (router.refresh after a
+  // send). useState only seeds on mount, so without this a just-sent message
+  // would not appear until a full reload if realtime is delayed/unavailable.
+  useEffect(() => {
+    setMessages((prev) => {
+      const seen = new Set(prev.map((m) => m.id));
+      const added = initialMessages.filter((m) => !seen.has(m.id));
+      if (added.length === 0) return prev;
+      return [...prev, ...added].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+    });
+  }, [initialMessages]);
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
