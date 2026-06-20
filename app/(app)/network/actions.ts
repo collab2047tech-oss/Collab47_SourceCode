@@ -8,13 +8,23 @@ import {
 
 export async function followUserAction(targetUserId: string) {
   const res = await followUser(targetUserId);
-  if (res.ok) revalidatePath("/network");
+  if (res.ok) {
+    // Revalidate every surface that renders suggested people so an
+    // already-followed person stops appearing / shows the right button state.
+    revalidatePath("/network");
+    revalidatePath("/explore");
+    revalidatePath("/home");
+  }
   return res;
 }
 
 export async function unfollowUserAction(targetUserId: string) {
   const res = await unfollowUser(targetUserId);
-  if (res.ok) revalidatePath("/network");
+  if (res.ok) {
+    revalidatePath("/network");
+    revalidatePath("/explore");
+    revalidatePath("/home");
+  }
   return res;
 }
 

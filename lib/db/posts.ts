@@ -25,10 +25,47 @@ export interface PostWithAuthor extends Post {
   reposted_from?: RepostedOriginal | null;
 }
 
-// Embedded-select fragment: pull the original post (via the self-FK) WITH its
-// author for any repost row in one round-trip.
-const REPOST_EMBED =
-  "reposted_from:posts!posts_reposted_from_post_id_fkey(*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college))";
+// Author embed fragment (profiles FK — works fine).
+const AUTHOR_EMBED =
+  "author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)";
+
+/**
+ * Resolve the original post embedded inside reposts via a SECOND batched query.
+ *
+ * PostgREST cannot embed a self-referential FK (posts -> posts) by hint, so we
+ * collect every reposted_from_post_id and fetch the originals (+ their authors)
+ * in one `.in()` round-trip, then attach them as `reposted_from`. Mutates and
+ * returns the same array. Shared by profile, feed and tag queries.
+ */
+export async function attachReposts<T extends PostWithAuthor>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  posts: T[],
+): Promise<T[]> {
+  const originalIds = Array.from(
+    new Set(
+      posts
+        .filter((p) => p.is_repost && p.reposted_from_post_id)
+        .map((p) => p.reposted_from_post_id as string),
+    ),
+  );
+  if (originalIds.length === 0) return posts;
+
+  const { data: originals } = await sb
+    .from("posts")
+    .select(`*, ${AUTHOR_EMBED}`)
+    .in("id", originalIds);
+
+  const byId = new Map<string, RepostedOriginal>();
+  for (const o of (originals ?? []) as RepostedOriginal[]) byId.set(o.id, o);
+
+  for (const p of posts) {
+    if (p.is_repost && p.reposted_from_post_id) {
+      p.reposted_from = byId.get(p.reposted_from_post_id) ?? null;
+    }
+  }
+  return posts;
+}
 
 // ---------------------------------------------------------------------------
 // Read helpers
@@ -39,10 +76,12 @@ export async function getPostByShortId(shortId: string): Promise<PostWithAuthor 
   if (!sb) return null;
   const { data } = await sb
     .from("posts")
-    .select(`*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college), ${REPOST_EMBED}`)
+    .select(`*, ${AUTHOR_EMBED}`)
     .eq("short_id", shortId)
     .maybeSingle();
-  return (data as unknown as PostWithAuthor) ?? null;
+  if (!data) return null;
+  const [post] = await attachReposts(sb, [data as unknown as PostWithAuthor]);
+  return post;
 }
 
 export async function getProfilePosts(profileId: string, limit = 24): Promise<PostWithAuthor[]> {
@@ -50,13 +89,13 @@ export async function getProfilePosts(profileId: string, limit = 24): Promise<Po
   if (!sb) return [];
   const { data } = await sb
     .from("posts")
-    .select(`*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college), ${REPOST_EMBED}`)
+    .select(`*, ${AUTHOR_EMBED}`)
     .eq("author_id", profileId)
     .or("expires_at.is.null,expires_at.gt.now(),is_pinned.eq.true")
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data as unknown as PostWithAuthor[]) ?? [];
+  return attachReposts(sb, (data as unknown as PostWithAuthor[]) ?? []);
 }
 
 // ---------------------------------------------------------------------------

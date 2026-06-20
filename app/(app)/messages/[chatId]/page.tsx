@@ -5,6 +5,7 @@ import {
 } from "@/lib/db/messages";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { Avatar } from "@/components/primitives/Avatar";
+import { Users } from "lucide-react";
 import { MessagesShell } from "@/components/composite/MessagesShell";
 import { MessageThread } from "@/components/composite/MessageThread";
 import { MessageComposer } from "@/components/composite/MessageComposer";
@@ -71,11 +72,14 @@ export default async function ChatPage({ params }: PageProps) {
     requestConvs.find((c) => c.id === chatId);
 
   const otherUser = header.otherUser ?? activeConv?.otherUser ?? null;
+  const isGroup = header.isGroup;
+  const groupTitle = header.groupTitle ?? activeConv?.otherUser.name ?? "Group";
 
   // The user can always compose in a conversation they belong to. The only
   // hard stop is being blocked (block list or the applicant->author gate) —
   // a request thread the user themselves initiated stays composable for them.
-  const canCompose = !header.blocked;
+  // Group members can always post (no block possible).
+  const canCompose = isGroup || !header.blocked;
 
   return (
     <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
@@ -131,7 +135,19 @@ export default async function ChatPage({ params }: PageProps) {
       {/* Right pane */}
       <section className="flex flex-col bg-cream">
         <header className="flex items-center justify-between border-b border-bone bg-paper px-6 py-4">
-          {otherUser ? (
+          {isGroup ? (
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-full bg-moss/15 text-moss">
+                <Users className="size-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-ink">{groupTitle}</p>
+                <p className="text-xs text-ash">
+                  {header.memberCount ?? 0} members
+                </p>
+              </div>
+            </div>
+          ) : otherUser ? (
             <div className="flex items-center gap-3">
               <Avatar
                 name={otherUser.name}
@@ -150,7 +166,7 @@ export default async function ChatPage({ params }: PageProps) {
           )}
           <ChatMenu
             conversationId={chatId}
-            otherUserId={(otherUser as { id?: string } | null)?.id ?? null}
+            otherUserId={isGroup ? null : (otherUser as { id?: string } | null)?.id ?? null}
           />
         </header>
 

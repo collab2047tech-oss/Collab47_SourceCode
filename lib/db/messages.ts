@@ -35,6 +35,12 @@ export interface ConversationHeader {
   blocked: boolean;
   /** Reason for the block, if any. */
   blockedReason?: string;
+  /** True if this conversation is a group chat. */
+  isGroup: boolean;
+  /** Group title (group conversations only). */
+  groupTitle?: string | null;
+  /** Number of members (group conversations only). */
+  memberCount?: number;
 }
 
 export interface PermissionResult {
@@ -190,6 +196,7 @@ export async function getConversationHeader(
     isRequest: false,
     isRequestSender: false,
     blocked: false,
+    isGroup: false,
   };
 
   const sb = await getSupabaseServer();
@@ -213,6 +220,27 @@ export async function getConversationHeader(
 
   const isMember = members.some((m) => m.user_id === user.id);
   if (!isMember) return empty;
+
+  // Resolve the conversation type/title up front so we can branch for groups.
+  const { data: conv } = await sb
+    .from("conversations")
+    .select("type, title")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (conv?.type === "group") {
+    // Groups have no single "other" user. Members can always post, so it is
+    // never blocked and never a request.
+    return {
+      otherUser: null,
+      isRequest: false,
+      isRequestSender: false,
+      blocked: false,
+      isGroup: true,
+      groupTitle: (conv.title as string | null) ?? `Group (${members.length})`,
+      memberCount: members.length,
+    };
+  }
 
   const otherMember = members.find((m) => m.user_id !== user.id);
   const otherUser = (otherMember?.profiles as unknown as MiniProfile) ?? null;
@@ -242,6 +270,7 @@ export async function getConversationHeader(
     isRequestSender,
     blocked: !!perm.blocked,
     blockedReason: perm.reason,
+    isGroup: false,
   };
 }
 
@@ -315,6 +344,112 @@ export async function getOrCreate1to1Conversation(
   return { ok: true, conversationId: newConv.id };
 }
 
+/**
+ * Find the shared 1:1 conversation between two users, if one exists, and report
+ * whether it already carries any message and whether the thread's first message
+ * is a still-pending request. Used so replies inside an existing thread never
+ * get blocked, while a reply to a pending request stays in the Requests folder.
+ */
+async function findShared1to1Thread(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  userA: string,
+  userB: string
+): Promise<{ conversationId: string; hasMessages: boolean; firstIsPendingRequest: boolean } | null> {
+  const { data: aMemberships } = await sb
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("user_id", userA);
+  if (!aMemberships || aMemberships.length === 0) return null;
+
+  const aConvIds = aMemberships.map((m: { conversation_id: string }) => m.conversation_id);
+
+  const { data: shared } = await sb
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("user_id", userB)
+    .in("conversation_id", aConvIds);
+  if (!shared || shared.length === 0) return null;
+
+  const sharedIds = shared.map((m: { conversation_id: string }) => m.conversation_id);
+
+  // Restrict to one_to_one conversations (groups are handled separately).
+  const { data: convs } = await sb
+    .from("conversations")
+    .select("id")
+    .in("id", sharedIds)
+    .eq("type", "one_to_one");
+  if (!convs || convs.length === 0) return null;
+
+  const convId = convs[0].id as string;
+
+  // Earliest message determines whether the thread is a pending request.
+  const { data: firstMsg } = await sb
+    .from("messages")
+    .select("is_request")
+    .eq("conversation_id", convId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    conversationId: convId,
+    hasMessages: !!firstMsg,
+    firstIsPendingRequest: !!firstMsg?.is_request,
+  };
+}
+
+/**
+ * Create a group conversation (type='group') with the given title and members.
+ * The creator is always added as a member. Membership management is privileged
+ * (RLS forbids users adding others), so this runs via the service-role client
+ * after verifying the caller server-side.
+ */
+export async function createGroupConversation(
+  title: string,
+  memberIds: string[]
+): Promise<{ ok: boolean; conversationId?: string; error?: string }> {
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false, error: "Supabase not configured" };
+
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const cleanTitle = title.trim();
+  if (!cleanTitle) return { ok: false, error: "Group name is required" };
+
+  // De-dupe and ensure the creator is always a member.
+  const uniqueMembers = Array.from(new Set([user.id, ...memberIds.filter(Boolean)]));
+  if (uniqueMembers.length < 2) {
+    return { ok: false, error: "Pick at least one other member" };
+  }
+
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured" };
+
+  const { data: newConv, error: convErr } = await admin
+    .from("conversations")
+    .insert({ type: "group", title: cleanTitle })
+    .select("id")
+    .single();
+
+  if (convErr || !newConv) {
+    return { ok: false, error: convErr?.message ?? "Failed to create group" };
+  }
+
+  const { error: membersErr } = await admin.from("conversation_members").insert(
+    uniqueMembers.map((uid) => ({ conversation_id: newConv.id, user_id: uid }))
+  );
+
+  if (membersErr) {
+    return { ok: false, error: membersErr.message };
+  }
+
+  return { ok: true, conversationId: newConv.id };
+}
+
 export async function computeIsRequest(
   senderId: string,
   recipientId: string
@@ -322,7 +457,7 @@ export async function computeIsRequest(
   const sb = await getSupabaseServer();
   if (!sb) return { is_request: false };
 
-  // 1. Block check: has recipient blocked sender, or sender blocked recipient
+  // 1. Block check (KEEP FIRST): either user blocked the other -> blocked.
   const { data: blockRows } = await sb
     .from("blocks")
     .select("blocker_id, blocked_id")
@@ -334,26 +469,28 @@ export async function computeIsRequest(
     return { blocked: true, reason: "You cannot message this person." };
   }
 
-  // 2. Project relationships (highest-priority gates).
+  // 2. Existing 1:1 thread with messages -> always allow (replies never blocked).
+  //    If the thread's first message is a still-pending request, keep is_request
+  //    true so the reply stays in Requests; otherwise route to the main inbox.
+  const sharedThread = await findShared1to1Thread(sb, senderId, recipientId);
+  if (sharedThread?.hasMessages) {
+    return { is_request: sharedThread.firstIsPendingRequest };
+  }
+
+  // 3. Accepted connection (1st degree) -> allow, main inbox. MUST precede the
+  //    applicant->author block: connected users DM freely regardless of any
+  //    project-application status.
+  if (await isAcceptedConnection(sb, senderId, recipientId)) {
+    return { is_request: false };
+  }
+
+  // 4. Project author override: sender authors a project the recipient applied
+  //    to -> direct, main inbox.
   const [{ data: senderProjects }, { data: recipientProjects }] = await Promise.all([
     sb.from("projects").select("id").eq("author_id", senderId),
     sb.from("projects").select("id").eq("author_id", recipientId),
   ]);
 
-  //   a) Sender has applied to a project the RECIPIENT authors -> BLOCKED.
-  //      Applicants cannot initiate to the author; the author reaches out first.
-  if (recipientProjects && recipientProjects.length > 0) {
-    const ids = recipientProjects.map((p: { id: string }) => p.id);
-    const { data: app } = await sb
-      .from("project_applications")
-      .select("id")
-      .eq("applicant_id", senderId)
-      .in("project_id", ids)
-      .maybeSingle();
-    if (app) return { blocked: true, reason: "Applicants cannot message project authors first." };
-  }
-
-  //   b) Sender authors a project the RECIPIENT applied to -> direct, main inbox.
   if (senderProjects && senderProjects.length > 0) {
     const ids = senderProjects.map((p: { id: string }) => p.id);
     const { data: app } = await sb
@@ -365,7 +502,21 @@ export async function computeIsRequest(
     if (app) return { is_request: false, project_override: true };
   }
 
-  //   c) Shared team membership (same project) -> direct, main inbox.
+  // 5. Applicant->author block — ONLY for a true cold contact. Connected users
+  //    and anyone with an existing thread were already allowed above, so this
+  //    now blocks only a stranger applicant cold-messaging the author.
+  if (recipientProjects && recipientProjects.length > 0) {
+    const ids = recipientProjects.map((p: { id: string }) => p.id);
+    const { data: app } = await sb
+      .from("project_applications")
+      .select("id")
+      .eq("applicant_id", senderId)
+      .in("project_id", ids)
+      .maybeSingle();
+    if (app) return { blocked: true, reason: "Applicants cannot message project authors first." };
+  }
+
+  // 6. Shared team membership (same project) -> direct, main inbox.
   const [{ data: myTeams }, { data: theirTeams }] = await Promise.all([
     sb.from("project_members").select("project_id").eq("user_id", senderId),
     sb.from("project_members").select("project_id").eq("user_id", recipientId),
@@ -375,7 +526,8 @@ export async function computeIsRequest(
     return { is_request: false };
   }
 
-  // 3. Recipient DM permission setting.
+  // 7. Recipient DM permission setting. 'nobody' allows only existing threads +
+  //    project authors (handled above) -> block new.
   const { data: recipientProfile } = await sb
     .from("profiles")
     .select("dm_permission")
@@ -383,23 +535,43 @@ export async function computeIsRequest(
     .maybeSingle();
   const dmPerm = recipientProfile?.dm_permission ?? "everyone";
 
-  // 'nobody' allows only existing threads + project authors (handled above) -> block new.
   if (dmPerm === "nobody") {
     return { blocked: true, reason: "This person is not accepting new messages." };
   }
 
-  // 4. Degree of separation on the follow + accepted-connection graph (<=3).
+  // 8. Degree of separation on the follow + accepted-connection graph (<=3).
   //    1st / 2nd / 3rd degree land directly in the main inbox (LinkedIn-style).
   if (await isWithinDegree(sb, senderId, recipientId, 3)) {
     return { is_request: false };
   }
 
-  // 5. True stranger (no path within 3 degrees).
+  // 9. True stranger (no path within 3 degrees).
   if (dmPerm === "connections") {
     return { blocked: true, reason: "This person only accepts messages from their network." };
   }
   // 'everyone': stranger lands in the Requests folder.
   return { is_request: true };
+}
+
+/**
+ * Whether two users are an accepted (1st-degree) connection. Connections are
+ * stored undirected as (user_a_id, user_b_id), so check both orderings.
+ */
+async function isAcceptedConnection(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  userA: string,
+  userB: string
+): Promise<boolean> {
+  const { data } = await sb
+    .from("connections")
+    .select("status")
+    .eq("status", "accepted")
+    .or(
+      `and(user_a_id.eq.${userA},user_b_id.eq.${userB}),and(user_a_id.eq.${userB},user_b_id.eq.${userA})`
+    )
+    .maybeSingle();
+  return !!data;
 }
 
 /**
@@ -476,27 +648,48 @@ export async function sendMessage({
     }
   }
 
-  // Find the other member of the conversation
+  // Resolve the conversation type so groups bypass the 1:1 permission gate.
+  const { data: conv } = await sb
+    .from("conversations")
+    .select("type")
+    .eq("id", conversationId)
+    .maybeSingle();
+  const isGroup = conv?.type === "group";
+
+  // Every other member of the conversation (recipients for notifications).
   const { data: members } = await sb
     .from("conversation_members")
     .select("user_id")
     .eq("conversation_id", conversationId)
     .neq("user_id", user.id);
 
-  if (!members || members.length === 0) {
-    return { ok: false, error: "Conversation not found" };
+  if (isGroup) {
+    // Confirm the sender is actually a member of this group.
+    const { data: myMembership } = await sb
+      .from("conversation_members")
+      .select("user_id")
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!myMembership) {
+      return { ok: false, error: "You are not a member of this group" };
+    }
+  } else {
+    if (!members || members.length === 0) {
+      return { ok: false, error: "Conversation not found" };
+    }
   }
 
-  const recipientId = members[0].user_id;
-
-  // Permission check
-  const perm = await computeIsRequest(user.id, recipientId);
-
-  if (perm.blocked) {
-    return { ok: false, blockedReason: perm.reason };
+  // Permission check applies to 1:1 only; group members can always post.
+  let isRequest = false;
+  if (!isGroup) {
+    const recipientId = members![0].user_id;
+    const perm = await computeIsRequest(user.id, recipientId);
+    if (perm.blocked) {
+      return { ok: false, blockedReason: perm.reason };
+    }
+    isRequest = perm.is_request ?? false;
   }
-
-  const isRequest = perm.is_request ?? false;
 
   // Insert message
   const { data: msg, error: msgErr } = await sb
@@ -521,18 +714,25 @@ export async function sendMessage({
     .update({ last_message_at: new Date().toISOString() })
     .eq("id", conversationId);
 
-  // Fire-and-forget notification to the recipient.
+  // Fire-and-forget notification to every recipient.
   void (async () => {
     try {
       const actor = await getActorDisplayInfo(user.id);
       if (!actor) return;
-      await createNotification({
-        userId: recipientId,
-        kind: isRequest ? "dm_request" : "dm",
-        actorName: actor.name,
-        text: `${actor.name} sent you a message`,
-        href: `/messages/${conversationId}`,
-      });
+      const recipients = (members ?? []).map((m) => m.user_id as string);
+      await Promise.all(
+        recipients.map((rid) =>
+          createNotification({
+            userId: rid,
+            kind: isRequest ? "dm_request" : "dm",
+            actorName: actor.name,
+            text: isGroup
+              ? `${actor.name} posted in a group`
+              : `${actor.name} sent you a message`,
+            href: `/messages/${conversationId}`,
+          })
+        )
+      );
     } catch { /* best-effort */ }
   })();
 

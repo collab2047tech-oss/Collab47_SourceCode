@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import {
   sendMessage,
   getOrCreate1to1Conversation,
+  createGroupConversation,
   acceptMessageRequest,
   markRead,
   blockUser,
   unblockUser,
   muteConversation,
 } from "@/lib/db/messages";
+import { getMyConnections, type MiniProfile } from "@/lib/db/social";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { DMPermission } from "@/lib/supabase/types";
 
@@ -37,6 +39,20 @@ export async function startConversationAction(
   if (result.ok && result.conversationId) {
     revalidatePath("/messages");
   }
+  return result;
+}
+
+export async function getGroupCandidatesAction(): Promise<MiniProfile[]> {
+  // The pool of people a user can add to a group = their accepted connections.
+  return getMyConnections("all");
+}
+
+export async function createGroupAction(
+  title: string,
+  memberIds: string[]
+): Promise<{ ok: boolean; conversationId?: string; error?: string }> {
+  const result = await createGroupConversation(title, memberIds);
+  if (result.ok) revalidatePath("/messages");
   return result;
 }
 

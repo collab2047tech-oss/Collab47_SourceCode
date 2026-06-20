@@ -2,7 +2,12 @@ import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { PersonCard } from "@/components/composite/PersonCard";
 import { NetworkTabs } from "@/components/composite/NetworkTabs";
-import { getMyConnections, getPendingConnections, getSuggestedConnections } from "@/lib/db/social";
+import {
+  getMyConnections,
+  getPendingConnections,
+  getSuggestedConnections,
+  getRelationshipStates,
+} from "@/lib/db/social";
 import { getMyProfile } from "@/lib/db/profiles";
 import { ShareButton } from "@/components/composite/ShareButton";
 import { ConnectionRequests } from "@/components/composite/ConnectionRequests";
@@ -19,6 +24,13 @@ export default async function NetworkPage() {
     ]);
 
   const { incoming, outgoing } = pendingSplit;
+
+  // Real follow/connection state for everyone shown in the Followers/Following
+  // tabs, so their buttons read "Following"/"Connected" instead of "Follow".
+  const relIds = Array.from(
+    new Set([...followers, ...following].map((p) => p.id))
+  );
+  const relStates = await getRelationshipStates(relIds);
 
   const collegeQuery = profile?.college
     ? `?college=${encodeURIComponent(profile.college)}`
@@ -70,6 +82,7 @@ export default async function NetworkPage() {
           followers={followers}
           following={following}
           pending={outgoing}
+          relStates={relStates}
         />
       </Reveal>
 

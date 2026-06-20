@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { PersonCard } from "@/components/composite/PersonCard";
-import type { MiniProfile } from "@/lib/db/social";
+import { PersonCard, type PersonCardState } from "@/components/composite/PersonCard";
+import type { MiniProfile, RelationshipState } from "@/lib/db/social";
 
 type TabId = "connections" | "followers" | "following" | "pending";
 
@@ -12,6 +12,8 @@ interface NetworkTabsProps {
   followers: MiniProfile[];
   following: MiniProfile[];
   pending: MiniProfile[];
+  /** Real follow/connection state keyed by person id (for Followers/Following). */
+  relStates?: Record<string, RelationshipState>;
 }
 
 export function NetworkTabs({
@@ -19,6 +21,7 @@ export function NetworkTabs({
   followers,
   following,
   pending,
+  relStates = {},
 }: NetworkTabsProps) {
   const [tab, setTab] = useState<TabId>("connections");
 
@@ -30,6 +33,21 @@ export function NetworkTabs({
   ];
 
   const activeData = tabs.find((t) => t.id === tab)?.data ?? [];
+
+  function stateFor(personId: string): PersonCardState {
+    if (tab === "pending") return { pending: true };
+    // Connections tab lists accepted connections by definition.
+    if (tab === "connections") return { isConnected: true };
+    // Followers / Following: reflect the viewer's real relationship so buttons
+    // read "Connected" / "Following" instead of "Follow".
+    const rel = relStates[personId];
+    if (!rel) return tab === "following" ? { isFollowing: true } : {};
+    return {
+      isFollowing: rel.isFollowing,
+      isConnected: rel.isConnected,
+      pending: rel.pending,
+    };
+  }
 
   return (
     <>
@@ -64,13 +82,7 @@ export function NetworkTabs({
               key={person.id}
               person={person}
               variant="grid"
-              state={
-                tab === "pending"
-                  ? { pending: true }
-                  : tab === "following"
-                  ? { isFollowing: true }
-                  : {}
-              }
+              state={stateFor(person.id)}
             />
           ))
         )}

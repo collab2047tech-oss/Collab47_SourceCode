@@ -109,6 +109,8 @@ export interface Conversation {
   id: string;
   type: ConversationType;
   project_id: string | null;
+  /** Human-readable title for group conversations; null for 1:1. */
+  title: string | null;
   created_at: string;
   last_message_at: string;
 }

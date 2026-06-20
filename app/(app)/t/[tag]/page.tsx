@@ -3,14 +3,14 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { getMyEngagementState } from "@/lib/db/engagement";
 import { toCardPost } from "@/lib/ui/toCardPost";
 import { PostCard } from "@/components/composite/PostCard";
-import type { PostWithAuthor } from "@/lib/db/posts";
+import { attachReposts, type PostWithAuthor } from "@/lib/db/posts";
 import { Hash } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+// Repost originals resolved via attachReposts() (PostgREST can't self-embed posts).
 const SELECT =
-  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,verified), " +
-  "reposted_from:posts!posts_reposted_from_post_id_fkey(*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college))";
+  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,verified)";
 
 export default async function HashtagPage({ params }: { params: Promise<{ tag: string }> }) {
   const { tag: raw } = await params;
@@ -30,7 +30,7 @@ export default async function HashtagPage({ params }: { params: Promise<{ tag: s
       .or("expires_at.is.null,expires_at.gt.now()")
       .order("created_at", { ascending: false })
       .limit(40);
-    posts = (data as unknown as PostWithAuthor[]) ?? [];
+    posts = await attachReposts(sb, (data as unknown as PostWithAuthor[]) ?? []);
   }
 
   const eng = await getMyEngagementState(posts.map((p) => p.id));

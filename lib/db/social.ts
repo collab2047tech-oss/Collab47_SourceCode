@@ -269,6 +269,37 @@ export async function getPendingConnections(): Promise<PendingConnections> {
   };
 }
 
+/**
+ * Set of user ids the given viewer already has a relationship with and who must
+ * therefore be EXCLUDED from "people you may know" suggestions:
+ *   - everyone the viewer already FOLLOWS (follows.follower_id = me)
+ *   - the other party of any connection in EITHER direction, regardless of
+ *     status (accepted OR pending), so both already-connected people and
+ *     in-flight requests stop being suggested.
+ * The viewer's own id is included so callers can filter it in one pass.
+ */
+export async function getExcludedSuggestionIds(viewerId: string): Promise<Set<string>> {
+  const sb = await getSupabaseServer();
+  const excluded = new Set<string>([viewerId]);
+  if (!sb) return excluded;
+
+  const [{ data: follows }, { data: conns }] = await Promise.all([
+    sb.from("follows").select("following_id").eq("follower_id", viewerId),
+    sb
+      .from("connections")
+      .select("user_a_id, user_b_id")
+      .or(`user_a_id.eq.${viewerId},user_b_id.eq.${viewerId}`)
+      .in("status", ["accepted", "pending"]),
+  ]);
+
+  for (const f of follows ?? []) excluded.add(f.following_id as string);
+  for (const c of conns ?? []) {
+    excluded.add(c.user_a_id as string);
+    excluded.add(c.user_b_id as string);
+  }
+  return excluded;
+}
+
 export async function getSuggestedConnections(limit = 10): Promise<MiniProfile[]> {
   const sb = await getSupabaseServer();
   if (!sb) return [];
@@ -276,6 +307,12 @@ export async function getSuggestedConnections(limit = 10): Promise<MiniProfile[]
   const cols = "id, handle, name, avatar_url, college, branch";
 
   if (user) {
+    // People the viewer already follows / is connected with / has a pending
+    // request with (either direction) must never be suggested.
+    const excluded = await getExcludedSuggestionIds(user.id);
+    // Over-fetch so that filtering out excluded ids still leaves up to `limit`.
+    const fetchLimit = limit + excluded.size;
+
     const { data: me } = await sb.from("profiles").select("college, branch, cluster_id").eq("id", user.id).maybeSingle();
     if (me?.college) {
       const { data } = await sb
@@ -285,16 +322,71 @@ export async function getSuggestedConnections(limit = 10): Promise<MiniProfile[]
         .neq("id", user.id)
         .is("deleted_at", null)
         .is("suspended_at", null)
-        .limit(limit);
-      if (data && data.length > 0) return data as MiniProfile[];
+        .limit(fetchLimit);
+      const filtered = (data as MiniProfile[] ?? []).filter((p) => !excluded.has(p.id));
+      if (filtered.length > 0) return filtered.slice(0, limit);
     }
-    // Fallback: any other real users (never self, never suspended).
-    const { data } = await sb.from("profiles").select(cols).neq("id", user.id).is("deleted_at", null).is("suspended_at", null).limit(limit);
-    return (data as MiniProfile[]) ?? [];
+    // Fallback: any other real users (never self, never suspended, never
+    // already-followed/connected/pending). Keep college-affinity ordering by
+    // only reaching here when the college query produced nothing usable.
+    const { data } = await sb.from("profiles").select(cols).neq("id", user.id).is("deleted_at", null).is("suspended_at", null).limit(fetchLimit);
+    return (data as MiniProfile[] ?? []).filter((p) => !excluded.has(p.id)).slice(0, limit);
   }
 
   const { data } = await sb.from("profiles").select(cols).is("deleted_at", null).is("suspended_at", null).limit(limit);
   return (data as MiniProfile[]) ?? [];
+}
+
+/**
+ * For a list of user ids, return the viewer's relationship to each so that
+ * Follow/Connect buttons can render the correct state (Following / Connected /
+ * Pending) instead of always showing "Follow". Used by pages that render people
+ * who may already be followed or connected (e.g. search / explore results).
+ */
+export interface RelationshipState {
+  isFollowing: boolean;
+  isConnected: boolean;
+  pending: boolean;
+}
+
+export async function getRelationshipStates(
+  ids: string[]
+): Promise<Record<string, RelationshipState>> {
+  const out: Record<string, RelationshipState> = {};
+  const sb = await getSupabaseServer();
+  if (!sb || ids.length === 0) return out;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return out;
+
+  const targets = ids.filter((id) => id !== user.id);
+  if (targets.length === 0) return out;
+
+  const [{ data: follows }, { data: conns }] = await Promise.all([
+    sb.from("follows").select("following_id").eq("follower_id", user.id).in("following_id", targets),
+    sb
+      .from("connections")
+      .select("user_a_id, user_b_id, status")
+      .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
+      .in("status", ["accepted", "pending"]),
+  ]);
+
+  const followingSet = new Set((follows ?? []).map((f) => f.following_id as string));
+  const connectedSet = new Set<string>();
+  const pendingSet = new Set<string>();
+  for (const c of conns ?? []) {
+    const otherId = c.user_a_id === user.id ? (c.user_b_id as string) : (c.user_a_id as string);
+    if (c.status === "accepted") connectedSet.add(otherId);
+    else pendingSet.add(otherId);
+  }
+
+  for (const id of targets) {
+    out[id] = {
+      isFollowing: followingSet.has(id),
+      isConnected: connectedSet.has(id),
+      pending: pendingSet.has(id),
+    };
+  }
+  return out;
 }
 
 export async function searchAll(query: string, limit = 20) {

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Avatar } from "@/components/primitives/Avatar";
 import { cn } from "@/lib/cn";
-import { Search, MessageSquare } from "lucide-react";
+import { Search, MessageSquare, Users } from "lucide-react";
 import Link from "next/link";
+import { NewGroupModal } from "@/components/composite/NewGroupModal";
 
 export interface ConversationListItem {
   id: string;
@@ -30,6 +31,7 @@ export function MessagesShell({
 }: MessagesShellProps) {
   const [tab, setTab] = useState<"inbox" | "requests">("inbox");
   const [search, setSearch] = useState("");
+  const [groupOpen, setGroupOpen] = useState(false);
 
   const items = tab === "inbox" ? inboxItems : requestItems;
   const filtered = search.trim()
@@ -43,7 +45,16 @@ export function MessagesShell({
       {/* Left rail */}
       <aside className="flex flex-col border-r border-bone bg-paper">
         <div className="p-5">
-          <h2 className="font-serif text-2xl text-ink">Messages</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-serif text-2xl text-ink">Messages</h2>
+            <button
+              onClick={() => setGroupOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-bone bg-cream px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-ink hover:bg-ink hover:text-cream"
+            >
+              <Users className="size-3.5" />
+              New group
+            </button>
+          </div>
 
           {/* Sub-tabs */}
           <div className="mt-4 flex gap-1 rounded-lg bg-cream p-1">
@@ -126,6 +137,8 @@ export function MessagesShell({
         <MessageSquare className="size-10 text-bone" />
         <p className="text-sm text-ash">Select a conversation to read messages.</p>
       </section>
+
+      <NewGroupModal open={groupOpen} onClose={() => setGroupOpen(false)} />
     </div>
   );
 }

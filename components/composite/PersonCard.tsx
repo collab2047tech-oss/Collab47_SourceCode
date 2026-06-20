@@ -66,7 +66,12 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
               Message
             </Button>
           </Link>
-          {state.pending ? (
+          {state.isConnected ? (
+            <Button variant="secondary" size="sm" disabled>
+              <UserCheck className="size-3.5" />
+              Connected
+            </Button>
+          ) : state.pending ? (
             <Button variant="secondary" size="sm" disabled>
               <CheckCircle className="size-3.5" />
               Pending
@@ -123,7 +128,11 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
             <MessageSquare className="size-4" /> Message
           </Button>
         </Link>
-        {state.pending ? (
+        {state.isConnected ? (
+          <Button variant="secondary" size="sm" className="flex-1" disabled>
+            <UserCheck className="size-4" /> Connected
+          </Button>
+        ) : state.pending ? (
           <Button variant="secondary" size="sm" className="flex-1" disabled>
             <CheckCircle className="size-4" /> Pending
           </Button>

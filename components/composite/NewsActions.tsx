@@ -49,12 +49,36 @@ export function NewsActions({
     });
   }
 
+  function flagCopied() {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   function handleShare() {
     const url = `${window.location.origin}/news/${newsId}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    // Prefer the async Clipboard API; fall back to a temporary input + execCommand
+    // for browsers/contexts where it's unavailable or rejects (e.g. insecure
+    // origin, permission denied). Share must always give feedback.
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(flagCopied, fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+    function fallbackCopy() {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        flagCopied();
+      } catch {
+        /* clipboard unavailable — nothing more we can do */
+      }
+    }
   }
 
   const handleReport = useCallback(
