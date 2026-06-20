@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { GOOGLE_AUTH_ENABLED, PHONE_AUTH_ENABLED } from "@/app/(auth)/authProviders";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -140,63 +141,82 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-3">
-            <Button
-              variant="secondary"
-              size="lg"
-              className="w-full justify-center"
-              onClick={signInGoogle}
-              disabled={loading}
-            >
-              Continue with Google
-            </Button>
-          </div>
-
-          <div className="my-8 flex items-center gap-4">
-            <span className="h-px flex-1 bg-bone" />
-            <span className="text-caption">or phone</span>
-            <span className="h-px flex-1 bg-bone" />
-          </div>
-
-          {step === "phone" ? (
-            <form onSubmit={sendOtp} className="space-y-4">
-              <Input
-                label="Phone (India)"
-                type="tel"
-                name="phone"
-                placeholder="+91 98000 00000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-              <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
-                Send OTP <ArrowRight className="size-4" />
+            {GOOGLE_AUTH_ENABLED ? (
+              <Button
+                variant="secondary"
+                size="lg"
+                className="w-full justify-center"
+                onClick={signInGoogle}
+                disabled={loading}
+              >
+                Continue with Google
               </Button>
-            </form>
-          ) : (
-            <form onSubmit={verifyOtp} className="space-y-4">
-              <Input
-                label="6-digit code"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                name="otp"
-                placeholder="123456"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                required
-              />
-              <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
-                Verify <ArrowRight className="size-4" />
-              </Button>
+            ) : (
               <button
                 type="button"
-                onClick={() => setStep("phone")}
-                className="block w-full text-center text-sm text-ash underline"
+                disabled
+                title="Google sign-in is coming soon. Use email for now."
+                aria-label="Continue with Google — coming soon"
+                className="flex h-14 w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-ink/10 bg-transparent px-7 text-lg font-medium text-ash opacity-60"
               >
-                Change phone
+                Continue with Google
+                <span className="rounded-full bg-bone px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ash">
+                  Coming soon
+                </span>
               </button>
-            </form>
-          )}
+            )}
+          </div>
+
+          {PHONE_AUTH_ENABLED ? (
+            <>
+              <div className="my-8 flex items-center gap-4">
+                <span className="h-px flex-1 bg-bone" />
+                <span className="text-caption">or phone</span>
+                <span className="h-px flex-1 bg-bone" />
+              </div>
+
+              {step === "phone" ? (
+                <form onSubmit={sendOtp} className="space-y-4">
+                  <Input
+                    label="Phone (India)"
+                    type="tel"
+                    name="phone"
+                    placeholder="+91 98000 00000"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                  <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+                    Send OTP <ArrowRight className="size-4" />
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={verifyOtp} className="space-y-4">
+                  <Input
+                    label="6-digit code"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    name="otp"
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                  />
+                  <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+                    Verify <ArrowRight className="size-4" />
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setStep("phone")}
+                    className="block w-full text-center text-sm text-ash underline"
+                  >
+                    Change phone
+                  </button>
+                </form>
+              )}
+            </>
+          ) : null}
 
           {error ? (
             <p className="mt-4 rounded-md bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>

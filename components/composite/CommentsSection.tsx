@@ -3,9 +3,9 @@
 import { useState, useTransition } from "react";
 import { Avatar } from "@/components/primitives/Avatar";
 import { cn } from "@/lib/cn";
-import { Send, ChevronDown, ChevronUp, Heart } from "lucide-react";
+import { Send, ChevronDown, ChevronUp, Heart, Trash2 } from "lucide-react";
 import type { CommentWithAuthor } from "@/lib/db/posts";
-import { addCommentOnPostAction } from "@/app/p/[short_id]/actions";
+import { addCommentOnPostAction, deleteCommentOnPostAction } from "@/app/p/[short_id]/actions";
 import { likeCommentAction, unlikeCommentAction } from "@/app/p/[short_id]/comment-like-actions";
 
 function relativeTime(iso: string): string {
@@ -27,10 +27,17 @@ interface Props {
   postId: string;
   initialComments: CommentWithAuthor[];
   initialLikes?: InitialLikes;
+  currentUserId?: string;
   currentUserName?: string;
 }
 
-export function CommentsSection({ postId, initialComments, initialLikes, currentUserName = "You" }: Props) {
+export function CommentsSection({
+  postId,
+  initialComments,
+  initialLikes,
+  currentUserId = "",
+  currentUserName = "You",
+}: Props) {
   const [comments, setComments] = useState<CommentWithAuthor[]>(initialComments);
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +104,39 @@ export function CommentsSection({ postId, initialComments, initialLikes, current
     });
   }
 
+  function deleteComment(commentId: string) {
+    // Not-yet-persisted optimistic comments can't be server-deleted.
+    if (commentId.startsWith("optimistic-")) return;
+    const snapshot = comments;
+    // Optimistically remove the comment (and any of its replies).
+    setComments((prev) => prev.filter((c) => c.id !== commentId && c.parent_comment_id !== commentId));
+    startTransition(async () => {
+      const res = await deleteCommentOnPostAction(commentId);
+      if (!res.ok) {
+        // Roll back to the pre-delete snapshot and surface the error.
+        setComments(snapshot);
+        if ("error" in res) setError(res.error ?? "Could not delete comment.");
+      }
+    });
+  }
+
+  function DeleteButton({ commentId, size = "sm" }: { commentId: string; size?: "sm" | "xs" }) {
+    return (
+      <button
+        type="button"
+        onClick={() => deleteComment(commentId)}
+        aria-label="Delete comment"
+        className={cn(
+          "inline-flex items-center gap-1 font-medium text-ash transition-colors hover:text-ember",
+          size === "sm" ? "text-xs" : "text-[11px]"
+        )}
+      >
+        <Trash2 className={size === "sm" ? "size-3.5" : "size-3"} />
+        Delete
+      </button>
+    );
+  }
+
   function LikeButton({ commentId, size = "sm" }: { commentId: string; size?: "sm" | "xs" }) {
     const liked = likedSet.has(commentId);
     const count = likeCounts[commentId] ?? 0;
@@ -139,6 +179,7 @@ export function CommentsSection({ postId, initialComments, initialLikes, current
       body: text,
       created_at: new Date().toISOString(),
       parent_comment_id: replyTo?.id ?? null,
+      author_id: currentUserId,
       author: { handle: "", name: currentUserName, avatar_url: null },
     };
     setComments((prev) => [...prev, optimistic]);
@@ -194,6 +235,9 @@ export function CommentsSection({ postId, initialComments, initialLikes, current
                       >
                         Reply
                       </button>
+                      {currentUserId && c.author_id === currentUserId ? (
+                        <DeleteButton commentId={c.id} size="sm" />
+                      ) : null}
                     </div>
                   </div>
                 </article>
@@ -246,6 +290,9 @@ export function CommentsSection({ postId, initialComments, initialLikes, current
                               >
                                 Reply
                               </button>
+                              {currentUserId && r.author_id === currentUserId ? (
+                                <DeleteButton commentId={r.id} size="xs" />
+                              ) : null}
                             </div>
                           </div>
                         </article>

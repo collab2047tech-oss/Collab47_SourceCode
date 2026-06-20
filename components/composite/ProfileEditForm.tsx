@@ -7,7 +7,7 @@ import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { updateProfileAction } from "@/app/(app)/profile/edit/actions";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
-import { compressImage } from "@/lib/media/compress";
+import { prepareImageForUpload, IMAGE_ACCEPT } from "@/lib/media/compress";
 import type { ProfileLinks } from "@/lib/supabase/types";
 
 const BRANCHES = [
@@ -67,13 +67,18 @@ export function ProfileEditForm({
   const [bioLen, setBioLen] = useState(bio.length);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(avatar_url);
   const [coverPreview, setCoverPreview] = useState<string | null>(cover_url);
+  // Tracks intent to clear the saved avatar so "Remove" actually persists.
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setAvatarPreview(URL.createObjectURL(file));
+    if (file) {
+      setAvatarPreview(URL.createObjectURL(file));
+      setAvatarRemoved(false);
+    }
   }
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -120,11 +125,11 @@ export function ProfileEditForm({
         }
         try {
           if (avatarFile) {
-            const toUpload = await compressImage(avatarFile);
+            const toUpload = await prepareImageForUpload(avatarFile);
             data.set("avatar_url", await uploadImage(sb, user.id, toUpload, "avatars"));
           }
           if (coverFile) {
-            const toUpload = await compressImage(coverFile);
+            const toUpload = await prepareImageForUpload(coverFile);
             data.set("cover_url", await uploadImage(sb, user.id, toUpload, "covers"));
           }
         } catch (err) {
@@ -132,7 +137,17 @@ export function ProfileEditForm({
           return;
         }
       }
-      await updateProfileAction(data);
+      // Persist avatar removal (only when the user did not pick a new file).
+      if (avatarRemoved && !avatarFile) {
+        data.set("avatar_url", "");
+        data.set("avatar_removed", "true");
+      }
+      const result = await updateProfileAction(data);
+      // On success the action redirects and never returns; a returned value
+      // means it failed validation/save, so surface the error to the user.
+      if (result && !result.ok) {
+        setError(result.error ?? "Could not save your profile. Please try again.");
+      }
     });
   }
 
@@ -159,7 +174,7 @@ export function ProfileEditForm({
           ref={coverInputRef}
           type="file"
           name="cover"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           className="hidden"
           onChange={handleCoverChange}
         />
@@ -190,6 +205,7 @@ export function ProfileEditForm({
                 className="text-xs text-ash hover:text-ink transition-colors"
                 onClick={() => {
                   setAvatarPreview(null);
+                  setAvatarRemoved(true);
                   if (avatarInputRef.current) avatarInputRef.current.value = "";
                 }}
               >
@@ -202,7 +218,7 @@ export function ProfileEditForm({
           ref={avatarInputRef}
           type="file"
           name="avatar"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           className="hidden"
           onChange={handleAvatarChange}
         />

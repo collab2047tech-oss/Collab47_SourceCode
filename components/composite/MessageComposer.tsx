@@ -1,15 +1,18 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { sendMessageAction } from "@/app/(app)/messages/actions";
-import { compressImage } from "@/lib/media/compress";
+import { prepareImageForUpload, IMAGE_ACCEPT } from "@/lib/media/compress";
 import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface MessageComposerProps {
   conversationId: string;
+  /** Current user's id — stamped on typing broadcasts so peers can filter self. */
+  currentUserId?: string;
   canCompose?: boolean;
   blockedReason?: string;
   /** Reason shown when canCompose is false (e.g. you blocked / were blocked). */
@@ -20,6 +23,7 @@ const TYPING_DEBOUNCE_MS = 800;
 
 export function MessageComposer({
   conversationId,
+  currentUserId,
   canCompose = true,
   blockedReason,
   cannotComposeReason,
@@ -35,14 +39,27 @@ export function MessageComposer({
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingChannelRef = useRef<RealtimeChannel | null>(null);
 
-  function broadcastTyping() {
+  // Maintain ONE subscribed channel for typing broadcasts. Sending on an
+  // unsubscribed channel is dropped, so we subscribe up front and reuse it.
+  useEffect(() => {
     const sb = getSupabaseBrowser();
     if (!sb) return;
-    sb.channel(`messages:conversation_id=eq.${conversationId}`).send({
+    const channel = sb.channel(`typing:${conversationId}`);
+    channel.subscribe();
+    typingChannelRef.current = channel;
+    return () => {
+      sb.removeChannel(channel);
+      typingChannelRef.current = null;
+    };
+  }, [conversationId]);
+
+  function broadcastTyping() {
+    typingChannelRef.current?.send({
       type: "broadcast",
       event: "typing",
-      payload: { conversationId },
+      payload: { conversationId, userId: currentUserId },
     });
   }
 
@@ -56,6 +73,15 @@ export function MessageComposer({
     const file = e.target.files?.[0] ?? null;
     setImageFile(file);
     if (file) {
+      // HEIC/HEIF can't be rendered by browsers, so a data-URL preview shows a
+      // broken image. Skip the inline preview for those — the file still
+      // converts to JPEG and uploads fine on send.
+      const isHeic =
+        /image\/hei[cf]/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+      if (isHeic) {
+        setImagePreview(null);
+        return;
+      }
       const reader = new FileReader();
       reader.onload = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
@@ -81,7 +107,8 @@ export function MessageComposer({
       let image_url: string | undefined;
       if (imageFile && sb) {
         try {
-          const toUpload = await compressImage(imageFile);
+          // Routes HEIC/HEIF (iPhone photos) -> JPEG and compresses all formats.
+          const toUpload = await prepareImageForUpload(imageFile);
           const ext = toUpload.name.split(".").pop()?.toLowerCase() ?? "jpg";
           const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
           const { error } = await sb.storage.from("message-media").upload(path, toUpload, { upsert: false });
@@ -170,6 +197,23 @@ export function MessageComposer({
         </div>
       )}
 
+      {imageFile && !imagePreview && (
+        <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-bone bg-cream px-3 py-2">
+          <Paperclip className="size-3.5 text-ash" />
+          <span className="max-w-48 truncate text-xs text-ink">
+            {imageFile.name}
+          </span>
+          <button
+            type="button"
+            onClick={removeImage}
+            aria-label="Remove attachment"
+            className="rounded-full p-0.5 text-ash hover:bg-bone hover:text-ink"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
         <div className="flex items-center gap-3 rounded-full border border-bone bg-cream px-4 py-2">
           <button
@@ -183,7 +227,7 @@ export function MessageComposer({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             className="hidden"
             onChange={handleImageChange}
           />

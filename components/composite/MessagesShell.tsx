@@ -16,6 +16,7 @@ export interface ConversationListItem {
   time: string;
   unread: boolean;
   href: string;
+  isGroup?: boolean;
 }
 
 interface MessagesShellProps {
@@ -114,7 +115,13 @@ export function MessagesShell({
               href={item.href}
               className="flex w-full items-start gap-3 px-5 py-4 text-left transition-colors hover:bg-bone/40"
             >
-              <Avatar name={item.name} src={item.avatarUrl} size="md" />
+              {item.isGroup ? (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
+                  <Users className="size-5" />
+                </span>
+              ) : (
+                <Avatar name={item.name} src={item.avatarUrl} size="md" />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="truncate text-sm font-semibold text-ink">

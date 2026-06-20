@@ -13,6 +13,7 @@ import {
   MessageCircle,
   Bookmark,
   Repeat2,
+  Share2,
   MoreHorizontal,
   Pin,
   PinOff,
@@ -40,6 +41,7 @@ import {
   deletePostAction,
   pinPostAction,
   unpinPostAction,
+  saveHighlightAction,
 } from "@/app/(app)/home/actions";
 import type { ReactionKind } from "@/lib/db/engagement";
 
@@ -129,6 +131,8 @@ export function PostCard({
   const [menuError, setMenuError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [repostToast, setRepostToast] = useState(false);
+  const [highlightSaved, setHighlightSaved] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -207,12 +211,41 @@ export function PostCard({
     });
   }
 
+  async function handleShare() {
+    const url = `${window.location.origin}/p/${post.short_id}`;
+    // Prefer the OS share sheet (DMs, WhatsApp, etc.) when supported.
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: `${post.author.name} on Collab47`, url });
+        return;
+      } catch {
+        /* cancelled or unsupported — fall back to copying */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      /* clipboard blocked */
+    }
+  }
+
   function handleRepost() {
+    setMenuError(null);
+    // Repost the ORIGINAL post, never a repost-of-a-repost.
+    const targetId = isRepost && post.repostOf ? undefined : post.id;
+    if (targetId === undefined) {
+      setMenuError("You can only repost an original post.");
+      return;
+    }
     startTransition(async () => {
-      const res = await repostPostAction(post.id);
+      const res = await repostPostAction(targetId);
       if (res.ok) {
         setRepostToast(true);
         setTimeout(() => setRepostToast(false), 2500);
+      } else {
+        setMenuError(res.error ?? "Could not repost.");
       }
     });
   }
@@ -270,7 +303,19 @@ export function PostCard({
     });
   }
   function handleSaveHighlight() {
-    if (onSaveHighlight) runAction(() => onSaveHighlight(post.id));
+    setMenuError(null);
+    setMenuOpen(false);
+    startTransition(async () => {
+      const result = onSaveHighlight
+        ? await onSaveHighlight(post.id)
+        : await saveHighlightAction(post.id);
+      if (result.ok) {
+        setHighlightSaved(true);
+        setTimeout(() => setHighlightSaved(false), 2500);
+      } else {
+        setMenuError(result.error ?? "Could not save highlight.");
+      }
+    });
   }
   function handleNotInterested() {
     setMenuOpen(false);
@@ -322,26 +367,36 @@ export function PostCard({
       ) : null}
 
       <div className="flex gap-3 px-5 py-5">
-        {/* Avatar - links to profile */}
-        <a
-          href={post.author.handle ? `/u/${post.author.handle}` : "#"}
-          className="shrink-0 mt-0.5"
-          tabIndex={-1}
-          aria-hidden="true"
-        >
-          <Avatar name={post.author.name} size="md" className="ring-2 ring-bone hover:ring-saffron/30 transition-all" />
-        </a>
+        {/* Avatar - links to profile (plain span when no handle) */}
+        {post.author.handle ? (
+          <a
+            href={`/u/${post.author.handle}`}
+            className="shrink-0 mt-0.5"
+            tabIndex={-1}
+            aria-hidden="true"
+          >
+            <Avatar name={post.author.name} size="md" className="ring-2 ring-bone hover:ring-saffron/30 transition-all" />
+          </a>
+        ) : (
+          <span className="shrink-0 mt-0.5" aria-hidden="true">
+            <Avatar name={post.author.name} size="md" className="ring-2 ring-bone transition-all" />
+          </span>
+        )}
 
         <div className="min-w-0 flex-1">
           {/* Author row */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-              <a
-                href={post.author.handle ? `/u/${post.author.handle}` : "#"}
-                className="text-sm font-semibold text-ink hover:text-saffron transition-colors truncate"
-              >
-                {post.author.name}
-              </a>
+              {post.author.handle ? (
+                <a
+                  href={`/u/${post.author.handle}`}
+                  className="text-sm font-semibold text-ink hover:text-saffron transition-colors truncate"
+                >
+                  {post.author.name}
+                </a>
+              ) : (
+                <span className="text-sm font-semibold text-ink truncate">{post.author.name}</span>
+              )}
               {post.author.handle ? (
                 <span className="text-xs text-ash truncate">@{post.author.handle}</span>
               ) : null}
@@ -439,9 +494,14 @@ export function PostCard({
             </>
           )}
 
-          {/* Menu error */}
+          {/* Menu error / highlight confirmation */}
           {menuError ? (
             <p className="mt-2 text-xs text-ember">{menuError}</p>
+          ) : highlightSaved ? (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-moss">
+              <Star className="size-3.5 fill-moss" />
+              Saved as a highlight.
+            </p>
           ) : null}
 
           {/* Action bar */}
@@ -580,6 +640,20 @@ export function PostCard({
                     saved ? "fill-saffron stroke-saffron scale-110" : "stroke-current"
                   )}
                 />
+              }
+            />
+
+            {/* Share */}
+            <ActionBtn
+              onClick={handleShare}
+              active={shareCopied}
+              activeClass="text-moss"
+              label={shareCopied ? "Link copied" : "Share"}
+              icon={<Share2 className="size-4 transition-all" />}
+              extraContent={
+                shareCopied ? (
+                  <span className="ml-1 text-[11px] text-moss font-medium">Copied</span>
+                ) : null
               }
             />
           </div>

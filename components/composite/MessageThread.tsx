@@ -131,6 +131,31 @@ export function MessageThread({
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          // Keep read receipts ("Seen") and any other field edits live without
+          // a refresh. Merge by id so we don't lose the attached sender profile.
+          const updated = payload.new as MessageWithSender;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === updated.id ? { ...m, ...updated, sender: m.sender } : m
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    // Typing indicator rides a separate broadcast channel (`typing:<id>`) that
+    // the composer subscribes to and sends on. Ignore our own broadcasts.
+    const typingChannel = sb
+      .channel(`typing:${conversationId}`)
       .on("broadcast", { event: "typing" }, (payload) => {
         if (payload.payload?.userId !== currentUserId) {
           setTypingVisible(true);
@@ -142,11 +167,23 @@ export function MessageThread({
 
     return () => {
       sb.removeChannel(channel);
+      sb.removeChannel(typingChannel);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, [conversationId, currentUserId]);
 
   const groups = groupByDate(messages);
+
+  // "Seen" indicator: the id of the current user's most recent message that the
+  // other party has read (read_at set). Honors read receipts — the server only
+  // stamps read_at when the reader has the privacy setting enabled.
+  const lastSeenOwnId = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.sender_id === currentUserId && m.read_at) return m.id;
+    }
+    return null;
+  })();
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-8 no-scrollbar">
@@ -194,11 +231,14 @@ export function MessageThread({
                     <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                     <p
                       className={cn(
-                        "mt-1 text-[10px]",
-                        isOwn ? "text-cream/70" : "text-ash"
+                        "mt-1 flex items-center gap-1 text-[10px]",
+                        isOwn ? "justify-end text-cream/70" : "text-ash"
                       )}
                     >
                       {formatTime(msg.created_at)}
+                      {isOwn && msg.id === lastSeenOwnId && (
+                        <span className="font-medium">· Seen</span>
+                      )}
                     </p>
                   </div>
                 </div>

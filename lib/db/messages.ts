@@ -19,6 +19,7 @@ export interface ConversationPreview {
   lastMessageAt: string;
   unreadCount: number;
   isRequest: boolean;
+  isGroup: boolean;
 }
 
 export interface MessageWithSender extends Message {
@@ -35,6 +36,10 @@ export interface ConversationHeader {
   blocked: boolean;
   /** Reason for the block, if any. */
   blockedReason?: string;
+  /** True if the CURRENT user is the one who blocked the other (so they can unblock). */
+  blockedByMe: boolean;
+  /** True if the current user is muting this conversation. */
+  muted: boolean;
   /** True if this conversation is a group chat. */
   isGroup: boolean;
   /** Group title (group conversations only). */
@@ -83,7 +88,7 @@ export async function getMyConversations(
   const { data: conversations } = await sb
     .from("conversations")
     .select(
-      `id, type, last_message_at,
+      `id, type, title, last_message_at,
        conversation_members(user_id, last_read_at,
          profiles:profiles!conversation_members_user_id_fkey(id, handle, name, avatar_url, college)
        ),
@@ -111,7 +116,10 @@ export async function getMyConversations(
     }>;
     const isGroup = conv.type === "group";
 
-    // For a group, the "other user" slot represents the whole team.
+    // For a group, the "other user" slot represents the whole team. Prefer the
+    // group's chosen title; fall back to a member count if it was never set.
+    const groupName =
+      (conv.title as string | null)?.trim() || `Team chat (${members.length})`;
     const otherMember = isGroup
       ? {
           user_id: conv.id as string,
@@ -119,7 +127,7 @@ export async function getMyConversations(
           profiles: {
             id: conv.id as string,
             handle: "",
-            name: `Team chat (${members.length})`,
+            name: groupName,
             avatar_url: members.find((m) => m.user_id !== user.id)?.profiles?.avatar_url ?? null,
             college: null,
           } as MiniProfile,
@@ -150,10 +158,11 @@ export async function getMyConversations(
     results.push({
       id: conv.id as string,
       otherUser: otherMember.profiles,
-      lastMessage: latestMsg.body,
+      lastMessage: latestMsg.body || (latestMsg.is_request ? "Wants to connect" : "Photo"),
       lastMessageAt: conv.last_message_at as string,
       unreadCount,
       isRequest,
+      isGroup,
     });
   }
 
@@ -196,6 +205,8 @@ export async function getConversationHeader(
     isRequest: false,
     isRequestSender: false,
     blocked: false,
+    blockedByMe: false,
+    muted: false,
     isGroup: false,
   };
 
@@ -207,19 +218,21 @@ export async function getConversationHeader(
   } = await sb.auth.getUser();
   if (!user) return empty;
 
-  // Confirm the caller is a member, and pull every member's profile.
+  // Confirm the caller is a member, and pull every member's profile + the
+  // caller's own mute flag.
   const { data: members } = await sb
     .from("conversation_members")
     .select(
-      `user_id,
+      `user_id, muted,
        profiles:profiles!conversation_members_user_id_fkey(id, handle, name, avatar_url, college)`
     )
     .eq("conversation_id", conversationId);
 
   if (!members || members.length === 0) return empty;
 
-  const isMember = members.some((m) => m.user_id === user.id);
-  if (!isMember) return empty;
+  const myRow = members.find((m) => m.user_id === user.id);
+  if (!myRow) return empty;
+  const muted = !!(myRow as { muted?: boolean }).muted;
 
   // Resolve the conversation type/title up front so we can branch for groups.
   const { data: conv } = await sb
@@ -236,8 +249,10 @@ export async function getConversationHeader(
       isRequest: false,
       isRequestSender: false,
       blocked: false,
+      blockedByMe: false,
+      muted,
       isGroup: true,
-      groupTitle: (conv.title as string | null) ?? `Group (${members.length})`,
+      groupTitle: (conv.title as string | null)?.trim() || `Group (${members.length})`,
       memberCount: members.length,
     };
   }
@@ -264,12 +279,23 @@ export async function getConversationHeader(
   // thread this also previews how the first message will be routed.
   const perm = await computeIsRequest(user.id, otherUser.id);
 
+  // Did the CURRENT user block the other? Only then can they unblock. (A block
+  // the other party placed is not theirs to lift.)
+  const { data: myBlock } = await sb
+    .from("blocks")
+    .select("blocker_id")
+    .eq("blocker_id", user.id)
+    .eq("blocked_id", otherUser.id)
+    .maybeSingle();
+
   return {
     otherUser,
     isRequest,
     isRequestSender,
     blocked: !!perm.blocked,
     blockedReason: perm.reason,
+    blockedByMe: !!myBlock,
+    muted,
     isGroup: false,
   };
 }
@@ -775,6 +801,61 @@ export async function acceptMessageRequest(
   return { ok: true };
 }
 
+/**
+ * Decline (delete) a pending message request. The recipient discards the cold
+ * contact: the conversation, its membership rows and messages are removed (the
+ * conversation delete cascades). Only allowed when the thread is genuinely a
+ * pending request the caller did NOT send, so a real conversation can never be
+ * destroyed by accident.
+ */
+export async function declineMessageRequest(
+  conversationId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false, error: "Supabase not configured" };
+
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  // Caller must be a member of this conversation.
+  const { data: membership } = await sb
+    .from("conversation_members")
+    .select("conversation_id")
+    .eq("conversation_id", conversationId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership) return { ok: false, error: "Not part of this conversation" };
+
+  // The thread must currently be a pending request the caller did NOT send.
+  const { data: firstMsg } = await sb
+    .from("messages")
+    .select("sender_id, is_request")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!firstMsg?.is_request) {
+    return { ok: false, error: "This is not a pending request." };
+  }
+  if (firstMsg.sender_id === user.id) {
+    return { ok: false, error: "You cannot decline your own request." };
+  }
+
+  // Delete via service role (RLS forbids removing the conversation/peer rows).
+  const admin = getAdminClient();
+  if (!admin) return { ok: false, error: "Server not configured" };
+
+  const { error } = await admin
+    .from("conversations")
+    .delete()
+    .eq("id", conversationId);
+  if (error) return { ok: false, error: error.message };
+
+  return { ok: true };
+}
+
 export async function markRead(
   conversationId: string
 ): Promise<{ ok: boolean }> {
@@ -788,20 +869,33 @@ export async function markRead(
 
   const now = new Date().toISOString();
 
-  // Update last_read_at for current user in this conversation
+  // Update last_read_at for current user in this conversation. This is always
+  // recorded — it drives the unread badge and is private to the reader.
   await sb
     .from("conversation_members")
     .update({ last_read_at: now })
     .eq("conversation_id", conversationId)
     .eq("user_id", user.id);
 
-  // Mark messages from others as read
-  await sb
-    .from("messages")
-    .update({ read_at: now })
-    .eq("conversation_id", conversationId)
-    .neq("sender_id", user.id)
-    .is("read_at", null);
+  // Honor the reader's "read receipts" privacy setting: only stamp read_at on
+  // the OTHER party's messages (which is what the sender sees as "Seen") when
+  // this reader has read receipts enabled. Default is OFF, matching settings.
+  const { data: me } = await sb
+    .from("profiles")
+    .select("privacy")
+    .eq("id", user.id)
+    .maybeSingle();
+  const readReceiptsOn =
+    (me?.privacy as Record<string, boolean> | null)?.read_receipts === true;
+
+  if (readReceiptsOn) {
+    await sb
+      .from("messages")
+      .update({ read_at: now })
+      .eq("conversation_id", conversationId)
+      .neq("sender_id", user.id)
+      .is("read_at", null);
+  }
 
   return { ok: true };
 }

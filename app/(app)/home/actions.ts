@@ -7,6 +7,7 @@ import {
   deletePost,
   pinPost,
   unpinPost,
+  convertRepostToHighlight,
 } from "@/lib/db/posts";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseConfigured } from "@/lib/supabase/env";
 import { moderateContent } from "@/lib/moderation/moderate";
@@ -149,6 +150,22 @@ export async function unpinPostAction(
 ): Promise<{ ok: boolean; error?: string }> {
   const result = await unpinPost(postId);
   if (result.ok) {
+    revalidatePath("/profile");
+    revalidatePath("/u/[handle]");
+  }
+  return result;
+}
+
+/**
+ * Save a repost permanently as a highlight (clears the 24h expiry). Only valid
+ * for the author's own still-live reposts.
+ */
+export async function saveHighlightAction(
+  postId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await convertRepostToHighlight(postId);
+  if (result.ok) {
+    revalidatePath("/home");
     revalidatePath("/profile");
     revalidatePath("/u/[handle]");
   }

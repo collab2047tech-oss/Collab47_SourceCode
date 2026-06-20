@@ -6,6 +6,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { getPostByShortId, getPostComments } from "@/lib/db/posts";
 import { getCommentLikeState } from "@/lib/db/comments";
 import { getMyEngagementState } from "@/lib/db/engagement";
+import { getMyProfile } from "@/lib/db/profiles";
 import { PostDetailActions } from "@/components/composite/PostDetailActions";
 import { CommentsSection } from "@/components/composite/CommentsSection";
 
@@ -28,9 +29,10 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
     );
   }
 
-  const [engagement, comments] = await Promise.all([
+  const [engagement, comments, me] = await Promise.all([
     getMyEngagementState([post.id]),
     getPostComments(post.id),
+    getMyProfile(),
   ]);
 
   const initialLiked = engagement.likes.has(post.id);
@@ -48,13 +50,28 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
       <article className="container-edit max-w-2xl pt-32 pb-20">
         <Reveal>
           <div className="flex items-center gap-3">
-            <Link href={`/u/${post.author.handle}`} className="flex items-center gap-3">
-              <Avatar name={post.author.name} src={post.author.avatar_url ?? undefined} size="md" />
-              <div>
-                <p className="text-base font-semibold text-ink">{post.author.name}</p>
-                <p className="text-xs text-ash">@{post.author.handle} . {post.author.college}</p>
+            {post.author.handle ? (
+              <Link href={`/u/${post.author.handle}`} className="flex items-center gap-3">
+                <Avatar name={post.author.name} src={post.author.avatar_url ?? undefined} size="md" />
+                <div>
+                  <p className="text-base font-semibold text-ink">{post.author.name}</p>
+                  <p className="text-xs text-ash">
+                    @{post.author.handle}
+                    {post.author.college ? ` . ${post.author.college}` : ""}
+                  </p>
+                </div>
+              </Link>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Avatar name={post.author.name} src={post.author.avatar_url ?? undefined} size="md" />
+                <div>
+                  <p className="text-base font-semibold text-ink">{post.author.name}</p>
+                  {post.author.college ? (
+                    <p className="text-xs text-ash">{post.author.college}</p>
+                  ) : null}
+                </div>
               </div>
-            </Link>
+            )}
           </div>
         </Reveal>
         <Reveal delay={0.05}>
@@ -104,6 +121,8 @@ export default async function PostPage({ params }: { params: Promise<{ short_id:
             postId={post.id}
             initialComments={comments}
             initialLikes={initialLikes}
+            currentUserId={me?.id ?? ""}
+            currentUserName={me?.name ?? "You"}
           />
         </Reveal>
       </article>

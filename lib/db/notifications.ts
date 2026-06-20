@@ -33,6 +33,29 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 /**
+ * Mark a single notification as read for the current user. Used when a row is
+ * clicked so the bell badge and per-row dot stay accurate. Best-effort; never
+ * throws. RLS (notif_update_own) already scopes updates to the owner, and we
+ * also constrain on user_id defensively.
+ */
+export async function markNotificationRead(id: string): Promise<void> {
+  try {
+    const sb = await getSupabaseServer();
+    if (!sb) return;
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    await sb
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .is("read_at", null);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
  * Insert a notification row. Fire-and-forget — never throws.
  * Uses the admin client because the notifications table is insert-restricted by RLS.
  */

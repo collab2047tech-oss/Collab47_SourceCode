@@ -6,6 +6,7 @@ import {
   getOrCreate1to1Conversation,
   createGroupConversation,
   acceptMessageRequest,
+  declineMessageRequest,
   markRead,
   blockUser,
   unblockUser,
@@ -62,6 +63,15 @@ export async function acceptRequestAction(
   const result = await acceptMessageRequest(conversationId);
   revalidatePath("/messages/requests");
   revalidatePath(`/messages/${conversationId}`);
+  revalidatePath("/messages");
+  return result;
+}
+
+export async function declineRequestAction(
+  conversationId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await declineMessageRequest(conversationId);
+  revalidatePath("/messages/requests");
   revalidatePath("/messages");
   return result;
 }

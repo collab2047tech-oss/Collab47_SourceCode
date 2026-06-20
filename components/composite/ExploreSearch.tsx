@@ -142,9 +142,9 @@ export function ExploreSearch() {
               <p className="mb-3 text-caption">Hashtags</p>
               <div className="flex flex-wrap gap-2">
                 {results.hashtags.map((h) => (
-                  <Tag key={h.tag} variant="saffron">
-                    #{h.tag}
-                  </Tag>
+                  <Link key={h.tag} href={`/t/${h.tag}`} className="transition-opacity hover:opacity-80">
+                    <Tag variant="saffron">#{h.tag}</Tag>
+                  </Link>
                 ))}
               </div>
             </section>

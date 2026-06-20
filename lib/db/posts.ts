@@ -237,6 +237,8 @@ export interface CommentWithAuthor {
   body: string;
   created_at: string;
   parent_comment_id: string | null;
+  /** The author's user id — needed so the UI can show "Delete" only to the author. */
+  author_id: string;
   author: { handle: string; name: string; avatar_url: string | null };
 }
 
@@ -245,7 +247,7 @@ export async function getPostComments(postId: string): Promise<CommentWithAuthor
   if (!sb) return [];
   const { data } = await sb
     .from("comments")
-    .select("id, body, created_at, parent_comment_id, author:profiles!comments_author_id_fkey(handle,name,avatar_url)")
+    .select("id, body, created_at, parent_comment_id, author_id, author:profiles!comments_author_id_fkey(handle,name,avatar_url)")
     .eq("post_id", postId)
     .order("created_at", { ascending: true })
     .limit(200);

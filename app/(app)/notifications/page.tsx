@@ -1,12 +1,14 @@
-import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
-import { Avatar } from "@/components/primitives/Avatar";
 import {
   Heart, MessageCircle, MessageSquare, CornerDownRight, UserPlus, UserCheck,
   Briefcase, Bell, AtSign, Repeat2, Bookmark, Mail,
 } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { MarkAllReadButton } from "@/components/composite/MarkAllReadButton";
+import {
+  NotificationItem,
+  type NotificationItemData,
+} from "@/components/composite/NotificationItem";
 
 const KIND_ICON: Record<string, React.ElementType> = {
   follow: UserPlus,
@@ -24,21 +26,11 @@ const KIND_ICON: Record<string, React.ElementType> = {
   system: Bell,
 };
 
-interface NotificationItem {
-  id: string;
-  kind: string;
-  text: string;
-  who: string;
-  when: string;
-  href: string;
-  unread: boolean;
-}
-
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
   const sb = await getSupabaseServer();
-  let items: NotificationItem[] = [];
+  let items: NotificationItemData[] = [];
 
   if (sb) {
     const { data: { user } } = await sb.auth.getUser();
@@ -90,24 +82,10 @@ export default async function NotificationsPage() {
               const Icon = KIND_ICON[n.kind] ?? Bell;
               return (
                 <li key={n.id}>
-                  <Link
-                    href={n.href}
-                    className={`flex items-start gap-4 py-5 transition-colors hover:bg-paper rounded-md px-2 ${n.unread ? "bg-saffron/5" : ""}`}
-                  >
-                    <div className="relative flex size-10 items-center justify-center rounded-full bg-bone">
-                      <Icon className="size-4 text-ink" />
-                      {n.unread ? (
-                        <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-saffron ring-2 ring-cream" />
-                      ) : null}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-base text-ink">
-                        <span className="font-semibold">{n.who}</span> {n.text}
-                      </p>
-                      <p className="mt-1 text-xs text-ash">{n.when}</p>
-                    </div>
-                    <Avatar name={n.who} size="sm" />
-                  </Link>
+                  <NotificationItem
+                    item={n}
+                    icon={<Icon className="size-4 text-ink" />}
+                  />
                 </li>
               );
             })

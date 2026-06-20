@@ -32,9 +32,12 @@ export default async function NetworkPage() {
   );
   const relStates = await getRelationshipStates(relIds);
 
-  const collegeQuery = profile?.college
-    ? `?college=${encodeURIComponent(profile.college)}`
-    : "";
+  // "Find from college" jumps to the Suggested section, which is already
+  // college-affinity filtered (getSuggestedConnections), when the viewer has a
+  // college set; otherwise it routes to the global Explore search.
+  const hasSuggested = suggested.length > 0;
+  const findFromCollegeHref =
+    profile?.college && hasSuggested ? "#suggested-cluster" : "/explore";
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -51,9 +54,10 @@ export default async function NetworkPage() {
               {/* Invite - copies the app origin as an invite link */}
               <ShareButton path="/" label="Invite" className="border-bone bg-paper text-ink" />
 
-              {/* Find from college - links to /explore filtered by the viewer's college */}
+              {/* Find from college - jumps to the college-affinity Suggested
+                  section (real data) or Explore when there is nothing to show. */}
               <Link
-                href={`/explore${collegeQuery}`}
+                href={findFromCollegeHref}
                 className="inline-flex items-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron/90 active:scale-95"
               >
                 Find from college
@@ -88,15 +92,25 @@ export default async function NetworkPage() {
 
       {/* Suggested */}
       <Reveal delay={0.1}>
-        <div className="mt-20">
-          <p className="text-caption mb-6">Suggested from your cluster</p>
-          <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-            {suggested.map((person) => (
-              <div key={`s-${person.id}`} className="w-64 shrink-0">
-                <PersonCard person={person} variant="grid" state={{}} />
-              </div>
-            ))}
-          </div>
+        <div id="suggested-cluster" className="mt-20 scroll-mt-24">
+          <p className="text-caption mb-6">
+            {profile?.college
+              ? `Suggested from ${profile.college}`
+              : "Suggested from your cluster"}
+          </p>
+          {suggested.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-bone bg-paper/60 py-10 text-center text-sm text-ash">
+              No new suggestions right now. Check back as more people join.
+            </p>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+              {suggested.map((person) => (
+                <div key={`s-${person.id}`} className="w-64 shrink-0">
+                  <PersonCard person={person} variant="grid" state={{}} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Reveal>
     </div>

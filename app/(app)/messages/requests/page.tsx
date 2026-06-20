@@ -2,6 +2,7 @@ import { getMyConversations } from "@/lib/db/messages";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Reveal } from "@/components/motion/Reveal";
 import { AcceptRequestButton } from "@/components/composite/AcceptRequestButton";
+import { DeclineRequestButton } from "@/components/composite/DeclineRequestButton";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 
@@ -71,8 +72,9 @@ export default async function RequestsPage() {
                   <p className="text-xs text-ash">{req.otherUser.college}</p>
                 )}
                 <p className="mt-1 truncate text-sm text-ash">{req.lastMessage}</p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <AcceptRequestButton conversationId={req.id} />
+                  <DeclineRequestButton conversationId={req.id} />
                   <Link
                     href={`/messages/${req.id}`}
                     className="rounded-md border border-bone px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-bone"

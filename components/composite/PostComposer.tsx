@@ -5,7 +5,12 @@ import { Button } from "@/components/primitives/Button";
 import { Tag } from "@/components/primitives/Tag";
 import { Avatar } from "@/components/primitives/Avatar";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
-import { compressImage, videoTooLarge } from "@/lib/media/compress";
+import {
+  prepareImageForUpload,
+  videoTooLarge,
+  IMAGE_ACCEPT,
+  VIDEO_ACCEPT,
+} from "@/lib/media/compress";
 import { ImagePlus, Video, Hash, ArrowRight, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
@@ -99,7 +104,7 @@ export function PostComposer({ action }: PostComposerProps) {
     if (!file) return;
 
     if (videoTooLarge(file)) {
-      setVideoError("Video must be under 25 MB.");
+      setVideoError("Video must be under 100 MB.");
       setVideoFile(null);
       if (videoInputRef.current) videoInputRef.current.value = "";
       return;
@@ -174,7 +179,8 @@ export function PostComposer({ action }: PostComposerProps) {
         try {
           if (images.length > 0) {
             for (const p of images) {
-              const toUpload = await compressImage(p.file);
+              // Routes HEIC/HEIF -> JPEG and compresses every image before upload.
+              const toUpload = await prepareImageForUpload(p.file);
               const url = await uploadToBucket(sb, user.id, toUpload);
               if (url) image_urls.push(url);
             }
@@ -376,7 +382,7 @@ export function PostComposer({ action }: PostComposerProps) {
         <input
           ref={imageInputRef}
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           multiple
           className="hidden"
           onChange={handleImageChange}
@@ -384,7 +390,7 @@ export function PostComposer({ action }: PostComposerProps) {
         <input
           ref={videoInputRef}
           type="file"
-          accept="video/*"
+          accept={VIDEO_ACCEPT}
           className="hidden"
           onChange={handleVideoChange}
         />

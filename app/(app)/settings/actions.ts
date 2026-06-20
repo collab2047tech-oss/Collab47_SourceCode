@@ -13,20 +13,37 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 export async function updateAccountAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
-  const name = (formData.get("name") as string | null)?.trim() ?? "";
-  const college = (formData.get("college") as string | null)?.trim() ?? "";
-  const branch = (formData.get("branch") as string | null)?.trim() ?? "";
-  const year_of_study = (formData.get("year_of_study") as string | null)?.trim() ?? "";
-  const handleRaw = (formData.get("handle") as string | null)?.trim().toLowerCase();
+  // Build the payload from ONLY the fields the submitted form actually carries.
+  // The Settings page has two separate forms (Profile + Academic) that share
+  // this action; including absent fields as "" would wipe data (e.g. submitting
+  // the Academic form would blank out the user's name). FormData.has() lets us
+  // update exactly what was sent.
+  const payload: Parameters<typeof updateProfile>[0] = {};
 
-  const payload: Parameters<typeof updateProfile>[0] = { name, college, branch, year_of_study };
-  // Only forward handle when the form actually carries it (the Account section does).
+  if (formData.has("name")) {
+    payload.name = (formData.get("name") as string | null)?.trim() ?? "";
+  }
+  if (formData.has("college")) {
+    payload.college = (formData.get("college") as string | null)?.trim() ?? "";
+  }
+  if (formData.has("branch")) {
+    payload.branch = (formData.get("branch") as string | null)?.trim() ?? "";
+  }
+  if (formData.has("year_of_study")) {
+    payload.year_of_study = (formData.get("year_of_study") as string | null)?.trim() ?? "";
+  }
+
+  // Only forward handle when the form carries a non-empty value. The Account
+  // section validates/saves it (uniqueness + format) in updateProfile.
+  const handleRaw = (formData.get("handle") as string | null)?.trim().toLowerCase();
   if (handleRaw) payload.handle = handleRaw;
 
   const result = await updateProfile(payload);
   if (!result.ok) return result;
 
   revalidatePath("/settings");
+  revalidatePath("/profile");
+  revalidatePath("/u/[handle]", "page");
   return { ok: true };
 }
 

@@ -8,18 +8,37 @@ interface Props {
   /** Path to copy, relative to the site origin. E.g. "/u/handle" */
   path: string;
   label?: string;
+  /** Optional title/text surfaced in the native share sheet. */
+  shareTitle?: string;
+  shareText?: string;
   className?: string;
 }
 
-export function ShareButton({ path, label = "Share", className }: Props) {
+export function ShareButton({ path, label = "Share", shareTitle, shareText, className }: Props) {
   const [copied, setCopied] = useState(false);
 
-  function handleShare() {
-    const url = `${window.location.origin}${path}`;
-    navigator.clipboard.writeText(url).then(() => {
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch {
+      /* clipboard blocked — nothing more we can do */
+    }
+  }
+
+  async function handleShare() {
+    const url = `${window.location.origin}${path}`;
+    // Prefer the OS share sheet (offers DMs, WhatsApp, etc.) when available.
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: shareTitle, text: shareText, url });
+        return;
+      } catch {
+        // User cancelled or share failed — fall back to copying the link.
+      }
+    }
+    await copyLink(url);
   }
 
   return (

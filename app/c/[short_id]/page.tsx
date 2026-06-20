@@ -62,6 +62,12 @@ export default async function ProjectPage({
     ? (members as Array<{ user_id: string }>).some((m) => m.user_id === user.id)
     : false;
 
+  // Owner holds one membership row; remaining open slots = requested slots minus
+  // accepted (non-owner) members. Used to gate the apply form when a team fills.
+  const acceptedMembers = Math.max(0, members.length - 1);
+  const openSlots = Math.max(0, (project.slot_count as number) - acceptedMembers);
+  const acceptsApplications = project.status === "open" && openSlots > 0;
+
   const statusBadgeVariant = (s: string) => {
     if (s === "open") return "saffron" as const;
     if (s === "team_formed" || s === "in_progress") return "moss" as const;
@@ -183,17 +189,30 @@ export default async function ProjectPage({
                       "Better luck next time."}
                   </span>
                 </div>
-              ) : (
+              ) : acceptsApplications ? (
                 <ApplyForm
                   projectId={project.id}
                   shortId={short_id}
                 />
+              ) : (
+                <div className="rounded-lg border border-bone bg-paper px-6 py-5">
+                  <p className="font-medium text-ink">
+                    {isDelivered
+                      ? "This project has been delivered."
+                      : project.status === "open"
+                      ? "This project's team is full."
+                      : "This project is no longer accepting applications."}
+                  </p>
+                  <p className="mt-1 text-sm text-ash">
+                    Browse other open briefs on the Collabs page.
+                  </p>
+                </div>
               )}
             </div>
           </Reveal>
         )}
 
-        {!isAuthor && !user && (
+        {!isAuthor && !user && acceptsApplications && (
           <Reveal delay={0.25}>
             <div className="mt-12">
               <Link href="/login">

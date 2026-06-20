@@ -77,6 +77,7 @@ export function PostDetailActions({
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [repostToast, setRepostToast] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,11 +150,14 @@ export function PostDetailActions({
   }
 
   function handleRepost() {
+    setActionError(null);
     startTransition(async () => {
       const res = await repostPostAction(postId);
       if (res.ok) {
         setRepostToast(true);
         setTimeout(() => setRepostToast(false), 2500);
+      } else {
+        setActionError(res.error ?? "Could not repost.");
       }
     });
   }
@@ -167,18 +171,31 @@ export function PostDetailActions({
     });
   }
 
-  function handleShare() {
+  async function handleShare() {
     const url = `${window.location.origin}/p/${shortId}`;
-    navigator.clipboard.writeText(url).then(() => {
+    // Prefer the OS share sheet (DMs, WhatsApp, etc.) when supported.
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Post on Collab47", url });
+        return;
+      } catch {
+        /* cancelled or unsupported — fall back to copying */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    } catch {
+      /* clipboard blocked */
+    }
   }
 
   const meta = getReactionMeta(liked ? reaction : undefined);
 
   return (
-    <div className={cn("mt-10 flex items-center gap-6 border-t border-bone pt-6 text-sm text-ash", isPending && "opacity-70")}>
+    <div className="mt-10 border-t border-bone pt-6">
+    <div className={cn("flex items-center gap-6 text-sm text-ash", isPending && "opacity-70")}>
       {/* Reaction control */}
       <div
         ref={reactionRef}
@@ -318,6 +335,8 @@ export function PostDetailActions({
         targetId={postId}
         onSubmit={submitReportAction}
       />
+    </div>
+    {actionError ? <p className="mt-3 text-xs text-ember">{actionError}</p> : null}
     </div>
   );
 }

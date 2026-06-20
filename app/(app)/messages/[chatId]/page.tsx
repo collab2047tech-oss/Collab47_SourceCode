@@ -6,10 +6,11 @@ import {
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Users } from "lucide-react";
-import { MessagesShell } from "@/components/composite/MessagesShell";
 import { MessageThread } from "@/components/composite/MessageThread";
 import { MessageComposer } from "@/components/composite/MessageComposer";
 import { ChatMenu } from "@/components/composite/ChatMenu";
+import { AcceptRequestButton } from "@/components/composite/AcceptRequestButton";
+import { DeclineRequestButton } from "@/components/composite/DeclineRequestButton";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function ChatPage({ params }: PageProps) {
     last: c.lastMessage,
     time: relativeTime(c.lastMessageAt),
     unread: c.unreadCount > 0,
+    isGroup: c.isGroup,
     href: `/messages/${c.id}`,
   }));
 
@@ -61,6 +63,7 @@ export default async function ChatPage({ params }: PageProps) {
     last: c.lastMessage,
     time: relativeTime(c.lastMessageAt),
     unread: c.unreadCount > 0,
+    isGroup: c.isGroup,
     href: `/messages/requests`,
   }));
 
@@ -80,6 +83,12 @@ export default async function ChatPage({ params }: PageProps) {
   // a request thread the user themselves initiated stays composable for them.
   // Group members can always post (no block possible).
   const canCompose = isGroup || !header.blocked;
+
+  // Tailor the "cannot compose" message: if the current user is the one who
+  // blocked, tell them to unblock via the menu; otherwise show the gate reason.
+  const cannotComposeReason = header.blockedByMe
+    ? "You blocked this person. Unblock from the menu to message them."
+    : header.blockedReason;
 
   return (
     <div className="-mx-4 -mt-6 grid h-[calc(100dvh-4rem)] grid-cols-[340px_1fr] md:-mx-8">
@@ -116,7 +125,13 @@ export default async function ChatPage({ params }: PageProps) {
                 item.id === chatId ? "bg-bone/60" : ""
               }`}
             >
-              <Avatar name={item.name} src={item.avatarUrl} size="md" />
+              {item.isGroup ? (
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-moss/15 text-moss">
+                  <Users className="size-5" />
+                </span>
+              ) : (
+                <Avatar name={item.name} src={item.avatarUrl} size="md" />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <p className="truncate text-sm font-semibold text-ink">{item.name}</p>
@@ -167,8 +182,26 @@ export default async function ChatPage({ params }: PageProps) {
           <ChatMenu
             conversationId={chatId}
             otherUserId={isGroup ? null : (otherUser as { id?: string } | null)?.id ?? null}
+            initialMuted={header.muted}
+            blockedByMe={header.blockedByMe}
           />
         </header>
+
+        {/* Inbound request banner: a request you received (not one you sent).
+            Lets the recipient accept (moves it to the main inbox) or decline
+            (deletes the request) right from the open thread. */}
+        {!isGroup && header.isRequest && !header.isRequestSender && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bone bg-saffron/5 px-6 py-3">
+            <p className="text-sm text-ink">
+              <span className="font-semibold">{otherUser?.name ?? "This person"}</span>{" "}
+              wants to message you.
+            </p>
+            <div className="flex gap-2">
+              <AcceptRequestButton conversationId={chatId} />
+              <DeclineRequestButton conversationId={chatId} redirectTo="/messages/requests" />
+            </div>
+          </div>
+        )}
 
         <MessageThread
           conversationId={chatId}
@@ -178,8 +211,9 @@ export default async function ChatPage({ params }: PageProps) {
 
         <MessageComposer
           conversationId={chatId}
+          currentUserId={currentUserId ?? ""}
           canCompose={canCompose}
-          cannotComposeReason={header.blockedReason}
+          cannotComposeReason={cannotComposeReason}
         />
       </section>
     </div>

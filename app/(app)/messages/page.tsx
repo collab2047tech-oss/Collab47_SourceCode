@@ -28,6 +28,7 @@ export default async function MessagesPage() {
     last: c.lastMessage,
     time: relativeTime(c.lastMessageAt),
     unread: c.unreadCount > 0,
+    isGroup: c.isGroup,
     href: `/messages/${c.id}`,
   }));
 
@@ -39,6 +40,7 @@ export default async function MessagesPage() {
     last: c.lastMessage,
     time: relativeTime(c.lastMessageAt),
     unread: c.unreadCount > 0,
+    isGroup: c.isGroup,
     href: `/messages/requests`,
   }));
 

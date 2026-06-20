@@ -26,6 +26,16 @@ async function getCollegeLeaderboard(limit = 5) {
     .map(([name, count]) => ({ name, count }));
 }
 
+// listOpenProjects() selects "*" but its inferred row type collapses to the
+// normalized `{ member_count }` shape (the spread of Record<string, unknown>
+// loses the concrete columns). The underlying row always carries these fields,
+// so narrow to just what this page renders.
+type FeaturedProject = {
+  short_id: string;
+  title: string;
+  brief: string | null;
+};
+
 export default async function ExplorePage() {
   const [projects, popular, suggested, leaderboard] = await Promise.all([
     listOpenProjects(1),
@@ -34,7 +44,7 @@ export default async function ExplorePage() {
     getCollegeLeaderboard(5),
   ]);
 
-  const featured = projects[0] ?? null;
+  const featured = (projects[0] as unknown as FeaturedProject | undefined) ?? null;
 
   const counts = new Map<string, number>();
   for (const p of popular) {
@@ -103,14 +113,21 @@ export default async function ExplorePage() {
             {trending.length > 0 ? (
               <ul className="mt-6 space-y-4">
                 {trending.map((t, i) => (
-                  <li key={t.tag} className="flex items-baseline gap-3">
-                    <span className="font-serif text-2xl text-saffron tabular-nums">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-ink">#{t.tag}</p>
-                      <p className="text-xs text-ash">{t.count} posts</p>
-                    </div>
+                  <li key={t.tag}>
+                    <Link
+                      href={`/t/${t.tag}`}
+                      className="group/tag flex items-baseline gap-3"
+                    >
+                      <span className="font-serif text-2xl text-saffron tabular-nums">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-ink transition-colors group-hover/tag:text-saffron">
+                          #{t.tag}
+                        </p>
+                        <p className="text-xs text-ash">{t.count} posts</p>
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>

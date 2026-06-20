@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
@@ -11,6 +12,7 @@ import {
   followUserAction,
   unfollowUserAction,
 } from "@/app/(app)/network/actions";
+import { startConversationAction } from "@/app/(app)/messages/actions";
 
 export interface PersonCardState {
   isFollowing?: boolean;
@@ -25,7 +27,9 @@ interface PersonCardProps {
 }
 
 export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [msgPending, startMsgTransition] = useTransition();
   const [optimisticFollowing, setOptimisticFollowing] = useState(
     state.isFollowing ?? false
   );
@@ -42,15 +46,29 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
     });
   }
 
+  function handleMessage() {
+    startMsgTransition(async () => {
+      const res = await startConversationAction(person.id);
+      if (res.ok && res.conversationId) {
+        router.push(`/messages/${res.conversationId}`);
+      } else {
+        // Fall back to the profile if the conversation could not be created.
+        router.push(`/u/${person.handle}`);
+      }
+    });
+  }
+
   if (variant === "row") {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:border-saffron">
-        <Avatar
-          name={person.name}
-          src={person.avatar_url ?? undefined}
-          size="sm"
-        />
-        <div className="min-w-0 flex-1">
+        <Link href={`/u/${person.handle}`} className="shrink-0">
+          <Avatar
+            name={person.name}
+            src={person.avatar_url ?? undefined}
+            size="sm"
+          />
+        </Link>
+        <Link href={`/u/${person.handle}`} className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
           <p className="truncate text-xs text-ash">@{person.handle}</p>
           {(person.branch || person.college) && (
@@ -58,14 +76,17 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
               {[person.branch, person.college].filter(Boolean).join(" . ")}
             </p>
           )}
-        </div>
+        </Link>
         <div className="flex shrink-0 gap-2">
-          <Link href={`/u/${person.handle}`}>
-            <Button variant="secondary" size="sm">
-              <MessageSquare className="size-3.5" />
-              Message
-            </Button>
-          </Link>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleMessage}
+            disabled={msgPending}
+          >
+            <MessageSquare className="size-3.5" />
+            {msgPending ? "Opening..." : "Message"}
+          </Button>
           {state.isConnected ? (
             <Button variant="secondary" size="sm" disabled>
               <UserCheck className="size-3.5" />
@@ -107,12 +128,14 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
       )}
     >
       <div className="flex items-start gap-4">
-        <Avatar
-          name={person.name}
-          src={person.avatar_url ?? undefined}
-          size="lg"
-        />
-        <div className="min-w-0 flex-1">
+        <Link href={`/u/${person.handle}`} className="shrink-0">
+          <Avatar
+            name={person.name}
+            src={person.avatar_url ?? undefined}
+            size="lg"
+          />
+        </Link>
+        <Link href={`/u/${person.handle}`} className="min-w-0 flex-1">
           <p className="text-base font-semibold text-ink">{person.name}</p>
           <p className="text-xs text-ash">@{person.handle}</p>
           {(person.branch || person.college) && (
@@ -120,14 +143,18 @@ export function PersonCard({ person, state = {}, variant = "grid" }: PersonCardP
               {[person.branch, person.college].filter(Boolean).join(" . ")}
             </p>
           )}
-        </div>
+        </Link>
       </div>
       <div className="mt-4 flex gap-2">
-        <Link href={`/u/${person.handle}`} className="flex-1">
-          <Button variant="secondary" size="sm" className="w-full">
-            <MessageSquare className="size-4" /> Message
-          </Button>
-        </Link>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          onClick={handleMessage}
+          disabled={msgPending}
+        >
+          <MessageSquare className="size-4" /> {msgPending ? "Opening..." : "Message"}
+        </Button>
         {state.isConnected ? (
           <Button variant="secondary" size="sm" className="flex-1" disabled>
             <UserCheck className="size-4" /> Connected

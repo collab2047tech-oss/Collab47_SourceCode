@@ -15,6 +15,8 @@ export async function updateProfileAction(formData: FormData) {
   // Images uploaded client-side to Storage; action only receives URLs.
   const avatar_url = (formData.get("avatar_url") as string | null)?.trim() || undefined;
   const cover_url = (formData.get("cover_url") as string | null)?.trim() || undefined;
+  // Explicit removal: the user cleared their avatar without picking a new one.
+  const avatarRemoved = formData.get("avatar_removed") === "true";
 
   // Social links. Always send the object so cleared fields are persisted as removed.
   const linkField = (key: string) =>
@@ -38,6 +40,7 @@ export async function updateProfileAction(formData: FormData) {
     links,
   };
   if (avatar_url) payload.avatar_url = avatar_url;
+  else if (avatarRemoved) payload.avatar_url = ""; // clear the saved avatar
   if (cover_url) payload.cover_url = cover_url;
 
   const result = await updateProfile(payload);

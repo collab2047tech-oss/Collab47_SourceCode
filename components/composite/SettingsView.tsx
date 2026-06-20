@@ -142,21 +142,42 @@ function DmPermissionsSection({ initial }: { initial: DMPermission }) {
 // ---------------------------------------------------------------------------
 
 function AccountSection({ initial }: { initial: SettingsInitial }) {
-  const [isPending, startTransition] = useTransition();
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Two independent forms (Profile, Academic) — keep their save state separate
+  // so a save in one does not light up "Saved." under the other.
+  const [profilePending, startProfileTransition] = useTransition();
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [academicPending, startAcademicTransition] = useTransition();
+  const [academicSaved, setAcademicSaved] = useState(false);
+  const [academicError, setAcademicError] = useState<string | null>(null);
+
+  function handleProfileSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    setError(null);
-    startTransition(async () => {
+    setProfileError(null);
+    startProfileTransition(async () => {
       const result = await updateAccountAction(data);
       if (result.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
+        setProfileSaved(true);
+        setTimeout(() => setProfileSaved(false), 2500);
       } else {
-        setError(result.error ?? "Something went wrong.");
+        setProfileError(result.error ?? "Something went wrong.");
+      }
+    });
+  }
+
+  function handleAcademicSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    setAcademicError(null);
+    startAcademicTransition(async () => {
+      const result = await updateAccountAction(data);
+      if (result.ok) {
+        setAcademicSaved(true);
+        setTimeout(() => setAcademicSaved(false), 2500);
+      } else {
+        setAcademicError(result.error ?? "Something went wrong.");
       }
     });
   }
@@ -178,23 +199,23 @@ function AccountSection({ initial }: { initial: SettingsInitial }) {
             </a>
           </div>
         </div>
-        <form onSubmit={handleSubmit} id="account-form">
+        <form onSubmit={handleProfileSubmit} id="account-form">
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <Input label="Full name" name="name" defaultValue={initial.name} />
             <div>
               <Input label="Handle" name="handle" defaultValue={initial.handle} />
               <p className="mt-1 text-xs text-ash">
-                Handle changes are not yet saved by the current action — contact your dev to wire it up.
+                3–32 lowercase letters, numbers, or underscores. Must be unique.
               </p>
             </div>
             <Input label="Email" defaultValue={initial.email} disabled />
           </div>
           <div className="mt-6 flex items-center gap-4">
-            <Button type="submit" size="md" disabled={isPending}>
-              {isPending ? "Saving..." : "Save changes"}
+            <Button type="submit" size="md" disabled={profilePending}>
+              {profilePending ? "Saving..." : "Save changes"}
             </Button>
-            {saved && <p className="text-sm text-moss">Saved.</p>}
-            {error && <p className="text-sm text-ember">{error}</p>}
+            {profileSaved && <p className="text-sm text-moss">Saved.</p>}
+            {profileError && <p className="text-sm text-ember">{profileError}</p>}
           </div>
         </form>
       </section>
@@ -204,16 +225,18 @@ function AccountSection({ initial }: { initial: SettingsInitial }) {
         <p className="mt-1 text-sm text-ash">
           Used by the feed ranker and college leaderboard.
         </p>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleAcademicSubmit}>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <Input label="College" name="college" defaultValue={initial.college} />
             <Input label="Branch" name="branch" defaultValue={initial.branch} />
             <Input label="Year of study" name="year_of_study" defaultValue={initial.year_of_study} />
           </div>
-          <div className="mt-6">
-            <Button type="submit" size="md" disabled={isPending}>
-              {isPending ? "Saving..." : "Save changes"}
+          <div className="mt-6 flex items-center gap-4">
+            <Button type="submit" size="md" disabled={academicPending}>
+              {academicPending ? "Saving..." : "Save changes"}
             </Button>
+            {academicSaved && <p className="text-sm text-moss">Saved.</p>}
+            {academicError && <p className="text-sm text-ember">{academicError}</p>}
           </div>
         </form>
       </section>

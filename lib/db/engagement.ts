@@ -169,7 +169,22 @@ export async function addComment(args: {
 export async function deleteComment(commentId: string): Promise<Result> {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: true };
-  const { error } = await sb.from("comments").delete().eq("id", commentId);
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+
+  // Author-only delete. RLS also enforces this, but we check explicitly so a
+  // non-author gets a clear error instead of a silent no-op (0 rows affected).
+  const { data: comment } = await sb
+    .from("comments")
+    .select("author_id")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (!comment) return { ok: false, error: "Comment not found" };
+  if ((comment.author_id as string) !== user.id) {
+    return { ok: false, error: "You can only delete your own comment." };
+  }
+
+  const { error } = await sb.from("comments").delete().eq("id", commentId).eq("author_id", user.id);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

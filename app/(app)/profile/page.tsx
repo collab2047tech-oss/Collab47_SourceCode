@@ -66,14 +66,23 @@ export default async function ProfilePage() {
           className="relative w-full overflow-hidden"
           style={{ height: "260px" }}
         >
-          {/* Gradient cover */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(135deg, #0B1220 0%, #1a2744 40%, #2C5BFF22 70%, #0B1220 100%)",
-            }}
-          />
+          {/* Cover: the user's uploaded image when present, else the brand gradient */}
+          {p.cover_url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={p.cover_url}
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+            />
+          ) : (
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(135deg, #0B1220 0%, #1a2744 40%, #2C5BFF22 70%, #0B1220 100%)",
+              }}
+            />
+          )}
           {/* Subtle noise texture overlay */}
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.03]"
