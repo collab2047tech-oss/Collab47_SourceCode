@@ -4,6 +4,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
 import { HomeFeed } from "@/components/composite/HomeFeed";
+import { FeedFilters } from "@/components/composite/FeedFilters";
 import { getForYouFeed, getRecentFeed, getPopularFeed, getTrendingFeed } from "@/lib/db/feed";
 import { getMyEngagementState } from "@/lib/db/engagement";
 import { getSuggestedConnections } from "@/lib/db/social";
@@ -24,6 +25,8 @@ export default async function HomePage() {
   const profile = await getMyProfile();
   const branch = profile?.branch ?? undefined;
   const city = profile?.city ?? undefined;
+  const feedPrefs =
+    (profile?.feed_prefs as { only_follows?: boolean; hide_news?: boolean; hide_projects?: boolean } | null) ?? null;
 
   const [forYouRaw, recentRaw, popularRaw, trendingRaw, suggested, branchNews, latestNews] =
     await Promise.all([
@@ -198,6 +201,14 @@ export default async function HomePage() {
               <PostComposer action={createPostAction} />
             </div>
           </Reveal>
+
+          <FeedFilters
+            initial={{
+              only_follows: Boolean(feedPrefs?.only_follows),
+              hide_news: Boolean(feedPrefs?.hide_news),
+              hide_projects: Boolean(feedPrefs?.hide_projects),
+            }}
+          />
 
           <HomeFeed
             forYou={forYou}

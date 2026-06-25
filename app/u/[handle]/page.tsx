@@ -8,6 +8,7 @@ import { MapPin, GraduationCap, ExternalLink, BadgeCheck, MessageCircle, Heart, 
 import { getProfileByHandle } from "@/lib/db/profiles";
 import { getProfilePosts } from "@/lib/db/posts";
 import { getFollowState, getConnectionStatus } from "@/lib/db/social";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import type { ProfileLinks } from "@/lib/supabase/types";
 import { ProfileActions } from "@/components/composite/ProfileActions";
 import { getVerifiedProjectsForUser } from "@/lib/db/projects";
@@ -86,6 +87,39 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           <Link href="/signup" className="mt-8 inline-block">
             <Button size="lg">Claim this handle</Button>
           </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // Enforce the privacy.public_profile setting: a private profile is only fully
+  // visible to its owner. Everyone else sees a minimal "private" card.
+  const sb = await getSupabaseServer();
+  const viewerId = sb ? (await sb.auth.getUser()).data.user?.id ?? null : null;
+  const isOwner = viewerId === profile.id;
+  const isPublic =
+    (profile.privacy as { public_profile?: boolean } | null)?.public_profile !== false;
+
+  if (!isPublic && !isOwner) {
+    return (
+      <main className="min-h-dvh bg-cream">
+        <PublicTopNav />
+        <div className="container-edit max-w-xl pt-40 text-center">
+          <Avatar name={profile.name} src={profile.avatar_url ?? undefined} size="2xl" className="mx-auto ring-4 ring-cream" />
+          <h1 className="mt-6 font-serif text-3xl text-ink">{profile.name}</h1>
+          <p className="mt-1 text-sm text-ash">@{profile.handle}</p>
+          <p className="mt-6 text-body text-ash">
+            This profile is <span className="text-ink">private</span>. Connect with{" "}
+            {profile.name.split(" ")[0]} to see their work.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <ProfileActions
+              handle={profile.handle}
+              targetUserId={profile.id}
+              initialState={{ isFollowing: false }}
+              initialConnection={"none"}
+            />
+          </div>
         </div>
       </main>
     );

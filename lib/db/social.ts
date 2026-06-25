@@ -400,7 +400,9 @@ export async function searchAll(query: string, limit = 20) {
   if (!tsq) return { people: [], posts: [], projects: [], hashtags: [] };
 
   const [people, posts, projects, hashtags] = await Promise.all([
-    sb.from("profiles").select("id, handle, name, avatar_url, college, branch").textSearch("search_tsv", tsq).is("deleted_at", null).is("suspended_at", null).limit(limit),
+    // Honour the privacy.searchable setting: exclude profiles that opted out of
+    // appearing in search (null / unset = searchable by default).
+    sb.from("profiles").select("id, handle, name, avatar_url, college, branch").textSearch("search_tsv", tsq).is("deleted_at", null).is("suspended_at", null).not("privacy->>searchable", "eq", "false").limit(limit),
     sb.from("posts").select("id, short_id, body, author_id").textSearch("search_tsv", tsq).is("deleted_at", null).limit(limit),
     sb.from("projects").select("id, short_id, title, brief").textSearch("search_tsv", tsq).limit(limit),
     sb.from("hashtags").select("tag, use_count").ilike("tag", `%${q}%`).limit(limit),
