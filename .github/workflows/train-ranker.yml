@@ -1,0 +1,29 @@
+name: Train feed neural ranker
+
+# Offline training only — runs on free GitHub Actions minutes, never on the
+# request path, so it adds ZERO deployment cost. Pulls real logged interactions
+# from Supabase, trains the ranker, and activates it only if it beats chance.
+on:
+  schedule:
+    - cron: "0 2 * * *" # nightly 02:00 UTC
+  workflow_dispatch: {}   # allow manual runs
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install supabase-js
+        working-directory: collab47-web
+        run: npm i @supabase/supabase-js@^2 --no-save
+      - name: Write env
+        working-directory: collab47-web
+        run: |
+          printf 'NEXT_PUBLIC_SUPABASE_URL=%s\nSUPABASE_SERVICE_ROLE_KEY=%s\n' \
+            "${{ secrets.SUPABASE_URL }}" "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" > .env.local
+      - name: Train ranker
+        working-directory: collab47-web
+        run: node scripts/train-ranker.mjs

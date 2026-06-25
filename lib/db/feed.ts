@@ -1,8 +1,10 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { attachReposts, type PostWithAuthor } from "@/lib/db/posts";
-import { scorePost, diversifyTopK, type ScoredPost, type RankerWeights } from "@/lib/ranker/score";
+import { scorePost, diversifyTopK, type ScoredPost, type RankerWeights, type ScoreContext } from "@/lib/ranker/score";
 import { checkContent } from "@/lib/moderation/guardrail";
 import { expandTagList } from "@/lib/ranker/taxonomy";
+import { extractFeatures, N_FEATURES } from "@/lib/ranker/features";
+import { isValidModel, type RankerModel } from "@/lib/ranker/model";
 
 // Self-referential repost originals are resolved by attachReposts() (a batched
 // second query) — PostgREST cannot embed posts->posts by FK hint.
@@ -55,6 +57,7 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
   let blockedIds: string[] = [];
   const behaviorAffinity = new Map<string, number>(); // tag -> revealed preference
   let learnedWeights: RankerWeights | undefined;
+  let model: RankerModel | undefined; // trained neural ranker (when active + valid)
 
   if (user) {
     const [{ data: prof }, { data: feedback }, { data: seen }, { data: follows }, { data: blockRows }, { data: events }, { data: rw }] =
@@ -101,6 +104,12 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     // Learned weights from the nightly fit job (only once it has enough samples).
     const wj = rw?.weights as RankerWeights | undefined;
     if (wj && (rw?.n_samples ?? 0) >= 200 && typeof wj.match === "number") learnedWeights = wj;
+
+    // Trained NEURAL ranker — only used if it's marked active AND validates.
+    const { data: mdl } = await sb.from("ranker_model").select("model, active, n_features").eq("id", 1).maybeSingle();
+    if (mdl?.active && mdl.n_features === N_FEATURES && isValidModel(mdl.model, N_FEATURES)) {
+      model = mdl.model as RankerModel;
+    }
 
     // Cohort authors (same college or branch) for "people like me" recall.
     if (viewer.college || branch) {
@@ -219,19 +228,33 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     for (const p of fresh) velocity.set(p.id, engagementScore(p) / vmax);
   }
 
-  // Score (MCDM Tchebycheff over semantic + field + behavioural + graph signals).
+  // Score: NEURAL ranker when active, else the MCDM cold-start engine.
   const recentTags: string[] = [];
+  const ctx: ScoreContext = {
+    interests, branch, seenIds, recentTags, relevancy, cf, ppr,
+    viewer, behaviorAffinity, velocity, weights: learnedWeights, model,
+  };
   const scored: ScoredPost[] = pool.map((p) => {
-    const s = scorePost(p, {
-      interests, branch, seenIds, recentTags, relevancy, cf, ppr,
-      viewer, behaviorAffinity, velocity, weights: learnedWeights,
-    });
+    const s = scorePost(p, ctx);
     const primary = p.hashtags?.[0]?.toLowerCase();
     if (primary) recentTags.push(primary);
     return s;
   });
 
-  return attachReposts(sb, diversifyTopK(scored, limit));
+  const served = diversifyTopK(scored, limit);
+
+  // Capture the served feature vectors as TRAINING DATA (the model learns from
+  // these joined with the impression/engagement events). Fire-and-forget.
+  if (user && served.length > 0) {
+    const rows = served.map((p) => ({
+      user_id: user.id,
+      post_id: p.id,
+      features: extractFeatures(p, ctx).values,
+    }));
+    void sb.from("feed_training").insert(rows);
+  }
+
+  return attachReposts(sb, served);
 }
 
 /** Recent — reverse-chronological from people you follow. Empty if no follows. */

@@ -1,5 +1,6 @@
 import type { PostWithAuthor } from "@/lib/db/posts";
-import { semanticMatch } from "@/lib/ranker/taxonomy";
+import { extractFeatures } from "@/lib/ranker/features";
+import { predict, type RankerModel } from "@/lib/ranker/model";
 
 export interface ScoredPost extends PostWithAuthor {
   score: number;
@@ -15,9 +16,8 @@ export interface RankerWeights {
   safety: number;
 }
 
-// Tchebycheff criterion weights. Match (relevance) dominates; safety is a kill
-// switch. These DEFAULTS are the cold-start prior; the nightly logistic-regression
-// job (lib/ranker/fit) overwrites them with weights LEARNED from real behaviour.
+// Tchebycheff criterion weights — the cold-start prior used until the trained
+// neural ranker is active. (The neural ranker, when present, replaces this.)
 export const DEFAULT_WEIGHTS: RankerWeights = {
   match: 0.4,
   recency: 0.2,
@@ -35,127 +35,80 @@ export interface ViewerFields {
 }
 
 export interface ScoreContext {
-  interests: string[];              // user's onboarding interest tags
-  branch?: string | null;           // user's branch (e.g. CSE) for branch_tags match
-  seenIds: Set<string>;             // already-seen post ids (from feed_events impressions)
-  recentTags: string[];             // primary hashtags of last served posts (diversity)
-  relevancy?: Map<string, number>;  // postId -> normalised BM25/FTS ts_rank (0..1)
-  cf?: Map<string, number>;         // postId -> item-CF affinity (0..1)
-  ppr?: Map<string, number>;        // authorId -> Personalised PageRank affinity (0..1)
-  // --- semantic + field + behavioural signals (zero-cost classical engine) ---
-  viewer?: ViewerFields;            // viewer's cohort fields, for field/location match
-  behaviorAffinity?: Map<string, number>; // tag -> revealed preference from feed_events (0..1)
-  velocity?: Map<string, number>;   // postId -> engagement velocity, "hot right now" (0..1)
-  weights?: RankerWeights;          // learned weights override (from ranker_weights)
+  interests: string[];
+  branch?: string | null;
+  seenIds: Set<string>;
+  recentTags: string[];
+  relevancy?: Map<string, number>;
+  cf?: Map<string, number>;
+  ppr?: Map<string, number>;
+  viewer?: ViewerFields;
+  behaviorAffinity?: Map<string, number>;
+  velocity?: Map<string, number>;
+  weights?: RankerWeights;
+  // Trained neural ranker. When present + validated, it REPLACES the MCDM
+  // scalarisation: score = P(engage) predicted by the model from the features.
+  model?: RankerModel;
 }
 
-function ageHours(iso: string): number {
-  return Math.max((Date.now() - new Date(iso).getTime()) / 3.6e6, 0);
-}
-const lc = (s: string) => s.toLowerCase();
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Cohort/field proximity between the viewer and a post's author (0..1):
-// same college, same branch, same city, similar year. The "people like me /
-// near me / in my field" signal — pure structured overlap, zero cost.
-function fieldProximity(viewer: ViewerFields | undefined, author: Record<string, unknown> | undefined): { score: number; sameCity: boolean; sameCollege: boolean } {
-  if (!viewer || !author) return { score: 0, sameCity: false, sameCollege: false };
-  const eq = (a?: unknown, b?: unknown) => a && b && lc(String(a)) === lc(String(b));
-  const sameCollege = Boolean(eq(viewer.college, author.college));
-  const sameBranch = Boolean(eq(viewer.branch, author.branch));
-  const sameCity = Boolean(eq(viewer.city, author.city));
-  let yearClose = false;
-  if (viewer.year && author.year_of_study) {
-    yearClose = Math.abs(Number(viewer.year) - Number(author.year_of_study)) <= 1;
-  }
-  const score = clamp01(
-    (sameCollege ? 0.5 : 0) + (sameBranch ? 0.3 : 0) + (sameCity ? 0.25 : 0) + (yearClose ? 0.15 : 0)
-  );
-  return { score, sameCity, sameCollege };
-}
-
 /**
- * scorePost: deterministic MCDM Tchebycheff scalarisation. 100% classical, zero
- * AI/API cost. Relevance ("match") fuses FIVE real signals:
- *   - graded SEMANTIC match via the tag taxonomy (LLM ~ AI/ML), not just exact overlap
- *   - branch_tags match
- *   - BM25/FTS keyword relevancy
- *   - item-CF co-engagement affinity
- *   - BEHAVIOURAL affinity (what the viewer actually engages with — revealed, not declared)
- * Author trust fuses verified + Personalised PageRank + cohort/field proximity.
- * Engagement fuses smoothed engagement-rate (real impressions) + velocity ("hot now").
+ * scorePost: deterministic ranking over the shared feature vector (lib/ranker/
+ * features). Two interchangeable heads, same features:
+ *   - NEURAL head (ctx.model): score = P(engage) from the trained net. 100% real,
+ *     learned offline from real interactions; forward pass is plain JS, $0 to serve.
+ *   - MCDM head (default / cold-start): hand-tuned Tchebycheff scalarisation,
+ *     which beats an under-trained net until enough real data exists.
+ * Diversity + already-seen penalties are applied identically to both heads.
  */
 export function scorePost(post: PostWithAuthor, ctx: ScoreContext): ScoredPost {
   const reason: string[] = [];
-  const weights = ctx.weights ?? DEFAULT_WEIGHTS;
-  const tags = (post.hashtags ?? []).map(lc);
+  const f = extractFeatures(post, ctx);
 
-  // f_1 MATCH (relevance) — the heart.
-  const semantic = semanticMatch(ctx.interests, tags);          // graded 0..1 via taxonomy
-  const branchMatch =
-    ctx.branch && (post.branch_tags ?? []).some((b) => lc(b) === lc(ctx.branch as string)) ? 1 : 0;
-  const rel = ctx.relevancy?.get(post.id) ?? 0;
-  const cf = ctx.cf?.get(post.id) ?? 0;
-  let behaviorAff = 0;
-  if (ctx.behaviorAffinity) for (const t of tags) behaviorAff = Math.max(behaviorAff, ctx.behaviorAffinity.get(t) ?? 0);
-  const match = clamp01(0.22 + semantic * 0.35 + branchMatch * 0.18 + rel * 0.18 + cf * 0.18 + behaviorAff * 0.32);
-  if (semantic >= 1) reason.push("matches your interests");
-  else if (semantic > 0) reason.push("related to your interests");
-  if (branchMatch) reason.push(`for ${ctx.branch}`);
-  if (rel > 0) reason.push("keyword-relevant");
-  if (cf > 0.01) reason.push("liked by similar people");
-  if (behaviorAff > 0.1) reason.push("you engage with this topic");
+  if (f.semantic >= 1) reason.push("matches your interests");
+  else if (f.semantic > 0) reason.push("related to your interests");
+  if (f.branchMatch) reason.push(`for ${ctx.branch}`);
+  if (f.rel > 0) reason.push("keyword-relevant");
+  if (f.cf > 0.01) reason.push("liked by similar people");
+  if (f.behaviorAff > 0.1) reason.push("you engage with this topic");
+  if (f.velocity > 0.3) reason.push("trending now");
+  if (f.ppr >= 1) reason.push("from your network");
+  else if (f.ppr > 0) reason.push("2nd-degree");
+  if (f.field.sameCollege) reason.push("same college");
+  else if (f.field.sameCity) reason.push("near you");
 
-  // f_2 RECENCY — exponential decay, half-life 24h.
-  const recency = Math.exp(-ageHours(post.created_at) / 24);
+  let base: number;
+  if (ctx.model) {
+    // Neural ranker: predicted probability the viewer engages with this post.
+    base = predict(f.values, ctx.model);
+    reason.push("ranked by learned model");
+  } else {
+    const w = ctx.weights ?? DEFAULT_WEIGHTS;
+    const v = f.values;
+    const match = clamp01(0.22 + v[0] * 0.35 + v[1] * 0.18 + v[2] * 0.18 + v[3] * 0.18 + v[4] * 0.32); // semantic/branch/bm25/cf/behaviour
+    const recency = v[5];
+    const engagement = clamp01(v[6] + v[7] * 0.35); // engagementRate + velocity
+    const authorTrust = clamp01(0.28 + v[8] * 0.3 + v[9] * 0.25 + v[10] * 0.25); // verified + ppr + field
+    const criteria: Array<[number, number]> = [
+      [w.match, match], [w.recency, recency], [w.engagement, engagement],
+      [w.authorTrust, authorTrust], [w.diversity, 1], [w.safety, 1],
+    ];
+    base = 1 - Math.max(...criteria.map(([wj, fj]) => wj * Math.abs(1 - fj)));
+  }
 
-  // f_3 ENGAGEMENT — smoothed real engagement-rate + velocity ("hot right now").
-  const impressions = (post as PostWithAuthor & { impressions?: number }).impressions ?? 0;
-  const engagementRate =
-    (post.like_count + 2 * post.comment_count + 4 * post.bookmark_count + 8 * post.repost_count) /
-    (impressions + 10);
-  const vel = ctx.velocity?.get(post.id) ?? 0;
-  const engagement = clamp01(engagementRate + vel * 0.35);
-  if (vel > 0.3) reason.push("trending now");
-
-  // f_4 AUTHOR TRUST — verified + Personalised PageRank + cohort/field proximity.
-  const verified = (post.author as { verified?: boolean } | undefined)?.verified ? 1 : 0;
-  const ppr = ctx.ppr?.get(post.author_id) ?? 0;
-  const field = fieldProximity(ctx.viewer, post.author as Record<string, unknown> | undefined);
-  const authorTrust = clamp01(0.28 + verified * 0.3 + ppr * 0.25 + field.score * 0.25);
-  if (ppr >= 1) reason.push("from your network");
-  else if (ppr > 0) reason.push("2nd-degree");
-  if (field.sameCollege) reason.push("same college");
-  else if (field.sameCity) reason.push("near you");
-
-  // f_5 DIVERSITY — penalise repeating the primary tag of recently served posts.
-  const primary = tags[0];
-  const diversity = primary && ctx.recentTags.includes(primary) ? 0.3 : 1;
-
-  // f_6 SAFETY — kill switch (read-feed already drops flagged posts).
-  const safety = 1;
-
-  const criteria: Array<[number, number]> = [
-    [weights.match, match],
-    [weights.recency, recency],
-    [weights.engagement, engagement],
-    [weights.authorTrust, authorTrust],
-    [weights.diversity, diversity],
-    [weights.safety, safety],
-  ];
-
-  const tcheby = 1 - Math.max(...criteria.map(([w, f]) => w * Math.abs(1 - f)));
+  // Serving-time re-ranks applied to BOTH heads.
+  const primary = (post.hashtags ?? [])[0]?.toLowerCase();
+  const diversityPenalty = primary && ctx.recentTags.includes(primary) ? 0.08 : 0;
   const seenPenalty = ctx.seenIds.has(post.id) ? 0.5 : 0;
-  const score = tcheby - seenPenalty;
   if (seenPenalty) reason.push("seen before");
 
-  return { ...post, score, reason };
+  return { ...post, score: base - diversityPenalty - seenPenalty, reason };
 }
 
 /**
- * diversifyTopK: greedy max-coverage to span distinct hashtags, then a reserved
- * exploration slot (mid-score post the greedy pass skipped) so the feed explores
- * beyond the obvious — the serendipity that keeps a feed alive.
+ * diversifyTopK: greedy max-coverage over distinct hashtags + a reserved
+ * exploration slot — the serendipity that keeps the feed from tunnelling.
  */
 export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   const sorted = [...scored].sort((a, b) => b.score - a.score);
@@ -177,6 +130,5 @@ export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   }
   const remaining = sorted.filter((p) => !picked.includes(p));
   if (remaining.length > 0) picked.push(remaining[Math.floor(remaining.length / 2)]);
-
   return picked.slice(0, k);
 }
