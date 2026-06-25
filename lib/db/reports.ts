@@ -2,6 +2,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "@/lib/supabase/env";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { overLimit, LIMITS, RATE_LIMITED } from "@/lib/security/ratelimit";
 
 export type ReportCategory = "spam" | "hate" | "sexual" | "other";
 
@@ -17,6 +18,10 @@ export async function submitReport(args: SubmitArgs): Promise<{ ok: boolean; err
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+
+  if (await overLimit(sb, { table: "reports", userColumn: "reporter_id", userId: user.id, ...LIMITS.report })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   const row: Record<string, unknown> = {
     reporter_id: user.id,

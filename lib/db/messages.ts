@@ -3,6 +3,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import type { Message } from "@/lib/supabase/types";
 import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
 import { moderateContent } from "@/lib/moderation/moderate";
+import { overLimit, LIMITS, RATE_LIMITED } from "@/lib/security/ratelimit";
 
 export interface MiniProfile {
   id: string;
@@ -665,6 +666,10 @@ export async function sendMessage({
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
+
+  if (await overLimit(sb, { table: "messages", userColumn: "sender_id", userId: user.id, ...LIMITS.message })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   // Moderate non-empty message body before DB insert
   if (body && body.length > 0) {

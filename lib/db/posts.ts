@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { Post } from "@/lib/supabase/types";
+import { overLimit, LIMITS, RATE_LIMITED } from "@/lib/security/ratelimit";
 
 export interface PostAuthor {
   handle: string;
@@ -136,6 +137,10 @@ export async function createPost(input: CreatePostInput): Promise<PostMutationRe
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
+
+  if (await overLimit(sb, { table: "posts", userColumn: "author_id", userId: user.id, ...LIMITS.post })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   const { data, error } = await sb
     .from("posts")
