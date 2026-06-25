@@ -1,12 +1,14 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { attachReposts, type PostWithAuthor } from "@/lib/db/posts";
-import { scorePost, diversifyTopK, type ScoredPost } from "@/lib/ranker/score";
+import { scorePost, diversifyTopK, type ScoredPost, type RankerWeights } from "@/lib/ranker/score";
 import { checkContent } from "@/lib/moderation/guardrail";
+import { expandTagList } from "@/lib/ranker/taxonomy";
 
 // Self-referential repost originals are resolved by attachReposts() (a batched
 // second query) — PostgREST cannot embed posts->posts by FK hint.
+// Author cohort fields (college/branch/city/year) drive field/location matching.
 const SELECT =
-  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,verified)";
+  "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,branch,city,year_of_study,verified)";
 
 // Live filter: not soft-deleted, not expired (unless pinned/highlight keep null).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -43,35 +45,70 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
   // Personalisation context.
   let interests: string[] = [];
   let branch: string | null = null;
+  let viewer: { college?: string | null; branch?: string | null; year?: string | null; city?: string | null } = {};
   let onlyFollows = false;
   let hideProjects = false;
   let followIds: string[] = [];
+  let cohortAuthorIds: string[] = [];
   const seenIds = new Set<string>();
   const notInterested = new Set<string>();
   let blockedIds: string[] = [];
+  const behaviorAffinity = new Map<string, number>(); // tag -> revealed preference
+  let learnedWeights: RankerWeights | undefined;
 
   if (user) {
-    const [{ data: prof }, { data: feedback }, { data: seen }, { data: follows }, { data: blockRows }] =
+    const [{ data: prof }, { data: feedback }, { data: seen }, { data: follows }, { data: blockRows }, { data: events }, { data: rw }] =
       await Promise.all([
-        sb.from("profiles").select("interests, branch, feed_prefs").eq("id", user.id).maybeSingle(),
+        sb.from("profiles").select("interests, branch, college, city, year_of_study, feed_prefs").eq("id", user.id).maybeSingle(),
         sb.from("user_feed_feedback").select("post_id").eq("user_id", user.id).eq("signal", "not_interested"),
         sb.from("user_seen_posts").select("post_id").eq("user_id", user.id),
         sb.from("follows").select("following_id").eq("follower_id", user.id),
         sb.from("blocks").select("blocker_id, blocked_id").or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`),
+        // Behavioural fuel: tags of posts the viewer actively engaged with.
+        sb.from("feed_events").select("post_id, kind, posts!inner(hashtags)").eq("user_id", user.id).in("kind", ["click", "expand", "save", "dwell"]).order("created_at", { ascending: false }).limit(500),
+        sb.from("ranker_weights").select("weights, n_samples").eq("id", 1).maybeSingle(),
       ]);
     interests = (prof?.interests as string[]) ?? [];
     branch = (prof?.branch as string | null) ?? null;
+    viewer = {
+      college: (prof?.college as string | null) ?? null,
+      branch,
+      year: (prof?.year_of_study as string | null) ?? null,
+      city: (prof?.city as string | null) ?? null,
+    };
     const fp = (prof?.feed_prefs as { only_follows?: boolean; hide_projects?: boolean } | null) ?? null;
     onlyFollows = Boolean(fp?.only_follows);
     hideProjects = Boolean(fp?.hide_projects);
     followIds = (follows ?? []).map((f) => f.following_id as string);
-    // "Only people I follow" with zero follows -> empty feed (honour the toggle).
     if (onlyFollows && followIds.length === 0) return [];
     for (const f of feedback ?? []) notInterested.add(f.post_id as string);
     for (const s of seen ?? []) seenIds.add(s.post_id as string);
     blockedIds = (blockRows ?? []).map((r) =>
       r.blocker_id === user.id ? (r.blocked_id as string) : (r.blocker_id as string)
     );
+
+    // Revealed preference: weight tags by how much the viewer engaged (recency-decayed),
+    // then normalise 0..1. This is "what you DO", which the scorer trusts highly.
+    const tagCounts = new Map<string, number>();
+    const W: Record<string, number> = { dwell: 1, click: 2, expand: 2, save: 4 };
+    for (const e of (events ?? []) as Array<{ kind: string; posts?: { hashtags?: string[] } }>) {
+      const w = W[e.kind] ?? 1;
+      for (const t of e.posts?.hashtags ?? []) tagCounts.set(t.toLowerCase(), (tagCounts.get(t.toLowerCase()) ?? 0) + w);
+    }
+    const maxTag = Math.max(1, ...tagCounts.values());
+    for (const [t, c] of tagCounts) behaviorAffinity.set(t, c / maxTag);
+
+    // Learned weights from the nightly fit job (only once it has enough samples).
+    const wj = rw?.weights as RankerWeights | undefined;
+    if (wj && (rw?.n_samples ?? 0) >= 200 && typeof wj.match === "number") learnedWeights = wj;
+
+    // Cohort authors (same college or branch) for "people like me" recall.
+    if (viewer.college || branch) {
+      let q = sb.from("profiles").select("id").neq("id", user.id).is("deleted_at", null).is("suspended_at", null).limit(200);
+      if (viewer.college) q = q.eq("college", viewer.college);
+      const { data: cohort } = await q;
+      cohortAuthorIds = (cohort ?? []).map((c) => c.id as string);
+    }
   }
 
   // RECALL: union of recent global + interest/branch-tag overlap (+ follows).
@@ -87,13 +124,15 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
       .limit(80);
     addAll(data as PostWithAuthor[] | null);
   } else {
-    const tags = [...interests, ...(branch ? [branch] : [])].map((t) => t.toLowerCase());
+    // Semantic recall: expand the viewer's interests to RELATED tags via the
+    // taxonomy (so "AI/ML" also recalls #llm / #deeplearning), capped for the query.
+    const expanded = expandTagList([...interests, ...(branch ? [branch] : [])]).slice(0, 60);
     const queries: PromiseLike<unknown>[] = [
       liveFilter(sb.from("posts").select(SELECT)).order("created_at", { ascending: false }).limit(60),
     ];
-    if (tags.length > 0) {
+    if (expanded.length > 0) {
       queries.push(
-        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", tags).order("created_at", { ascending: false }).limit(40)
+        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", expanded).order("created_at", { ascending: false }).limit(50)
       );
       if (branch) {
         queries.push(
@@ -104,6 +143,12 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     if (followIds.length > 0) {
       queries.push(
         liveFilter(sb.from("posts").select(SELECT)).in("author_id", followIds).order("created_at", { ascending: false }).limit(40)
+      );
+    }
+    // Cohort recall: recent posts from people in your college/branch ("like me").
+    if (cohortAuthorIds.length > 0) {
+      queries.push(
+        liveFilter(sb.from("posts").select(SELECT)).in("author_id", cohortAuthorIds.slice(0, 150)).order("created_at", { ascending: false }).limit(40)
       );
     }
     const results = (await Promise.all(queries)) as Array<{ data: PostWithAuthor[] | null }>;
@@ -165,10 +210,22 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     }
   }
 
-  // Score (MCDM Tchebycheff) + diversify.
+  // Velocity ("hot right now"): engagement of posts younger than 6h, normalised.
+  // The freshness/virality signal — what's accelerating in the last few hours.
+  const velocity = new Map<string, number>();
+  const fresh = pool.filter((p) => (Date.now() - new Date(p.created_at).getTime()) / 3.6e6 < 6);
+  if (fresh.length > 0) {
+    const vmax = Math.max(1e-6, ...fresh.map(engagementScore));
+    for (const p of fresh) velocity.set(p.id, engagementScore(p) / vmax);
+  }
+
+  // Score (MCDM Tchebycheff over semantic + field + behavioural + graph signals).
   const recentTags: string[] = [];
   const scored: ScoredPost[] = pool.map((p) => {
-    const s = scorePost(p, { interests, branch, seenIds, recentTags, relevancy, cf, ppr });
+    const s = scorePost(p, {
+      interests, branch, seenIds, recentTags, relevancy, cf, ppr,
+      viewer, behaviorAffinity, velocity, weights: learnedWeights,
+    });
     const primary = p.hashtags?.[0]?.toLowerCase();
     if (primary) recentTags.push(primary);
     return s;

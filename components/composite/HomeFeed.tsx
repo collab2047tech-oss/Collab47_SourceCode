@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { PostCard, type Post as CardPost } from "@/components/composite/PostCard";
 import { cn } from "@/lib/cn";
 import { Rss, Clock, Flame, TrendingUp } from "lucide-react";
+import { FeedTracker } from "@/components/composite/FeedTracker";
 
 interface HomeFeedProps {
   forYou: CardPost[];
@@ -32,6 +33,8 @@ export function HomeFeed({ forYou, recent, popular, trending, currentUserId }: H
 
   return (
     <>
+      {/* Real behavioural-signal capture (impressions + dwell) for the ranker. */}
+      <FeedTracker />
       {/* Sticky tab bar — horizontally scrollable on mobile, never overflows the page. */}
       <div
         className={cn(

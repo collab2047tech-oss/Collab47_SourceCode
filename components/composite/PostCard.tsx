@@ -342,6 +342,7 @@ export function PostCard({
 
   return (
     <article
+      data-feed-post={post.id}
       className={cn(
         "group relative border-b border-bone bg-paper transition-colors duration-200",
         "hover:bg-cream/60",
