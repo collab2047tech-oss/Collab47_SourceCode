@@ -23,7 +23,7 @@ export function CTABand() {
     <section className="bg-ink py-28 sm:py-40 md:py-56">
       <div className="container-edit">
         <Reveal>
-          <p className="text-caption text-cream/70">Now in open beta</p>
+          <p className="text-caption text-cream/70">Get started</p>
         </Reveal>
         <Reveal delay={0.1}>
           <h2 className="mt-6 max-w-5xl font-serif text-[2.5rem] leading-[1.06] tracking-tight text-cream sm:mt-8 sm:text-6xl md:text-8xl">
@@ -31,16 +31,22 @@ export function CTABand() {
             <span className="italic text-saffron">actually</span> wanted on LinkedIn.
           </h2>
         </Reveal>
+        <Reveal delay={0.18}>
+          <p className="mt-6 max-w-2xl text-body text-cream/70 sm:mt-8">
+            Build in the open, find collaborators, and connect across India&apos;s
+            academia and industry. One platform. Infinite collaborations.
+          </p>
+        </Reveal>
         <Reveal delay={0.25}>
           <form
             onSubmit={handleSubmit}
-            className="mt-10 flex max-w-2xl flex-col gap-3 sm:mt-16 sm:flex-row sm:gap-4"
+            className="mt-10 flex max-w-2xl flex-col gap-3 sm:mt-12 sm:flex-row sm:gap-4"
           >
             <Input
               type="email"
               required
-              aria-label="Your college email"
-              placeholder="you@college.edu"
+              aria-label="Your email"
+              placeholder="you@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-14 border-cream/20 bg-cream/5 text-lg text-cream placeholder:text-cream/50 focus:border-cream sm:h-16"
@@ -51,7 +57,7 @@ export function CTABand() {
               size="lg"
               className="h-14 w-full shrink-0 bg-saffron text-cream hover:bg-saffron-dk sm:h-16 sm:w-auto"
             >
-              {done ? "You are in." : "Sign up free"}
+              {done ? "Taking you in." : "Sign up free"}
               {!done && <ArrowRight className="size-5" />}
             </Button>
           </form>
@@ -63,7 +69,7 @@ export function CTABand() {
           >
             {done
               ? "Taking you to sign up…"
-              : "Free during beta . College email gets you a verified badge."}
+              : "Free to join. We carry your email straight into sign up."}
           </p>
         </Reveal>
       </div>

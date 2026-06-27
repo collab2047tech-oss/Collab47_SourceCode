@@ -17,16 +17,16 @@ export function Quote() {
             >
               &ldquo;
             </span>
-            Build in the open from day one. The work{" "}
-            <span className="italic text-saffron">compounds</span>, and the right
-            people find you.
+            Where talent, innovation and opportunity{" "}
+            <span className="italic text-saffron">converge</span> — collaborate and
+            innovate for Viksit Bharat 2047.
           </blockquote>
         </Reveal>
         <Reveal delay={0.25}>
           <div className="mt-10 flex items-center gap-4 sm:mt-12">
             <span className="h-px w-10 bg-cream/30" aria-hidden />
             <p className="text-caption text-cream/60">
-              Shaurya Punj . Co-founding CTO
+              Collab47 . Built for India. Built to Lead.
             </p>
           </div>
         </Reveal>

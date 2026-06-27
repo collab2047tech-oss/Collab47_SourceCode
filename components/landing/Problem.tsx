@@ -5,23 +5,23 @@ import { Reveal } from "@/components/motion/Reveal";
 const items = [
   {
     n: "01",
-    h: "LinkedIn is for the job you don't have yet.",
-    p: "Resume profile, three internship slots, English-first, and a feed of strangers congratulating themselves on promotions. None of it fits a 19-year-old who built a thing last weekend.",
+    h: "Talent stays invisible.",
+    p: "A student in Lucknow ships something real and no one outside their campus ever sees it. 95% of India's talent sits outside the top fifty institutions — and outside the networks that get noticed.",
   },
   {
     n: "02",
-    h: "Internshala is a noticeboard.",
-    p: "Solid listings. Zero community. You go in, find one internship, leave, and forget the site exists until exam season. There is nothing to come back for between applications.",
+    h: "Research runs without direction.",
+    p: "Researchers and faculty work on problems that industry would fund and use, while companies solve the same problems alone. The two sides rarely meet early enough to matter.",
   },
   {
     n: "03",
-    h: "Unstop disappears between hackathons.",
-    p: "It is great for the weekend of the event. The Tuesday after, your project, your team, and your work are gone. No place to keep building, no profile that remembers what you shipped.",
+    h: "Hiring is slow and blind.",
+    p: "Industry and startups screen on pedigree and resumes because there is nowhere to see what someone has actually built. Strong people are missed; the wrong filters stay in place.",
   },
   {
     n: "04",
-    h: "The Lucknow first-year has no platform.",
-    p: "95% of India's students are outside the top 50 colleges. The current platforms reward who already has a recruiter network, not who builds the most interesting thing in their dorm.",
+    h: "Institutions can't reach industry.",
+    p: "Universities want their people connected to real problems, internships, and collaborations. Today that depends on scattered contacts and luck — not a place where the whole ecosystem shows up.",
   },
 ];
 
@@ -31,10 +31,15 @@ export function Problem() {
       <div className="container-edit">
         <Reveal>
           <p className="text-caption mb-6">The Problem</p>
-          <h2 className="text-[2.1rem] leading-[1.1] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
-            Indian students juggle five platforms. None of them integrate.{" "}
-            <span className="text-ash">None of them were built for them.</span>
+          <h2 className="text-[2.1rem] leading-[1.12] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
+            Academia and industry are built to need each other.{" "}
+            <span className="text-ash">In India, they barely meet.</span>
           </h2>
+          <p className="mt-7 max-w-2xl text-body-lg text-ash sm:mt-8">
+            Students and freshers, researchers, faculty, institutions, and
+            industry all want the same thing — to find each other and build. The
+            problem is the gap between them.
+          </p>
         </Reveal>
 
         <div className="mt-14 grid gap-px bg-bone sm:mt-20 md:grid-cols-2">

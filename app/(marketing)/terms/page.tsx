@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Terms of Use — Collab47",
   description:
-    "The rules for using Collab47 — your account, your content, acceptable use, and the terms of our open beta.",
+    "The rules for using Collab47 — your account, your content, acceptable use, and the terms of service.",
 };
 
 const updated = "20 June 2026";
@@ -26,14 +26,14 @@ export default function TermsPage() {
           <div className="mt-14 space-y-10 text-body text-ink/85">
             <p>
               These terms govern your use of Collab47, operated by Collab47
-              Technologies, Amritsar, Punjab, India. By creating an account, you
+              Technologies Private Limited, India. By creating an account, you
               agree to them. If you do not agree, please do not use the service.
             </p>
 
             <div>
               <h2 className="font-serif text-3xl text-ink">Your account</h2>
               <ul className="mt-4 list-disc space-y-2 pl-6">
-                <li>You must be a college student, or at least 16, to join.</li>
+                <li>You must be at least 16 years old to join.</li>
                 <li>Give accurate information and keep your login secure.</li>
                 <li>You are responsible for activity on your account.</li>
               </ul>
@@ -65,13 +65,12 @@ export default function TermsPage() {
             </div>
 
             <div>
-              <h2 className="font-serif text-3xl text-ink">Open beta</h2>
+              <h2 className="font-serif text-3xl text-ink">Service availability</h2>
               <p className="mt-4">
-                Collab47 is in open beta. Features may change, break, or
+                The product is evolving. Features may change, break, or
                 disappear, and the service is provided &ldquo;as is&rdquo; without
                 warranties. We work hard to keep it running and safe, but we
-                cannot guarantee uninterrupted or error-free service during this
-                stage.
+                cannot guarantee uninterrupted or error-free service.
               </p>
             </div>
 
@@ -89,7 +88,7 @@ export default function TermsPage() {
               <h2 className="font-serif text-3xl text-ink">Governing law</h2>
               <p className="mt-4">
                 These terms are governed by the laws of India, and disputes are
-                subject to the courts of Amritsar, Punjab.
+                subject to the courts of India.
               </p>
             </div>
 

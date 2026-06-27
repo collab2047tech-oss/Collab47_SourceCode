@@ -32,7 +32,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <p className="font-serif text-3xl">Collab47.</p>
             <p className="mt-4 max-w-xs text-sm text-cream/60">
-              India's first work-first network for students.
+              India&apos;s unified academia–industry collaboration ecosystem.
             </p>
           </div>
 
@@ -67,8 +67,8 @@ export function Footer() {
         </div>
 
         <div className="mt-14 flex flex-col gap-3 border-t border-cream/15 pt-8 text-caption text-cream/50 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <p>Collab47 Technologies, Amritsar, India. 2026.</p>
-          <p className="font-indic">सहयोग. कौशल. भविष्य.</p>
+          <p>© 2026 Collab47 Technologies Private Limited. India.</p>
+          <p>Built for India. Built to Lead.</p>
         </div>
       </div>
     </footer>

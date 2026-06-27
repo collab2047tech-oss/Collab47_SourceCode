@@ -5,7 +5,7 @@ import { Input } from "@/components/primitives/Input";
 import { Button } from "@/components/primitives/Button";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { GOOGLE_AUTH_ENABLED, PHONE_AUTH_ENABLED } from "@/app/(auth)/authProviders";
 
@@ -17,6 +17,12 @@ export default function SignupPage() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill email when arriving from the landing CTA (/signup?email=...).
+  useEffect(() => {
+    const qp = new URLSearchParams(window.location.search).get("email");
+    if (qp) setEmail(qp);
+  }, []);
 
   async function signUpEmail(e: React.FormEvent) {
     e.preventDefault();

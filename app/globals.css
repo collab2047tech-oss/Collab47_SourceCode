@@ -24,8 +24,8 @@
   --color-gold: #F5A623;
 
   /* Type families */
-  --font-serif: "Instrument Serif", "Times New Roman", serif;
-  --font-sans: "General Sans", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Fraunces", "Times New Roman", serif;
+  --font-sans: "Hanken Grotesk", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
   --font-indic: "Noto Sans Devanagari", var(--font-sans);
 

@@ -25,8 +25,8 @@ export default function PrivacyPage() {
 
           <div className="prose-legal mt-14 space-y-10 text-body text-ink/85">
             <p>
-              Collab47 is a work-first professional network for Indian students,
-              operated by Collab47 Technologies, Amritsar, Punjab, India
+              Collab47 is India&apos;s unified academia–industry collaboration
+              ecosystem, operated by Collab47 Technologies Private Limited, India
               (&ldquo;Collab47&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;). This
               policy explains what we collect, why, and the control you have over
               it. We keep it short and we keep it honest.
@@ -37,8 +37,8 @@ export default function PrivacyPage() {
               <ul className="mt-4 list-disc space-y-2 pl-6">
                 <li>
                   <strong>Account data</strong> you give us: name, email, handle,
-                  college, branch, interests, and anything you add to your
-                  profile.
+                  your institution or organisation, field, interests, and
+                  anything you add to your profile.
                 </li>
                 <li>
                   <strong>Content you create</strong>: posts, comments,
@@ -109,18 +109,18 @@ export default function PrivacyPage() {
             <div>
               <h2 className="font-serif text-3xl text-ink">Children</h2>
               <p className="mt-4">
-                Collab47 is for college students. It is not intended for anyone
-                under 16. If you believe a younger child has registered, contact
-                us and we will remove the account.
+                Collab47 is intended for users aged 16 and above. It is not
+                intended for anyone under 16. If you believe a younger child has
+                registered, contact us and we will remove the account.
               </p>
             </div>
 
             <div>
               <h2 className="font-serif text-3xl text-ink">Changes</h2>
               <p className="mt-4">
-                We are in open beta and the product is evolving. If this policy
-                changes materially, we will update the date above and, where it
-                matters, tell you in the app.
+                The product is evolving. If this policy changes materially, we
+                will update the date above and, where it matters, tell you in the
+                app.
               </p>
             </div>
 

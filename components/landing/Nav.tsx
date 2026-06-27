@@ -43,7 +43,7 @@ export function Nav() {
           : "bg-transparent"
       )}
     >
-      <div className="container-edit flex h-16 items-center justify-between gap-3">
+      <div className="container-edit flex h-16 items-center justify-between gap-4 sm:h-18">
         <Link
           href="/"
           className="font-serif text-2xl font-normal tracking-tight text-ink transition-opacity hover:opacity-80 sm:text-3xl"
@@ -53,7 +53,7 @@ export function Nav() {
         </Link>
 
         {/* Desktop links */}
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-9 md:flex">
           <Link
             href="/home"
             className="text-base text-ink/80 transition-colors hover:text-saffron"
