@@ -1,163 +1,175 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
-import Link from "next/link";
-import { Search } from "lucide-react";
-import { Avatar } from "@/components/primitives/Avatar";
-import { Tag } from "@/components/primitives/Tag";
-import { searchAction } from "@/app/(app)/explore/actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Search, X } from "lucide-react";
+import { searchAllAction } from "@/app/(app)/explore/actions";
+import { getCachedSearch, setCachedSearch } from "@/lib/search/clientCache";
+import { pushRecentSearch } from "@/lib/search/recent";
+import { SearchResultsList, flattenResults } from "@/components/search/SearchResults";
+import type { SearchResults } from "@/lib/db/social";
 
-type SearchResults = Awaited<ReturnType<typeof searchAction>>;
+const DEBOUNCE_MS = 180;
 
-export function ExploreSearch() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResults | null>(null);
+function hasAny(r: SearchResults | null): boolean {
+  return Boolean(
+    r && (r.people.length || r.posts.length || r.projects.length || r.hashtags.length)
+  );
+}
+
+/**
+ * Full-page Explore search. Seeded with the server-rendered initial query +
+ * results from /explore?q= so a top-bar submit lands on a populated, editable
+ * box (the old box dropped the URL query entirely). Reuses the same ranked data
+ * layer and shared result rows as the top-bar dropdown.
+ */
+export function ExploreSearch({
+  initialQuery = "",
+  initialResults = null,
+}: {
+  initialQuery?: string;
+  initialResults?: SearchResults | null;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState<SearchResults | null>(initialResults);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [isPending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Track the query the current `results` belong to so we don't re-fetch the
+  // server-seeded initial query on mount.
+  const seededQuery = useRef(initialQuery.trim());
+
+  const trimmed = query.trim();
+  const flat = results ? flattenResults(results) : [];
+
+  // Seed the client cache with the server-rendered initial results.
+  useEffect(() => {
+    if (initialQuery.trim() && initialResults) {
+      setCachedSearch(initialQuery.trim(), false, initialResults);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
+    if (!trimmed) {
       setResults(null);
+      setActiveIndex(-1);
+      return;
+    }
+    // Don't re-fetch the query we were seeded with on first render.
+    if (trimmed === seededQuery.current && results) return;
+
+    const cached = getCachedSearch(trimmed, false);
+    if (cached) {
+      setResults(cached);
+      setActiveIndex(-1);
       return;
     }
     debounceRef.current = setTimeout(() => {
       startTransition(async () => {
-        const res = await searchAction(query);
+        const res = await searchAllAction(trimmed);
+        setCachedSearch(trimmed, false, res);
         setResults(res);
+        setActiveIndex(-1);
+        seededQuery.current = "";
       });
-    }, 300);
+    }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmed]);
 
-  const hasResults =
-    results &&
-    (results.people.length > 0 ||
-      results.posts.length > 0 ||
-      results.projects.length > 0 ||
-      results.hashtags.length > 0);
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (flat.length) setActiveIndex((i) => (i + 1) % flat.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (flat.length) setActiveIndex((i) => (i <= 0 ? flat.length - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeIndex >= 0 && flat[activeIndex]) {
+        if (trimmed) pushRecentSearch(trimmed);
+        router.push(flat[activeIndex].href);
+      }
+    } else if (e.key === "Escape" && trimmed) {
+      setQuery("");
+    }
+  }
+
+  const activeHref = activeIndex >= 0 ? flat[activeIndex]?.href : null;
+  const noResults = trimmed && !isPending && results !== null && !hasAny(results);
 
   return (
-    <div className="mb-10">
-      {/* Search box */}
+    <div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ash" />
         <input
+          ref={inputRef}
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people, projects, hashtags..."
-          className="h-12 w-full rounded-full border border-bone bg-paper pl-11 pr-5 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none"
+          onKeyDown={handleKeyDown}
+          placeholder="Search people, posts, projects, #hashtags"
+          aria-label="Search Collab47"
+          className="h-12 w-full rounded-full border border-bone bg-paper pl-11 pr-11 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none"
         />
-        {isPending && (
-          <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs text-ash">
-            Searching...
-          </span>
-        )}
+        {query ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-ash transition-colors hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+        {isPending ? (
+          <span className="absolute right-11 top-1/2 size-4 -translate-y-1/2 animate-spin rounded-full border-2 border-bone border-t-saffron" />
+        ) : null}
       </div>
 
-      {/* Results */}
-      {query.trim() && results && (
-        <div className="mt-4 space-y-6">
-          {/* People */}
-          {results.people.length > 0 && (
-            <section>
-              <p className="mb-3 text-caption">People · {results.people.length}</p>
-              <ul className="space-y-2">
-                {results.people.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/u/${p.handle}`}
-                      className="card card-hover flex items-center gap-3 px-4 py-3"
-                    >
-                      <Avatar
-                        name={p.name}
-                        src={(p.avatar_url as string | null) ?? undefined}
-                        size="sm"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-ink">
-                          {p.name}
-                        </p>
-                        <p className="truncate text-xs text-ash">
-                          @{p.handle}
-                          {p.college ? ` . ${p.college}` : ""}
-                        </p>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Posts */}
-          {results.posts.length > 0 && (
-            <section>
-              <p className="mb-3 text-caption">Posts · {results.posts.length}</p>
-              <ul className="space-y-2">
-                {results.posts.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/p/${p.short_id}`}
-                      className="card card-hover block px-4 py-3"
-                    >
-                      <p className="line-clamp-2 text-sm text-ink">{p.body}</p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Projects */}
-          {results.projects.length > 0 && (
-            <section>
-              <p className="mb-3 text-caption">Projects · {results.projects.length}</p>
-              <ul className="space-y-2">
-                {results.projects.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/c/${p.short_id}`}
-                      className="card card-hover block px-4 py-3"
-                    >
-                      <p className="text-sm font-semibold text-ink">{p.title}</p>
-                      {p.brief && (
-                        <p className="mt-1 line-clamp-1 text-xs text-ash">
-                          {p.brief}
-                        </p>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Hashtags */}
-          {results.hashtags.length > 0 && (
-            <section>
-              <p className="mb-3 text-caption">Hashtags · {results.hashtags.length}</p>
-              <div className="flex flex-wrap gap-2">
-                {results.hashtags.map((h) => (
-                  <Link key={h.tag} href={`/t/${h.tag}`} className="transition-opacity hover:opacity-80">
-                    <Tag variant="saffron">#{h.tag}</Tag>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Empty state */}
-          {!hasResults && !isPending && (
-            <p className="py-6 text-center text-sm text-ash">
-              No results for &ldquo;{query}&rdquo;.
+      {trimmed ? (
+        <div className="mt-4 rounded-2xl border border-bone bg-paper p-1.5">
+          {isPending && !results ? (
+            <SkeletonRows />
+          ) : noResults ? (
+            <p className="px-3 py-8 text-center text-sm text-ash">
+              No results for &ldquo;{trimmed}&rdquo;. Try a name, @handle, #tag, or project.
             </p>
-          )}
+          ) : results ? (
+            <SearchResultsList
+              results={results}
+              activeHref={activeHref}
+              onActivate={() => trimmed && pushRecentSearch(trimmed)}
+              onHover={(href) => router.prefetch(href)}
+            />
+          ) : null}
         </div>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <div className="space-y-1 p-1.5" aria-hidden>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="flex items-center gap-3 px-1.5 py-2">
+          <div className="size-8 shrink-0 animate-pulse rounded-full bg-bone" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="h-3 w-1/3 animate-pulse rounded bg-bone" />
+            <div className="h-2.5 w-1/2 animate-pulse rounded bg-bone" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

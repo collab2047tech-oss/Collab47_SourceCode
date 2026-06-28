@@ -41,7 +41,7 @@ export interface CommentLikeState {
 
 /**
  * Fetch like counts for a set of comments and which of them the current user
- * has liked. Companion to getPostComments — call it from the page with the
+ * has liked. Companion to getPostComments - call it from the page with the
  * comment ids and pass the result to CommentsSection.
  */
 export async function getCommentLikeState(commentIds: string[]): Promise<CommentLikeState> {

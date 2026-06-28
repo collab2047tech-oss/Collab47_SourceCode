@@ -57,7 +57,10 @@ export async function updatePrivacyAction(
   const result = await updatePrivacy({ public_profile, searchable, read_receipts });
   if (!result.ok) return result;
 
-  revalidatePath("/settings");
+  // Do NOT revalidate /settings - the UI is optimistic and a full re-render adds
+  // lag. Revalidate the public profile so the public/private view reflects the
+  // new privacy state on the viewer's next visit.
+  revalidatePath("/u/[handle]", "page");
   return { ok: true };
 }
 
@@ -83,13 +86,19 @@ export async function updateNotificationPrefsAction(
   const result = await updateNotificationPrefs(prefs);
   if (!result.ok) return result;
 
-  revalidatePath("/settings");
+  // Optimistic UI handles the visual state; skip the /settings re-render to keep
+  // toggles instant. Prefs are persisted for when email/push are wired.
   return { ok: true };
 }
 
 export async function deleteAccountAction(): Promise<{ ok: boolean; error?: string }> {
   const result = await deleteMyAccount();
   if (!result.ok) return result;
+  // Sign the user out immediately so the soft-deleted session does not linger.
+  // The account stays restorable for 14 days by signing back in (the purge cron
+  // hard-deletes after that). The client then redirects to "/".
+  const sb = await getSupabaseServer();
+  if (sb) await sb.auth.signOut();
   return { ok: true };
 }
 

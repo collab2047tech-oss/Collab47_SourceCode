@@ -70,7 +70,7 @@ export async function resolveReport(
   action: "dismiss" | "remove_post" | "suspend_user"
 ): Promise<{ ok: boolean; error?: string }> {
   // CRITICAL: admin gate. This runs with the service-role client and can delete
-  // posts / suspend users — it must never be reachable by a non-admin caller.
+  // posts / suspend users - it must never be reachable by a non-admin caller.
   if (!(await isCurrentUserAdmin())) return { ok: false, error: "Not authorized." };
   const sc = serviceClient();
   if (!sc) return { ok: false, error: "Server not configured." };

@@ -4,7 +4,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const sb = await getSupabaseServer();
 
-  // If Supabase is not configured, deny access — never expose admin to unauthenticated requests.
+  // If Supabase is not configured, deny access - never expose admin to unauthenticated requests.
   if (!sb) redirect("/home");
 
   const { data: { user } } = await sb.auth.getUser();

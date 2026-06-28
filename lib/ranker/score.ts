@@ -16,7 +16,7 @@ export interface RankerWeights {
   safety: number;
 }
 
-// Tchebycheff criterion weights — the cold-start prior used until the trained
+// Tchebycheff criterion weights - the cold-start prior used until the trained
 // neural ranker is active. (The neural ranker, when present, replaces this.)
 export const DEFAULT_WEIGHTS: RankerWeights = {
   match: 0.4,
@@ -108,7 +108,7 @@ export function scorePost(post: PostWithAuthor, ctx: ScoreContext): ScoredPost {
 
 /**
  * diversifyTopK: greedy max-coverage over distinct hashtags + a reserved
- * exploration slot — the serendipity that keeps the feed from tunnelling.
+ * exploration slot - the serendipity that keeps the feed from tunnelling.
  */
 export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   const sorted = [...scored].sort((a, b) => b.score - a.score);

@@ -5,6 +5,7 @@
  */
 
 export type DMPermission = "everyone" | "connections" | "nobody";
+export type AccountType = "student" | "researcher" | "faculty" | "institution" | "industry";
 export type ReportCategory = "spam" | "hate" | "sexual" | "other";
 export type ConversationType = "one_to_one" | "group";
 export type ProjectStatus = "open" | "team_formed" | "in_progress" | "delivered" | "closed";
@@ -36,12 +37,19 @@ export interface Profile {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  /** Chosen built-in banner preset id (null when an uploaded cover is used). */
+  banner_preset: string | null;
+  /** Uploaded-cover focal point, 0..100 (% from left / top). Default 50/50. */
+  cover_focal_x: number;
+  cover_focal_y: number;
   college: string | null;
   branch: string | null;
   year_of_study: string | null;
   city: string | null;
   birthdate: string | null;
   interests: string[];
+  account_type: AccountType | null;
+  organization: string | null;
   cluster_id: number | null;
   verified: boolean;
   suspended_at: string | null;
@@ -132,6 +140,8 @@ export interface Message {
   is_request: boolean;
   read_at: string | null;
   created_at: string;
+  /** Client-generated id used to reconcile optimistic-send temp bubbles. */
+  client_id: string | null;
 }
 
 export interface Project {
@@ -168,13 +178,24 @@ export interface Notification {
   created_at: string;
 }
 
+export type NewsSummaryStatus = "ai" | "headline" | "raw" | "none";
+
 export interface NewsItem {
   id: string;
   source: string;
   url: string;
   title: string;
+  /** Raw publisher blurb, kept for provenance. The UI reads `summary`. */
   excerpt: string | null;
+  /** Guaranteed-real summary (AI or honest fallback). Read this in the UI. */
+  summary: string | null;
+  /** How the summary was produced - lets the UI promise a real brief. */
+  summary_status: NewsSummaryStatus;
+  /** Reader-facing categories (Tech / Business / Careers / ...). Renderable. */
+  topics: string[];
+  lang: string;
   image_url: string | null;
+  /** Internal taxonomy for MATCHING only. Never render as a chip. */
   branch_tags: string[];
   city_tags: string[];
   published_at: string;

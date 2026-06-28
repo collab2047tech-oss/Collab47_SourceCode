@@ -56,7 +56,7 @@ export async function markNotificationRead(id: string): Promise<void> {
 }
 
 /**
- * Insert a notification row. Fire-and-forget — never throws.
+ * Insert a notification row. Fire-and-forget - never throws.
  * Uses the admin client because the notifications table is insert-restricted by RLS.
  */
 export async function createNotification(input: {

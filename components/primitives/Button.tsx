@@ -19,7 +19,7 @@ const button = cva(
         link: "text-ink underline underline-offset-4 decoration-saffron decoration-2 hover:text-saffron px-0",
       },
       size: {
-        sm: "h-9 px-4 text-sm rounded-md",
+        sm: "h-10 px-4 text-sm rounded-md",
         md: "h-11 px-5 text-base rounded-lg",
         lg: "h-14 px-7 text-lg rounded-lg",
         xl: "h-16 px-9 text-xl rounded-xl",

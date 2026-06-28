@@ -2,7 +2,7 @@ import type { PostWithAuthor } from "@/lib/db/posts";
 import { semanticMatch } from "@/lib/ranker/taxonomy";
 import type { ScoreContext } from "@/lib/ranker/score";
 
-// Fixed feature order — MUST stay stable (the trained model indexes by position).
+// Fixed feature order - MUST stay stable (the trained model indexes by position).
 export const FEATURE_NAMES = [
   "semantic", "branchMatch", "bm25", "cf", "behaviorAff",
   "recency", "engagementRate", "velocity", "verified", "ppr",
@@ -43,7 +43,7 @@ export interface ExtractedFeatures {
 
 /**
  * Extract the per-(viewer, post) feature vector. This is the SINGLE source of
- * truth for both the MCDM scorer and the neural ranker — identical features at
+ * truth for both the MCDM scorer and the neural ranker - identical features at
  * serve time and (via logged vectors) at train time, so the model never sees a
  * different world than production.
  */

@@ -1,63 +1,83 @@
 import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
-import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { ExploreSearch } from "@/components/composite/ExploreSearch";
-import { listOpenProjects } from "@/lib/db/projects";
-import { getPopularFeed } from "@/lib/db/feed";
-import { getSuggestedConnections } from "@/lib/db/social";
+import { TrendingTags } from "@/components/composite/TrendingTags";
+import { SuggestedPersonCard } from "./SuggestedPersonCard";
+import { SuggestedProjectCard } from "./SuggestedProjectCard";
+import {
+  searchAll,
+  getSuggestedPeople,
+  getSuggestedProjects,
+  getTrendingTags,
+  getRelationshipStates,
+} from "@/lib/db/social";
 import { getSupabaseServer } from "@/lib/supabase/server";
-import { TrendingUp, Sparkles, Trophy, ChevronRight } from "lucide-react";
+import { TrendingUp, Sparkles, Trophy, Briefcase, Hash } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-async function getCollegeLeaderboard(limit = 5) {
+async function getCollegeLeaderboard(limit = 5): Promise<{ name: string; count: number }[]> {
   const sb = await getSupabaseServer();
-  if (!sb) return [] as { name: string; count: number }[];
-  const { data } = await sb.from("profiles").select("college").is("deleted_at", null).limit(1000);
-  const counts = new Map<string, number>();
-  for (const row of data ?? []) {
-    const c = (row.college as string | null)?.trim();
-    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([name, count]) => ({ name, count }));
+  if (!sb) return [];
+  const { data } = await sb.rpc("college_leaderboard", { lim: limit });
+  return ((data as Array<{ college: string; members: number }> | null) ?? []).map((r) => ({
+    name: r.college,
+    count: r.members,
+  }));
 }
 
-// listOpenProjects() selects "*" but its inferred row type collapses to the
-// normalized `{ member_count }` shape (the spread of Record<string, unknown>
-// loses the concrete columns). The underlying row always carries these fields,
-// so narrow to just what this page renders.
-type FeaturedProject = {
-  short_id: string;
-  title: string;
-  brief: string | null;
-};
+function SectionLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-ash">
+      {icon} {children}
+    </div>
+  );
+}
 
-export default async function ExplorePage() {
-  const [projects, popular, suggested, leaderboard] = await Promise.all([
-    listOpenProjects(1),
-    getPopularFeed(40),
-    getSuggestedConnections(4),
+export default async function ExplorePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const query = (q ?? "").trim();
+
+  // ---------------------------------------------------------------------------
+  // SEARCH MODE: /explore?q= now actually renders ranked results (was dropped).
+  // ---------------------------------------------------------------------------
+  if (query) {
+    const initialResults = await searchAll(query);
+    return (
+      <div className="mx-auto max-w-3xl">
+        <Reveal>
+          <div className="rule-top">
+            <p className="text-caption">Search</p>
+            <h1 className="mt-3 font-serif text-3xl leading-tight text-ink sm:text-4xl">
+              Results for <span className="italic text-saffron">{query}</span>
+            </h1>
+          </div>
+        </Reveal>
+        <div className="mt-8">
+          <ExploreSearch initialQuery={query} initialResults={initialResults} />
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // DISCOVER MODE: dense, real discovery surface.
+  // ---------------------------------------------------------------------------
+  const [people, projects, trending, tagCloud, leaderboard] = await Promise.all([
+    getSuggestedPeople(8),
+    getSuggestedProjects(4),
+    getTrendingTags(6),
+    getTrendingTags(24),
     getCollegeLeaderboard(5),
   ]);
 
-  const featured = (projects[0] as unknown as FeaturedProject | undefined) ?? null;
-
-  const counts = new Map<string, number>();
-  for (const p of popular) {
-    for (const t of p.hashtags ?? []) {
-      const tag = t.toLowerCase();
-      counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-  }
-  const trending = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([tag, count]) => ({ tag, count }));
+  const relationships = await getRelationshipStates(people.map((p) => p.id));
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -79,125 +99,93 @@ export default async function ExplorePage() {
         <ExploreSearch />
       </div>
 
-      <Reveal>
-        <div className="mt-4 flex items-center gap-3">
-          <p className="text-caption shrink-0">On the radar</p>
-          <span className="h-px flex-1 bg-bone" />
-        </div>
-      </Reveal>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Featured project */}
-        <Reveal className="lg:col-span-2">
-          {featured ? (
-            <Link
-              href={`/c/${featured.short_id}`}
-              className="group relative block h-72 overflow-hidden rounded-lg bg-ink sm:h-80"
-            >
-              <div className="absolute inset-0 bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)]" />
-              <div className="relative flex h-full flex-col justify-end p-6 text-cream sm:p-8">
-                <Tag variant="saffron" className="self-start">
-                  Featured project
-                </Tag>
-                <h2 className="mt-4 font-serif text-2xl leading-tight sm:text-3xl md:text-4xl">{featured.title}</h2>
-                <p className="mt-3 max-w-md text-sm text-cream/80 line-clamp-2 sm:line-clamp-3">{featured.brief}</p>
-                <span className="mt-5 inline-flex items-center gap-2 self-start rounded-full bg-saffron px-5 py-2.5 text-sm text-cream transition-all group-hover:bg-saffron-dk group-active:scale-95 sm:mt-6">
-                  View brief <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-                </span>
-              </div>
-            </Link>
-          ) : (
-            <div className="flex h-80 flex-col items-center justify-center rounded-lg border border-dashed border-bone bg-paper/50 text-center">
-              <p className="text-sm text-ash">No open projects yet.</p>
-              <Link href="/collabs/new" className="mt-2 text-sm text-saffron underline">
-                Start the first one
+      {/* People you may know - ranked + actionable Follow */}
+      {people.length > 0 ? (
+        <Reveal>
+          <section className="mt-12">
+            <div className="flex items-center justify-between gap-3">
+              <SectionLabel icon={<Sparkles className="size-3" />}>People you may know</SectionLabel>
+              <Link href="/network" className="text-xs font-medium text-saffron transition-colors hover:text-saffron-dk">
+                See all
               </Link>
             </div>
-          )}
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {people.map((p) => (
+                <SuggestedPersonCard key={p.id} person={p} state={relationships[p.id]} />
+              ))}
+            </div>
+          </section>
+        </Reveal>
+      ) : null}
+
+      <div className="mt-12 grid gap-6 lg:grid-cols-3">
+        {/* Projects for you - matched + real */}
+        <Reveal className="lg:col-span-2">
+          <section className="card h-full p-6">
+            <div className="flex items-center justify-between gap-3">
+              <SectionLabel icon={<Briefcase className="size-3" />}>Projects for you</SectionLabel>
+              <Link href="/collabs" className="text-xs font-medium text-saffron transition-colors hover:text-saffron-dk">
+                Browse all
+              </Link>
+            </div>
+            {projects.length > 0 ? (
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                {projects.map((p) => (
+                  <SuggestedProjectCard key={p.id} project={p} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-6 flex flex-col items-center justify-center rounded-lg border border-dashed border-bone bg-paper/50 py-12 text-center">
+                <p className="text-sm text-ash">No open projects yet.</p>
+                <Link href="/collabs/new" className="mt-2 text-sm text-saffron underline">
+                  Start the first one
+                </Link>
+              </div>
+            )}
+          </section>
         </Reveal>
 
-        {/* Trending */}
+        {/* Trending now - one real source of truth */}
         <Reveal delay={0.1}>
           <article className="card h-full p-6">
-            <div className="flex items-center gap-2 text-caption">
-              <TrendingUp className="size-3" /> Trending now
+            <SectionLabel icon={<TrendingUp className="size-3" />}>Trending now</SectionLabel>
+            <div className="mt-5">
+              <TrendingTags tags={trending} variant="card" />
             </div>
-            {trending.length > 0 ? (
-              <ul className="mt-6 space-y-1">
-                {trending.map((t, i) => (
-                  <li key={t.tag}>
-                    <Link
-                      href={`/t/${t.tag}`}
-                      className="group/tag -mx-2 flex items-baseline gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-cream"
-                    >
-                      <span className="font-serif text-2xl text-saffron tabular-nums">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink transition-colors group-hover/tag:text-saffron">
-                          #{t.tag}
-                        </p>
-                        <p className="text-xs text-ash tabular-nums">
-                          {t.count} {t.count === 1 ? "post" : "posts"}
-                        </p>
-                      </div>
-                      <ChevronRight className="size-4 shrink-0 self-center text-ash opacity-0 transition-all group-hover/tag:translate-x-0.5 group-hover/tag:opacity-100" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-6 text-sm text-ash">No trends yet. Post something with a #hashtag to start one.</p>
-            )}
           </article>
         </Reveal>
 
-        {/* New people */}
-        <Reveal>
-          <article className="card h-full p-6">
-            <div className="flex items-center gap-2 text-caption">
-              <Sparkles className="size-3" /> People you may know
-            </div>
-            {suggested.length > 0 ? (
-              <ul className="mt-6 space-y-1">
-                {suggested.map((p) => (
-                  <li key={p.id}>
-                    <Link
-                      href={`/u/${p.handle}`}
-                      className="group/p -mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-cream"
-                    >
-                      <Avatar name={p.name} src={p.avatar_url ?? undefined} size="sm" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-ink transition-colors group-hover/p:text-saffron">{p.name}</p>
-                        <p className="truncate text-xs text-ash">
-                          {[p.branch, p.college].filter(Boolean).join(" . ") || "On Collab47"}
-                        </p>
-                      </div>
-                      <ChevronRight className="size-4 shrink-0 text-ash opacity-0 transition-all group-hover/p:translate-x-0.5 group-hover/p:opacity-100" />
-                    </Link>
-                  </li>
+        {/* Hashtag discovery cloud - sized by real use_count */}
+        {tagCloud.length > 0 ? (
+          <Reveal className="lg:col-span-2">
+            <article className="card h-full p-6">
+              <SectionLabel icon={<Hash className="size-3" />}>Explore hashtags</SectionLabel>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {tagCloud.map((t) => (
+                  <Link key={t.tag} href={`/t/${t.tag}`} className="transition-opacity hover:opacity-80">
+                    <Tag variant={t.forYou ? "saffron" : "outline"}>
+                      #{t.tag}
+                      <span className="ml-1.5 text-[10px] tabular-nums opacity-70">{t.count}</span>
+                    </Tag>
+                  </Link>
                 ))}
-              </ul>
-            ) : (
-              <p className="mt-6 text-sm text-ash">No one to suggest yet.</p>
-            )}
-          </article>
-        </Reveal>
+              </div>
+            </article>
+          </Reveal>
+        ) : null}
 
-        {/* College leaderboard */}
-        <Reveal delay={0.1} className="lg:col-span-2">
+        {/* College leaderboard - SQL aggregate, honest counts */}
+        <Reveal delay={0.1}>
           <article className="card h-full p-6">
-            <div className="flex items-center gap-2 text-caption">
-              <Trophy className="size-3" /> Colleges by members
-            </div>
+            <SectionLabel icon={<Trophy className="size-3" />}>Colleges by members</SectionLabel>
             {leaderboard.length > 0 ? (
               <ul className="mt-4 divide-y divide-bone">
                 {leaderboard.map((c, i) => (
                   <li key={c.name} className="flex items-center justify-between gap-3 py-3">
-                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
                       <span
-                        className={`w-8 shrink-0 text-center font-serif text-2xl tabular-nums sm:text-3xl ${
-                          i === 0 ? "text-gold" : i < 3 ? "text-saffron" : "text-ink/40"
+                        className={`w-7 shrink-0 text-center font-serif text-2xl tabular-nums ${
+                          i === 0 ? "text-gold" : i < 3 ? "text-saffron" : "text-ash"
                         }`}
                       >
                         {i + 1}

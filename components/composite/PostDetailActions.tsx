@@ -179,7 +179,7 @@ export function PostDetailActions({
         await navigator.share({ title: "Post on Collab47", url });
         return;
       } catch {
-        /* cancelled or unsupported — fall back to copying */
+        /* cancelled or unsupported - fall back to copying */
       }
     }
     try {
@@ -203,7 +203,7 @@ export function PostDetailActions({
         onMouseEnter={openReactionPopover}
         onMouseLeave={cancelReactionPopover}
       >
-        {/* Reaction popover — clamped so it never spills past the viewport edge. */}
+        {/* Reaction popover - clamped so it never spills past the viewport edge. */}
         {reactionPopoverOpen ? (
           <div
             className="absolute bottom-full left-0 z-50 mb-1.5 flex max-w-[calc(100vw-2rem)] items-center gap-0.5 overflow-x-auto rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10 sm:gap-1 sm:overflow-visible"
@@ -318,7 +318,7 @@ export function PostDetailActions({
         {copied ? <span className="text-xs font-medium text-moss">Copied!</span> : null}
       </button>
 
-      {/* Report — pushed to the far end of the row */}
+      {/* Report - pushed to the far end of the row */}
       <button
         type="button"
         onClick={() => setReportOpen(true)}

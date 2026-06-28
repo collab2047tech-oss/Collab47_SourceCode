@@ -13,7 +13,7 @@ export default async function ProfileEditPage() {
     <div className="mx-auto max-w-2xl">
       <div className="rule-top">
         <p className="text-caption">Profile</p>
-        <h1 className="mt-4 text-display-md text-ink">Edit profile</h1>
+        <h1 className="mt-4 text-3xl leading-tight text-ink sm:text-4xl md:text-display-md">Edit profile</h1>
       </div>
 
       <div className="mt-10">
@@ -27,6 +27,9 @@ export default async function ProfileEditPage() {
           city={p.city ?? ""}
           avatar_url={p.avatar_url ?? null}
           cover_url={p.cover_url ?? null}
+          banner_preset={p.banner_preset ?? null}
+          cover_focal_x={p.cover_focal_x ?? 50}
+          cover_focal_y={p.cover_focal_y ?? 50}
           links={p.links ?? null}
         />
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { PersonCard, type PersonCardState } from "@/components/composite/PersonCard";
 import type { MiniProfile, RelationshipState } from "@/lib/db/social";
@@ -25,6 +25,13 @@ export function NetworkTabs({
 }: NetworkTabsProps) {
   const [tab, setTab] = useState<TabId>("connections");
 
+  // Ids the viewer follows; lets the Followers tab show "Following" for people
+  // the viewer already follows back, even when relStates lacks an entry.
+  const followingIds = useMemo(
+    () => new Set(following.map((p) => p.id)),
+    [following]
+  );
+
   const tabs: { id: TabId; label: string; data: MiniProfile[] }[] = [
     { id: "connections", label: "Connections", data: connections },
     { id: "followers", label: "Followers", data: followers },
@@ -34,6 +41,13 @@ export function NetworkTabs({
 
   const activeData = tabs.find((t) => t.id === tab)?.data ?? [];
 
+  const emptyCopy: Record<TabId, string> = {
+    connections: "No connections yet. Connect with people from your college below.",
+    followers: "No followers yet. Share your profile to grow your network.",
+    following: "You are not following anyone yet. See people you may know below.",
+    pending: "No requests waiting. Connect with someone to get started.",
+  };
+
   function stateFor(personId: string): PersonCardState {
     if (tab === "pending") return { pending: true };
     // Connections tab lists accepted connections by definition.
@@ -41,7 +55,12 @@ export function NetworkTabs({
     // Followers / Following: reflect the viewer's real relationship so buttons
     // read "Connected" / "Following" instead of "Follow".
     const rel = relStates[personId];
-    if (!rel) return tab === "following" ? { isFollowing: true } : {};
+    if (!rel) {
+      // Following tab: a listed person is followed by definition.
+      if (tab === "following") return { isFollowing: true };
+      // Followers tab: only show "Following" if the viewer follows them back.
+      return followingIds.has(personId) ? { isFollowing: true } : {};
+    }
     return {
       isFollowing: rel.isFollowing,
       isConnected: rel.isConnected,
@@ -81,8 +100,8 @@ export function NetworkTabs({
 
       {/* Grid */}
       {activeData.length === 0 ? (
-        <p className="mt-10 rounded-lg border border-dashed border-bone bg-paper/60 py-12 text-center text-sm text-ash">
-          Nothing here yet.
+        <p className="mt-10 rounded-lg border border-dashed border-bone bg-paper py-12 text-center text-sm text-ink/70">
+          {emptyCopy[tab]}
         </p>
       ) : (
         <div

@@ -4,7 +4,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseConfigured } from "@/lib/supab
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-const GATED_PREFIXES = ["/home", "/explore", "/network", "/messages", "/profile", "/settings", "/notifications", "/onboarding", "/collabs"];
+const GATED_PREFIXES = ["/home", "/explore", "/network", "/messages", "/profile", "/settings", "/notifications", "/onboarding", "/collabs", "/events", "/analytics", "/queue"];
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: req });

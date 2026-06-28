@@ -23,7 +23,7 @@ export function ShareButton({ path, label = "Share", shareTitle, shareText, clas
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard blocked — nothing more we can do */
+      /* clipboard blocked - nothing more we can do */
     }
   }
 
@@ -35,7 +35,7 @@ export function ShareButton({ path, label = "Share", shareTitle, shareText, clas
         await navigator.share({ title: shareTitle, text: shareText, url });
         return;
       } catch {
-        // User cancelled or share failed — fall back to copying the link.
+        // User cancelled or share failed - fall back to copying the link.
       }
     }
     await copyLink(url);

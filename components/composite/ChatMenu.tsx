@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { MoreHorizontal, BellOff, Bell, Ban, ShieldCheck } from "lucide-react";
 import {
   blockUserAction,
   unblockUserAction,
   muteConversationAction,
 } from "@/app/(app)/messages/actions";
+import { useThread } from "@/components/messages/ThreadProvider";
 
 export function ChatMenu({
   conversationId,
@@ -21,12 +21,15 @@ export function ChatMenu({
   /** True if the current user has blocked the other party (enables Unblock). */
   blockedByMe?: boolean;
 }) {
+  const { setBlockedByMenu } = useThread();
   const [open, setOpen] = useState(false);
   const [muted, setMuted] = useState(initialMuted);
   const [blocked, setBlocked] = useState(blockedByMe);
   const [isPending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+
+  // Seed the composer's blocked footer from the server-resolved state.
+  useEffect(() => setBlockedByMenu(blockedByMe), [blockedByMe, setBlockedByMenu]);
 
   // Keep local state in sync if the server re-renders with fresh props.
   useEffect(() => setMuted(initialMuted), [initialMuted]);
@@ -54,14 +57,14 @@ export function ChatMenu({
   function block() {
     if (!otherUserId) return;
     setOpen(false);
+    // Optimistic: flip the composer to the blocked footer instantly (no reload).
     setBlocked(true);
+    setBlockedByMenu(true);
     startTransition(async () => {
       const r = await blockUserAction(otherUserId);
-      if (r.ok) {
-        // Refresh so the thread + composer reflect the blocked state.
-        router.refresh();
-      } else {
+      if (!r.ok) {
         setBlocked(false);
+        setBlockedByMenu(false);
       }
     });
   }
@@ -70,12 +73,12 @@ export function ChatMenu({
     if (!otherUserId) return;
     setOpen(false);
     setBlocked(false);
+    setBlockedByMenu(false);
     startTransition(async () => {
       const r = await unblockUserAction(otherUserId);
-      if (r.ok) {
-        router.refresh();
-      } else {
+      if (!r.ok) {
         setBlocked(true);
+        setBlockedByMenu(true);
       }
     });
   }

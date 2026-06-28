@@ -3,7 +3,7 @@
  * Renders a compact vertical list of news cards in the right rail.
  */
 
-import { getNewsForUser } from "@/lib/news/fetch";
+import { getRankedNewsForUser } from "@/lib/news/fetch";
 import type { NewsItem } from "@/lib/supabase/types";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
@@ -17,13 +17,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// `items` lets the parent fetch once (e.g. inside its own Promise.all) and pass
+// the ranked list down, so the rail and any mobile copy share a single fetch.
+// When omitted, the rail self-fetches via the full viewer-aware ranker.
 interface NewsRailProps {
-  branch?: string;
-  city?: string;
+  items?: NewsItem[];
 }
 
-export async function NewsRail({ branch, city }: NewsRailProps) {
-  const items: NewsItem[] = await getNewsForUser(branch, city, 6);
+export async function NewsRail({ items: provided }: NewsRailProps = {}) {
+  const items: NewsItem[] = (provided ?? (await getRankedNewsForUser(6))).slice(0, 6);
 
   return (
     <section>
@@ -32,7 +34,7 @@ export async function NewsRail({ branch, city }: NewsRailProps) {
           Daily brief
         </p>
         <p className="mt-0.5 text-xs text-ash">
-          Career news for your branch
+          Top stories for you
         </p>
       </div>
 

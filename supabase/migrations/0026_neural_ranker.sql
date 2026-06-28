@@ -1,13 +1,13 @@
 -- ========================================================================
--- Neural feed ranker — training-data capture + model store.
+-- Neural feed ranker - training-data capture + model store.
 --   feed_training : the per-(viewer,post) feature vector AS SERVED (the model's
 --                   X). Joined with feed_events/likes (the label y) by the
 --                   offline trainer. RLS: a user only writes their own rows.
 --   ranker_model  : the single trained model (logreg or MLP weights, jsonb) +
 --                   its holdout AUC. `active` gates whether the live feed uses
---                   it — it stays FALSE (MCDM engine) until trained on real data
+--                   it - it stays FALSE (MCDM engine) until trained on real data
 --                   and proven to beat chance.
--- Training is OFFLINE (scripts/train-ranker.mjs via GitHub Actions) — zero
+-- Training is OFFLINE (scripts/train-ranker.mjs via GitHub Actions) - zero
 -- deployment cost. Inference is a plain-JS forward pass at serve time.
 -- ========================================================================
 

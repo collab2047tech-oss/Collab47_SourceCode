@@ -7,7 +7,7 @@ import { extractFeatures, N_FEATURES } from "@/lib/ranker/features";
 import { isValidModel, type RankerModel } from "@/lib/ranker/model";
 
 // Self-referential repost originals are resolved by attachReposts() (a batched
-// second query) — PostgREST cannot embed posts->posts by FK hint.
+// second query) - PostgREST cannot embed posts->posts by FK hint.
 // Author cohort fields (college/branch/city/year) drive field/location matching.
 const SELECT =
   "*, author:profiles!posts_author_id_fkey(handle,name,avatar_url,college,branch,city,year_of_study,verified)";
@@ -18,9 +18,24 @@ function liveFilter<T extends { is: (...a: any[]) => T; or: (...a: any[]) => T }
   return q.is("deleted_at", null).or("expires_at.is.null,expires_at.gt.now()");
 }
 
+/**
+ * Engagement rate with Bayesian/Laplace shrink.
+ *
+ * eng = weighted reactions/comments/reposts/saves; impr = real reach (0 when
+ * never recorded). The +C prior regresses low-reach posts toward 0 so a post
+ * with 1 like and 0 measured impressions does NOT out-rank a post seen by 500
+ * people. This removes the old magic `?? 30` that inflated unseen posts.
+ */
 function engagementScore(p: PostWithAuthor): number {
-  const impr = (p as PostWithAuthor & { impressions?: number }).impressions ?? 30;
-  return (p.like_count + 2 * p.comment_count + 3 * p.repost_count + 4 * p.bookmark_count) / (impr + 10);
+  const eng = p.like_count + 2 * p.comment_count + 3 * p.repost_count + 4 * p.bookmark_count;
+  const impr = (p as PostWithAuthor & { impressions?: number }).impressions ?? 0;
+  const C = 20; // smoothing prior: until ~20 impressions, regress toward 0
+  return eng / (impr + C);
+}
+
+/** Raw engagement count (used for Popular's minimum-signal floor). */
+function rawEngagement(p: PostWithAuthor): number {
+  return p.like_count + p.comment_count + p.repost_count + p.bookmark_count;
 }
 
 // Build an OR tsquery from the user's interests + branch (sanitised). Empty -> null.
@@ -33,14 +48,115 @@ function buildInterestTsQuery(interests: string[], branch?: string | null): stri
   return [...new Set(terms)].join(" | ");
 }
 
+// ---------------------------------------------------------------------------
+// Feed preferences + shared post-filters (honoured by EVERY tab)
+// ---------------------------------------------------------------------------
+
+export interface FeedPrefs {
+  only_follows: boolean;
+  hide_projects: boolean;
+}
+
+/** Apply hide_projects (and any future content prefs) to a ranked pool. */
+function applyPrefs(posts: PostWithAuthor[], prefs: FeedPrefs): PostWithAuthor[] {
+  if (!prefs.hide_projects) return posts;
+  return posts.filter((p) => !(p as { project_id?: string | null }).project_id);
+}
+
+// ---------------------------------------------------------------------------
+// Pagination contract
+// ---------------------------------------------------------------------------
+
+export type FeedTab = "foryou" | "recent" | "popular" | "trending";
+
+export interface FeedPage {
+  posts: PostWithAuthor[];
+  /** Opaque cursor for the next page; null = exhausted. */
+  nextCursor: string | null;
+}
+
+export interface FeedPageOptions {
+  cursor?: string | null;
+  limit?: number;
+  prefs?: FeedPrefs;
+  /** Post ids already on screen - excluded from the next For-You page. */
+  excludeIds?: string[];
+}
+
 /**
- * For You — the classical feed engine.
+ * Single paginated entry point. The client has ONE server action that calls
+ * this; it dispatches per tab and returns a uniform { posts, nextCursor }.
+ */
+export async function getFeedPage(tab: FeedTab, opts: FeedPageOptions = {}): Promise<FeedPage> {
+  const limit = opts.limit ?? 12;
+  const prefs: FeedPrefs = opts.prefs ?? { only_follows: false, hide_projects: false };
+  switch (tab) {
+    case "recent":
+      return getRecentFeedPage({ before: opts.cursor ?? null, limit, prefs });
+    case "popular":
+      return getPopularFeedPage({ offset: cursorToOffset(opts.cursor), limit, prefs });
+    case "trending":
+      return getTrendingFeedPage({ offset: cursorToOffset(opts.cursor), limit, prefs });
+    case "foryou":
+    default:
+      return getForYouFeedPage({ excludeIds: opts.excludeIds ?? [], limit, prefs });
+  }
+}
+
+function cursorToOffset(cursor?: string | null): number {
+  const n = cursor ? parseInt(cursor, 10) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Public feed functions.
+// Overloaded for backward compatibility: passing a plain `limit: number`
+// returns just the post array (legacy callers e.g. explore); passing an options
+// object (or nothing) returns a paginated { posts, nextCursor }.
+// ---------------------------------------------------------------------------
+
+export async function getForYouFeed(limit: number): Promise<PostWithAuthor[]>;
+export async function getForYouFeed(opts?: { excludeIds?: string[]; limit?: number; prefs?: FeedPrefs }): Promise<FeedPage>;
+export async function getForYouFeed(arg?: number | { excludeIds?: string[]; limit?: number; prefs?: FeedPrefs }) {
+  if (typeof arg === "number") return (await getForYouFeedPage({ limit: arg })).posts;
+  return getForYouFeedPage(arg);
+}
+
+export async function getRecentFeed(limit: number): Promise<PostWithAuthor[]>;
+export async function getRecentFeed(opts?: { before?: string | null; limit?: number; prefs?: FeedPrefs }): Promise<FeedPage>;
+export async function getRecentFeed(arg?: number | { before?: string | null; limit?: number; prefs?: FeedPrefs }) {
+  if (typeof arg === "number") return (await getRecentFeedPage({ limit: arg })).posts;
+  return getRecentFeedPage(arg);
+}
+
+export async function getPopularFeed(limit: number): Promise<PostWithAuthor[]>;
+export async function getPopularFeed(opts?: { offset?: number; limit?: number; prefs?: FeedPrefs }): Promise<FeedPage>;
+export async function getPopularFeed(arg?: number | { offset?: number; limit?: number; prefs?: FeedPrefs }) {
+  if (typeof arg === "number") return (await getPopularFeedPage({ limit: arg })).posts;
+  return getPopularFeedPage(arg);
+}
+
+export async function getTrendingFeed(limit: number): Promise<PostWithAuthor[]>;
+export async function getTrendingFeed(opts?: { offset?: number; limit?: number; prefs?: FeedPrefs }): Promise<FeedPage>;
+export async function getTrendingFeed(arg?: number | { offset?: number; limit?: number; prefs?: FeedPrefs }) {
+  if (typeof arg === "number") return (await getTrendingFeedPage({ limit: arg })).posts;
+  return getTrendingFeedPage(arg);
+}
+
+/**
+ * For You - the classical feed engine.
  * Recall (follows + interest/branch overlap + recent) -> BM25/FTS relevancy ->
  * MCDM Tchebycheff scoring -> greedy diversity. Honours feed_prefs + feedback.
+ *
+ * Pagination: re-ranks fresh on each page, excluding ids already on screen
+ * (`excludeIds`) so pages are deduped without a fragile keyset on a JS score.
  */
-export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
+async function getForYouFeedPage(opts: { excludeIds?: string[]; limit?: number; prefs?: FeedPrefs } = {}): Promise<FeedPage> {
+  const limit = opts.limit ?? 12;
+  const excludeIds = opts.excludeIds ?? [];
+  const prefOverride = opts.prefs;
   const sb = await getSupabaseServer();
-  if (!sb) return [];
+  if (!sb) return { posts: [], nextCursor: null };
 
   const { data: { user } } = await sb.auth.getUser();
 
@@ -80,10 +196,10 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
       city: (prof?.city as string | null) ?? null,
     };
     const fp = (prof?.feed_prefs as { only_follows?: boolean; hide_projects?: boolean } | null) ?? null;
-    onlyFollows = Boolean(fp?.only_follows);
-    hideProjects = Boolean(fp?.hide_projects);
+    onlyFollows = prefOverride ? prefOverride.only_follows : Boolean(fp?.only_follows);
+    hideProjects = prefOverride ? prefOverride.hide_projects : Boolean(fp?.hide_projects);
     followIds = (follows ?? []).map((f) => f.following_id as string);
-    if (onlyFollows && followIds.length === 0) return [];
+    if (onlyFollows && followIds.length === 0) return { posts: [], nextCursor: null };
     for (const f of feedback ?? []) notInterested.add(f.post_id as string);
     for (const s of seen ?? []) seenIds.add(s.post_id as string);
     blockedIds = (blockRows ?? []).map((r) =>
@@ -105,7 +221,7 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     const wj = rw?.weights as RankerWeights | undefined;
     if (wj && (rw?.n_samples ?? 0) >= 200 && typeof wj.match === "number") learnedWeights = wj;
 
-    // Trained NEURAL ranker — only used if it's marked active AND validates.
+    // Trained NEURAL ranker - only used if it's marked active AND validates.
     const { data: mdl } = await sb.from("ranker_model").select("model, active, n_features").eq("id", 1).maybeSingle();
     if (mdl?.active && mdl.n_features === N_FEATURES && isValidModel(mdl.model, N_FEATURES)) {
       model = mdl.model as RankerModel;
@@ -118,30 +234,39 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
       const { data: cohort } = await q;
       cohortAuthorIds = (cohort ?? []).map((c) => c.id as string);
     }
+  } else if (prefOverride) {
+    onlyFollows = prefOverride.only_follows;
+    hideProjects = prefOverride.hide_projects;
   }
+
+  // Already-served ids (this page must exclude them so infinite scroll dedupes).
+  const excludeSet = new Set(excludeIds);
 
   // RECALL: union of recent global + interest/branch-tag overlap (+ follows).
   const byId = new Map<string, PostWithAuthor>();
   const addAll = (rows: PostWithAuthor[] | null) => {
-    for (const r of rows ?? []) byId.set(r.id, r);
+    for (const r of rows ?? []) if (!excludeSet.has(r.id)) byId.set(r.id, r);
   };
+
+  // Over-fetch when paginating so excluded ids don't starve the next page.
+  const recallBoost = excludeIds.length > 0 ? 1 : 0;
 
   if (onlyFollows && followIds.length > 0) {
     const { data } = await liveFilter(sb.from("posts").select(SELECT))
       .in("author_id", followIds)
       .order("created_at", { ascending: false })
-      .limit(80);
+      .limit(80 + recallBoost * 60);
     addAll(data as PostWithAuthor[] | null);
   } else {
     // Semantic recall: expand the viewer's interests to RELATED tags via the
     // taxonomy (so "AI/ML" also recalls #llm / #deeplearning), capped for the query.
     const expanded = expandTagList([...interests, ...(branch ? [branch] : [])]).slice(0, 60);
     const queries: PromiseLike<unknown>[] = [
-      liveFilter(sb.from("posts").select(SELECT)).order("created_at", { ascending: false }).limit(60),
+      liveFilter(sb.from("posts").select(SELECT)).order("created_at", { ascending: false }).limit(60 + recallBoost * 60),
     ];
     if (expanded.length > 0) {
       queries.push(
-        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", expanded).order("created_at", { ascending: false }).limit(50)
+        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", expanded).order("created_at", { ascending: false }).limit(50 + recallBoost * 40)
       );
       if (branch) {
         queries.push(
@@ -175,52 +300,65 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
       checkContent(p.body).ok &&
       !(hideProjects && (p as { project_id?: string | null }).project_id)
   );
-  if (pool.length === 0) return [];
+  if (pool.length === 0) return { posts: [], nextCursor: null };
 
-  // BM25/FTS relevancy: which candidates match the user's interest tsquery.
+  // BM25/FTS relevancy, item-based CF, and Personalised PageRank are three
+  // INDEPENDENT signal sources. The FTS match (on the pool ids) and the PPR
+  // second-degree fetch don't depend on each other or on the CF chain; the CF
+  // chain is internally sequential (my-likes -> co-likers -> co-liked) but can
+  // run concurrently with the other two. Run all three at once.
   const relevancy = new Map<string, number>();
+  const cf = new Map<string, number>();
+  const ppr = new Map<string, number>();
   const tsq = buildInterestTsQuery(interests, branch);
-  if (tsq && pool.length > 0) {
+
+  // PPR first hop is pure JS (no query) - seed it before the concurrent fetch.
+  if (user) {
+    for (const f of followIds) ppr.set(f, 1.0);
+  }
+
+  const ftsMatch = async () => {
+    if (!tsq || pool.length === 0) return;
     const { data: matched } = await sb
       .from("posts")
       .select("id")
       .in("id", pool.map((p) => p.id))
       .textSearch("search_tsv", tsq);
     for (const m of matched ?? []) relevancy.set(m.id as string, 1);
-  }
+  };
 
   // Item-based Collaborative Filtering (live, bounded, classical): people who
   // liked what I liked also liked X -> boost X. Pure co-occurrence counts.
-  const cf = new Map<string, number>();
-  const ppr = new Map<string, number>();
-  if (user) {
+  const cfChain = async () => {
+    if (!user) return;
     const { data: myLikes } = await sb.from("likes").select("post_id").eq("user_id", user.id).limit(100);
     const myLikedIds = (myLikes ?? []).map((r) => r.post_id as string);
-    if (myLikedIds.length > 0) {
-      const { data: coLikers } = await sb
-        .from("likes").select("user_id").in("post_id", myLikedIds).neq("user_id", user.id).limit(800);
-      const coSet = [...new Set((coLikers ?? []).map((r) => r.user_id as string))].slice(0, 400);
-      if (coSet.length > 0) {
-        const { data: coLiked } = await sb.from("likes").select("post_id").in("user_id", coSet).limit(2000);
-        const counts = new Map<string, number>();
-        for (const r of coLiked ?? []) counts.set(r.post_id as string, (counts.get(r.post_id as string) ?? 0) + 1);
-        const max = Math.max(1, ...counts.values());
-        for (const [pid, c] of counts) cf.set(pid, c / max);
-      }
+    if (myLikedIds.length === 0) return;
+    const { data: coLikers } = await sb
+      .from("likes").select("user_id").in("post_id", myLikedIds).neq("user_id", user.id).limit(800);
+    const coSet = [...new Set((coLikers ?? []).map((r) => r.user_id as string))].slice(0, 400);
+    if (coSet.length === 0) return;
+    const { data: coLiked } = await sb.from("likes").select("post_id").in("user_id", coSet).limit(2000);
+    const counts = new Map<string, number>();
+    for (const r of coLiked ?? []) counts.set(r.post_id as string, (counts.get(r.post_id as string) ?? 0) + 1);
+    const max = Math.max(1, ...counts.values());
+    for (const [pid, c] of counts) cf.set(pid, c / max);
+  };
+
+  // Personalised PageRank (approx, network science): 1st degree = 1.0, 2nd = 0.5.
+  const pprFetch = async () => {
+    if (!user || followIds.length === 0) return;
+    const { data: second } = await sb.from("follows").select("following_id").in("follower_id", followIds).limit(2000);
+    for (const r of second ?? []) {
+      const a = r.following_id as string;
+      if (!ppr.has(a)) ppr.set(a, 0.5);
     }
-    // Personalised PageRank (approx, network science): 1st degree = 1.0, 2nd = 0.5.
-    for (const f of followIds) ppr.set(f, 1.0);
-    if (followIds.length > 0) {
-      const { data: second } = await sb.from("follows").select("following_id").in("follower_id", followIds).limit(2000);
-      for (const r of second ?? []) {
-        const a = r.following_id as string;
-        if (!ppr.has(a)) ppr.set(a, 0.5);
-      }
-    }
-  }
+  };
+
+  await Promise.all([ftsMatch(), cfChain(), pprFetch()]);
 
   // Velocity ("hot right now"): engagement of posts younger than 6h, normalised.
-  // The freshness/virality signal — what's accelerating in the last few hours.
+  // The freshness/virality signal - what's accelerating in the last few hours.
   const velocity = new Map<string, number>();
   const fresh = pool.filter((p) => (Date.now() - new Date(p.created_at).getTime()) / 3.6e6 < 6);
   if (fresh.length > 0) {
@@ -254,41 +392,127 @@ export async function getForYouFeed(limit = 12): Promise<PostWithAuthor[]> {
     void sb.from("feed_training").insert(rows);
   }
 
-  return attachReposts(sb, served);
+  const posts = await attachReposts(sb, served);
+  // More pages likely exist while we keep filling a full page from a deep pool.
+  const nextCursor = served.length >= limit && pool.length > served.length ? String(excludeIds.length + served.length) : null;
+  return { posts, nextCursor };
 }
 
-/** Recent — reverse-chronological from people you follow. Empty if no follows. */
-export async function getRecentFeed(limit = 12): Promise<PostWithAuthor[]> {
+/**
+ * Recent - reverse-chronological from people you follow PLUS your own posts, so
+ * a post you just made shows up immediately. New users (no follows) fall back to
+ * a recent-global discovery stream instead of a dead empty tab. Keyset on
+ * created_at via the `before` cursor.
+ */
+async function getRecentFeedPage(
+  opts: { before?: string | null; limit?: number; prefs?: FeedPrefs } = {}
+): Promise<FeedPage> {
+  const limit = opts.limit ?? 12;
+  const before = opts.before ?? null;
+  const prefs = opts.prefs ?? { only_follows: false, hide_projects: false };
   const sb = await getSupabaseServer();
-  if (!sb) return [];
+  if (!sb) return { posts: [], nextCursor: null };
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) return [];
-  const { data: follows } = await sb.from("follows").select("following_id").eq("follower_id", user.id);
-  const ids = (follows ?? []).map((f) => f.following_id as string);
-  if (ids.length === 0) return [];
-  const { data } = await liveFilter(sb.from("posts").select(SELECT))
-    .in("author_id", ids)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  return attachReposts(sb, (data as unknown as PostWithAuthor[]) ?? []);
+
+  // Authors whose posts fill the Recent tab: the people you follow PLUS yourself.
+  // CRITICAL: when you follow nobody, we must NOT collapse to "your own posts
+  // only" (that shows a lone repost and feels broken). Instead we leave the
+  // author filter OFF entirely so Recent becomes a real global discovery stream
+  // of everything new across Collab47. This matches recentIsDiscovery().
+  let ids: string[] = [];
+  if (user) {
+    const { data: follows } = await sb.from("follows").select("following_id").eq("follower_id", user.id);
+    const followIds = (follows ?? []).map((f) => f.following_id as string);
+    if (followIds.length > 0) {
+      // Has follows -> their posts + your own, reverse-chron.
+      ids = [...followIds, user.id];
+    }
+    // No follows -> ids stays empty -> global discovery below (includes your own).
+  }
+
+  // Over-fetch by 1 to detect whether a further page exists.
+  let q = liveFilter(sb.from("posts").select(SELECT));
+  if (ids.length > 0) {
+    q = q.in("author_id", ids);
+  }
+  // hide_projects must be applied IN SQL (not just post-fetch) so that limit+1
+  // counts only the rows that survive the filter - otherwise a page padded with
+  // project posts shrinks below `limit` and the stream terminates early.
+  if (prefs.hide_projects) {
+    q = q.is("project_id", null);
+  }
+  // else: no user / no follows -> recent-global discovery stream (never dead).
+  q = q.order("created_at", { ascending: false }).limit(limit + 1);
+  if (before) q = q.lt("created_at", before);
+
+  const { data } = await q;
+  let rows = (data as unknown as PostWithAuthor[]) ?? [];
+  rows = applyPrefs(rows, prefs);
+
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit);
+  const nextCursor = hasMore && page.length > 0 ? page[page.length - 1].created_at : null;
+  const posts = await attachReposts(sb, page);
+  return { posts, nextCursor };
 }
 
-/** Popular — last 24h, ranked by engagement-per-impression. */
-export async function getPopularFeed(limit = 12): Promise<PostWithAuthor[]> {
+/** Whether the Recent tab is falling back to a global discovery stream. */
+export async function recentIsDiscovery(): Promise<boolean> {
   const sb = await getSupabaseServer();
-  if (!sb) return [];
+  if (!sb) return true;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return true;
+  const { count } = await sb
+    .from("follows")
+    .select("following_id", { count: "exact", head: true })
+    .eq("follower_id", user.id);
+  return (count ?? 0) === 0;
+}
+
+/**
+ * Popular - last 24h, ranked by the shrunk engagement RATE (real impressions),
+ * with a minimum-signal floor so zero-engagement posts never rank as popular.
+ * The 24h candidate set is bounded, so we rank in JS and page by score offset.
+ */
+async function getPopularFeedPage(
+  opts: { offset?: number; limit?: number; prefs?: FeedPrefs } = {}
+): Promise<FeedPage> {
+  const limit = opts.limit ?? 12;
+  const offset = opts.offset ?? 0;
+  const prefs = opts.prefs ?? { only_follows: false, hide_projects: false };
+  const sb = await getSupabaseServer();
+  if (!sb) return { posts: [], nextCursor: null };
+
+  const followIds = prefs.only_follows ? await getFollowIds(sb) : null;
+  if (prefs.only_follows && (!followIds || followIds.length === 0)) return { posts: [], nextCursor: null };
+
   const since = new Date(Date.now() - 24 * 3.6e6).toISOString();
-  const { data } = await liveFilter(sb.from("posts").select(SELECT))
-    .gte("created_at", since)
-    .limit(120);
-  const rows = (data as unknown as PostWithAuthor[]) ?? [];
-  return attachReposts(sb, rows.sort((a, b) => engagementScore(b) - engagementScore(a)).slice(0, limit));
+  let q = liveFilter(sb.from("posts").select(SELECT)).gte("created_at", since);
+  if (followIds) q = q.in("author_id", followIds);
+  const { data } = await q.limit(200);
+
+  let rows = (data as unknown as PostWithAuthor[]) ?? [];
+  rows = applyPrefs(rows, prefs)
+    .filter((p) => rawEngagement(p) >= 1) // minimum-signal floor
+    .sort((a, b) => engagementScore(b) - engagementScore(a));
+
+  return sliceWindow(sb, rows, offset, limit);
 }
 
-/** Trending — last 6h, branch+city boosted, ranked by recent engagement. */
-export async function getTrendingFeed(limit = 12): Promise<PostWithAuthor[]> {
+/**
+ * Trending - true VELOCITY (engagement acceleration) in a short window, branch +
+ * city aware (multiplicative boost). Never silently mirrors Popular: if the 6h
+ * window is empty it widens to 12h, still velocity-ranked.
+ */
+async function getTrendingFeedPage(
+  opts: { offset?: number; limit?: number; prefs?: FeedPrefs } = {}
+): Promise<FeedPage> {
+  const limit = opts.limit ?? 12;
+  const offset = opts.offset ?? 0;
+  const prefs = opts.prefs ?? { only_follows: false, hide_projects: false };
   const sb = await getSupabaseServer();
-  if (!sb) return [];
+  if (!sb) return { posts: [], nextCursor: null };
+
   const { data: { user } } = await sb.auth.getUser();
   let branch: string | null = null;
   let city: string | null = null;
@@ -297,19 +521,78 @@ export async function getTrendingFeed(limit = 12): Promise<PostWithAuthor[]> {
     branch = (prof?.branch as string | null) ?? null;
     city = (prof?.city as string | null) ?? null;
   }
-  const since = new Date(Date.now() - 6 * 3.6e6).toISOString();
-  const { data } = await liveFilter(sb.from("posts").select(SELECT))
-    .gte("created_at", since)
-    .limit(120);
-  let rows = (data as unknown as PostWithAuthor[]) ?? [];
-  if (rows.length === 0) return getPopularFeed(limit);
 
-  const boost = (p: PostWithAuthor) => {
-    let b = engagementScore(p);
-    if (branch && (p.branch_tags ?? []).some((t) => t.toLowerCase() === branch!.toLowerCase())) b += 0.5;
-    if (city && (p.city_tags ?? []).some((t) => t.toLowerCase() === city!.toLowerCase())) b += 0.3;
-    return b;
+  const followIds = prefs.only_follows ? await getFollowIds(sb) : null;
+  if (prefs.only_follows && (!followIds || followIds.length === 0)) return { posts: [], nextCursor: null };
+
+  // Candidate windows WIDEN until enough genuinely-engaged posts exist, so a
+  // quiet hour never makes a lone zero-engagement repost "trend". A minimum-
+  // signal floor (real reactions/comments/reposts/saves) is the key guard:
+  // posts with no engagement are NOT trending, they are just recent.
+  const WINDOWS = [6, 24, 72, 168];
+  let rows: PostWithAuthor[] = [];
+  for (let i = 0; i < WINDOWS.length; i++) {
+    const w = applyPrefs(await fetchWindow(sb, WINDOWS[i], followIds), prefs).filter(
+      (p) => rawEngagement(p) >= 1
+    );
+    if (w.length >= 3 || i === WINDOWS.length - 1) {
+      rows = w;
+      break;
+    }
+  }
+  if (rows.length === 0) return { posts: [], nextCursor: null };
+
+  // Velocity = engagement RATE, decayed by age so fresher-but-engaged posts rise
+  // above older ones, with a multiplicative branch/city boost.
+  const vmax = Math.max(1e-6, ...rows.map(engagementScore));
+  const branchL = branch?.toLowerCase();
+  const cityL = city?.toLowerCase();
+  const now = Date.now();
+  const score = (p: PostWithAuthor) => {
+    let v = engagementScore(p) / vmax; // 0..1 base velocity
+    const ageH = (now - new Date(p.created_at).getTime()) / 3.6e6;
+    v *= Math.exp(-ageH / 72); // recency decay: "what's hot now", not last week
+    if (branchL && (p.branch_tags ?? []).some((t) => t.toLowerCase() === branchL)) v *= 1.25;
+    if (cityL && (p.city_tags ?? []).some((t) => t.toLowerCase() === cityL)) v *= 1.15;
+    return v;
   };
-  rows = rows.sort((a, b) => boost(b) - boost(a)).slice(0, limit);
-  return attachReposts(sb, rows);
+  rows = rows.sort((a, b) => score(b) - score(a));
+
+  return sliceWindow(sb, rows, offset, limit);
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getFollowIds(sb: any): Promise<string[] | null> {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return null;
+  const { data } = await sb.from("follows").select("following_id").eq("follower_id", user.id);
+  return (data ?? []).map((f: { following_id: string }) => f.following_id);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchWindow(sb: any, hours: number, followIds: string[] | null): Promise<PostWithAuthor[]> {
+  const since = new Date(Date.now() - hours * 3.6e6).toISOString();
+  let q = liveFilter(sb.from("posts").select(SELECT)).gte("created_at", since);
+  if (followIds) q = q.in("author_id", followIds);
+  const { data } = await q.limit(200);
+  return (data as unknown as PostWithAuthor[]) ?? [];
+}
+
+/** Slice a JS-ranked array by offset and attach reposts; cursor = next offset. */
+async function sliceWindow(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sb: any,
+  ranked: PostWithAuthor[],
+  offset: number,
+  limit: number
+): Promise<FeedPage> {
+  const page = ranked.slice(offset, offset + limit);
+  const nextOffset = offset + limit;
+  const nextCursor = nextOffset < ranked.length ? String(nextOffset) : null;
+  const posts = await attachReposts(sb, page);
+  return { posts, nextCursor };
 }

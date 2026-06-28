@@ -3,6 +3,10 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { declineRequestAction } from "@/app/(app)/messages/actions";
+import {
+  useMessagesStore,
+  type RailConversation,
+} from "@/components/messages/MessagesProvider";
 import { cn } from "@/lib/cn";
 import { X } from "lucide-react";
 
@@ -17,12 +21,23 @@ export function DeclineRequestButton({
   redirectTo,
 }: DeclineRequestButtonProps) {
   const router = useRouter();
+  const store = useMessagesStore();
   const [isPending, startTransition] = useTransition();
 
   function handleDecline() {
+    // Snapshot the row so we can restore it if the server decline fails.
+    const snapshot: RailConversation | undefined = store?.requests.find(
+      (c) => c.id === conversationId
+    );
+    // Optimistic: remove the row instantly.
+    store?.removeConversation(conversationId);
     startTransition(async () => {
       const r = await declineRequestAction(conversationId);
-      if (r.ok && redirectTo) router.push(redirectTo);
+      if (r.ok) {
+        if (redirectTo) router.push(redirectTo);
+      } else if (snapshot) {
+        store?.restoreConversation(snapshot);
+      }
     });
   }
 

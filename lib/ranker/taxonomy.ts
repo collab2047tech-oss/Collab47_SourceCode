@@ -5,7 +5,7 @@
 // #datascience, and "Web Dev" matches #react / #nextjs / #frontend.
 //
 // This is the classical, no-ML substitute for embeddings: human-curated meaning.
-// Edit/extend freely — it is just data. Everything is lowercased + #-stripped.
+// Edit/extend freely - it is just data. Everything is lowercased + #-stripped.
 // ===========================================================================
 
 /** Each cluster = a set of mutually-related tags (a "topic"). */

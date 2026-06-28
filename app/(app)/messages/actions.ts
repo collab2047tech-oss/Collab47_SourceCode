@@ -11,6 +11,8 @@ import {
   blockUser,
   unblockUser,
   muteConversation,
+  getConversationMessages,
+  type MessageWithSender,
 } from "@/lib/db/messages";
 import { getMyConnections, type MiniProfile } from "@/lib/db/social";
 import { getSupabaseServer } from "@/lib/supabase/server";
@@ -20,11 +22,12 @@ import type { DMPermission } from "@/lib/supabase/types";
 export async function sendMessageAction(formData: FormData) {
   const conversationId = formData.get("conversationId") as string;
   const body = formData.get("body") as string;
+  const clientId = (formData.get("client_id") as string | null)?.trim() || undefined;
   // Image is uploaded client-side directly to Storage; we only receive the URL
   // (so files never hit the Server Action's 1MB body limit).
   let imageUrl = (formData.get("image_url") as string | null)?.trim() || undefined;
 
-  // Only accept media URLs that point at OUR Supabase Storage public path —
+  // Only accept media URLs that point at OUR Supabase Storage public path -
   // never persist an arbitrary attacker-supplied URL onto a message row.
   if (imageUrl && !imageUrl.startsWith(`${SUPABASE_URL}/storage/v1/object/public/`)) {
     imageUrl = undefined;
@@ -34,10 +37,28 @@ export async function sendMessageAction(formData: FormData) {
     return { ok: false, error: "Missing fields" };
   }
 
-  const result = await sendMessage({ conversationId, body: (body ?? "").trim(), imageUrl });
-  revalidatePath(`/messages/${conversationId}`);
-  revalidatePath("/messages");
-  return result;
+  // No revalidatePath here: display is fully optimistic (the temp bubble shows
+  // instantly) and reconciled by the realtime INSERT echo + the MessagesProvider
+  // rail update, so a heavy server re-render of the whole thread/inbox on every
+  // send would only fight the realtime channel and re-introduce the ~1s lag.
+  return sendMessage({
+    conversationId,
+    body: (body ?? "").trim(),
+    imageUrl,
+    clientId,
+  });
+}
+
+/**
+ * Load the page of OLDER messages immediately preceding `beforeIso` for the
+ * "Load earlier" affordance. Keyset pagination on created_at; returns ascending.
+ */
+export async function loadEarlierAction(
+  conversationId: string,
+  beforeIso: string
+): Promise<MessageWithSender[]> {
+  if (!conversationId || !beforeIso) return [];
+  return getConversationMessages(conversationId, { before: beforeIso, limit: 50 });
 }
 
 export async function startConversationAction(

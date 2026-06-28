@@ -89,20 +89,20 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-cream">
-      <div className="container-edit flex min-h-dvh items-center justify-center py-20">
-        <Reveal className="w-full max-w-md">
-          <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
+ <main className="min-h-dvh bg-cream">
+ <div className="container-edit flex min-h-dvh items-center justify-center py-20">
+ <Reveal className="w-full max-w-md">
+ <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
             Collab47.
           </Link>
-          <h1 className="mt-12 font-serif text-5xl text-ink">
-            Welcome <span className="italic text-saffron">back.</span>
+ <h1 className="mt-12 font-serif text-5xl text-ink">
+ Welcome <span className="text-saffron">back.</span>
           </h1>
-          <p className="mt-4 text-body text-ash">
+ <p className="mt-4 text-body text-ash">
             Sign in to your portfolio. Pick up where you left off.
           </p>
 
-          <form onSubmit={signInEmail} className="mt-10 space-y-4">
+ <form onSubmit={signInEmail} className="mt-10 space-y-4">
             <Input
               label="Email"
               type="email"
@@ -121,31 +121,31 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
-            <div className="flex justify-end">
+ <div className="flex justify-end">
               <Link
                 href="/forgot-password"
-                className="text-sm text-ash underline underline-offset-4 hover:text-saffron"
+ className="text-sm text-ash underline underline-offset-4 hover:text-saffron"
               >
                 Forgot password?
               </Link>
             </div>
-            <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
-              Sign in <ArrowRight className="size-4" />
+ <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+ Sign in <ArrowRight className="size-4" />
             </Button>
           </form>
 
-          <div className="my-8 flex items-center gap-4">
-            <span className="h-px flex-1 bg-bone" />
-            <span className="text-caption">or</span>
-            <span className="h-px flex-1 bg-bone" />
+ <div className="my-8 flex items-center gap-4">
+ <span className="h-px flex-1 bg-bone" />
+ <span className="text-caption">or</span>
+ <span className="h-px flex-1 bg-bone" />
           </div>
 
-          <div className="space-y-3">
+ <div className="space-y-3">
             {GOOGLE_AUTH_ENABLED ? (
               <Button
                 variant="secondary"
                 size="lg"
-                className="w-full justify-center"
+ className="w-full justify-center"
                 onClick={signInGoogle}
                 disabled={loading}
               >
@@ -156,11 +156,11 @@ export default function LoginPage() {
                 type="button"
                 disabled
                 title="Google sign-in is coming soon. Use email for now."
-                aria-label="Continue with Google — coming soon"
-                className="flex h-14 w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-ink/10 bg-transparent px-7 text-lg font-medium text-ash opacity-60"
+                aria-label="Continue with Google - coming soon"
+ className="flex h-14 w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-ink/10 bg-transparent px-7 text-lg font-medium text-ash opacity-60"
               >
                 Continue with Google
-                <span className="rounded-full bg-bone px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ash">
+ <span className="rounded-full bg-bone px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-ash">
                   Coming soon
                 </span>
               </button>
@@ -169,14 +169,14 @@ export default function LoginPage() {
 
           {PHONE_AUTH_ENABLED ? (
             <>
-              <div className="my-8 flex items-center gap-4">
-                <span className="h-px flex-1 bg-bone" />
-                <span className="text-caption">or phone</span>
-                <span className="h-px flex-1 bg-bone" />
+ <div className="my-8 flex items-center gap-4">
+ <span className="h-px flex-1 bg-bone" />
+ <span className="text-caption">or phone</span>
+ <span className="h-px flex-1 bg-bone" />
               </div>
 
               {step === "phone" ? (
-                <form onSubmit={sendOtp} className="space-y-4">
+ <form onSubmit={sendOtp} className="space-y-4">
                   <Input
                     label="Phone (India)"
                     type="tel"
@@ -186,12 +186,12 @@ export default function LoginPage() {
                     onChange={(e) => setPhone(e.target.value)}
                     required
                   />
-                  <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
-                    Send OTP <ArrowRight className="size-4" />
+ <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+ Send OTP <ArrowRight className="size-4" />
                   </Button>
                 </form>
               ) : (
-                <form onSubmit={verifyOtp} className="space-y-4">
+ <form onSubmit={verifyOtp} className="space-y-4">
                   <Input
                     label="6-digit code"
                     type="text"
@@ -203,13 +203,13 @@ export default function LoginPage() {
                     onChange={(e) => setOtp(e.target.value)}
                     required
                   />
-                  <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
-                    Verify <ArrowRight className="size-4" />
+ <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+ Verify <ArrowRight className="size-4" />
                   </Button>
                   <button
                     type="button"
                     onClick={() => setStep("phone")}
-                    className="block w-full text-center text-sm text-ash underline"
+ className="block w-full text-center text-sm text-ash underline"
                   >
                     Change phone
                   </button>
@@ -219,12 +219,12 @@ export default function LoginPage() {
           ) : null}
 
           {error ? (
-            <p className="mt-4 rounded-md bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>
+ <p className="mt-4 rounded-md bg-ember/10 px-3 py-2 text-sm text-ember">{error}</p>
           ) : null}
 
-          <p className="mt-8 text-center text-sm text-ash">
+ <p className="mt-8 text-center text-sm text-ash">
             New here?{" "}
-            <Link href="/signup" className="text-saffron underline underline-offset-4">
+ <Link href="/signup" className="text-saffron underline underline-offset-4">
               Create an account
             </Link>
           </p>

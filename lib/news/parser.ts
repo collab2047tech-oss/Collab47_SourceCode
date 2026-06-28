@@ -38,6 +38,20 @@ function cleanText(raw: string): string {
   return decodeEntities(stripHtml(stripCdata(raw))).trim();
 }
 
+/**
+ * Some feeds (notably Hacker News via hnrss) ship a <description> that is pure
+ * link metadata - "Article URL: ... Comments URL: ... Points: N # Comments: N" -
+ * with no real prose. Strip those tokens; if nothing readable remains, return ""
+ * so the item carries no junk excerpt. Defensive: the HN source itself is gone.
+ */
+const META_TOKENS = /\b(Article URL|Comments URL|Points|#\s*Comments)\s*:?\s*\S*/gi;
+function stripFeedMetadata(s: string): string {
+  if (!META_TOKENS.test(s)) return s;
+  const out = s.replace(META_TOKENS, " ").replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim();
+  // If what's left is too short to be a real sentence, treat it as empty.
+  return out.split(/\s+/).filter(Boolean).length >= 6 ? out : "";
+}
+
 /** Pull the first capture of a regex out of a string. Returns "" if not found. */
 function extract(pattern: RegExp, src: string): string {
   const m = src.match(pattern);
@@ -71,9 +85,9 @@ export function parseRss(xml: string): ParsedArticle[] {
     url = cleanText(url);
     if (!url || !url.startsWith("http")) continue;
 
-    // Excerpt from <description>
+    // Excerpt from <description> (with feed-metadata boilerplate stripped).
     const rawDesc = extract(/<description[^>]*>([\s\S]*?)<\/description>/i, block);
-    const excerpt = cleanText(rawDesc).slice(0, 280);
+    const excerpt = stripFeedMetadata(cleanText(rawDesc)).slice(0, 280);
 
     // Image: try <enclosure url="..."> first, then <media:content url="...">
     let image_url: string | null = null;

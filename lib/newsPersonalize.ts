@@ -1,5 +1,5 @@
 /**
- * Client-only news personalisation. Lives entirely in localStorage — NO database
+ * Client-only news personalisation. Lives entirely in localStorage - NO database
  * writes, no extra load. Implements a lightweight TikTok-style loop: when you tap
  * "interested" on an article, topics from it gain weight, so the next shuffled
  * cycle floats similar stories up.
@@ -43,7 +43,7 @@ export function saveProfile(p: InterestProfile): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(p));
   } catch {
-    /* storage full / disabled — personalisation is best-effort */
+    /* storage full / disabled - personalisation is best-effort */
   }
 }
 

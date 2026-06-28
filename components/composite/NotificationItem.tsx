@@ -1,79 +1,97 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
 import { Avatar } from "@/components/primitives/Avatar";
 import { cn } from "@/lib/cn";
-import { markNotificationReadAction } from "@/app/(app)/notifications/actions";
+import { iconForKind } from "@/lib/ui/notificationKind";
+import { absoluteTime, relativeTime } from "@/lib/ui/time";
 
 export interface NotificationItemData {
   id: string;
   kind: string;
-  text: string;
+  /** Full message INCLUDING the actor name, e.g. "Asha started following you". */
+  message: string;
+  /** Actor display name. Used for the avatar + bolding the leading name only. */
   who: string;
-  when: string;
+  /** Raw ISO timestamp straight from the DB. Formatted client-side. */
+  createdAt: string;
   href: string;
   unread: boolean;
 }
 
 /**
  * A single, clickable notification row. Clicking marks the notification read
- * (clearing its dot + decrementing the bell badge) and then routes to the
- * notification's target. Renders a per-kind icon supplied by the page.
+ * (handled by the parent list, which owns optimistic state + the bell badge)
+ * and routes to the notification's target. Time is rendered client-side as a
+ * relative label with the exact local timestamp on hover.
+ *
+ * `now` is threaded from the parent so every row re-renders its relative label
+ * together on a shared 60s tick.
  */
 export function NotificationItem({
   item,
-  icon,
+  now,
+  onRead,
 }: {
   item: NotificationItemData;
-  icon: React.ReactNode;
+  now: number;
+  /** Called on a plain left-click of an unread row, before navigation. */
+  onRead: (id: string) => void;
 }) {
   const router = useRouter();
-  const [, startTransition] = useTransition();
-  // Optimistically clear the unread state the instant the row is clicked.
-  const [read, setRead] = useState(!item.unread);
+  const Icon = iconForKind(item.kind);
 
   function handleClick(e: React.MouseEvent) {
-    // Let modifier-clicks / middle-clicks fall through to the browser so users
-    // can still open in a new tab.
+    // Let modifier-clicks / middle-clicks fall through so users can open in a
+    // new tab; only intercept a plain left-click.
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
       return;
     }
     e.preventDefault();
-
-    const go = () => router.push(item.href);
-
-    if (item.unread && !read) {
-      setRead(true);
-      startTransition(async () => {
-        await markNotificationReadAction(item.id);
-      });
-    }
-    go();
+    if (item.unread) onRead(item.id);
+    router.push(item.href);
   }
 
-  const unread = item.unread && !read;
+  // The message already begins with the actor name; bold just that leading span
+  // instead of printing the name a second time (the old "Asha Asha ..." bug).
+  const startsWithWho =
+    item.who && item.message.toLowerCase().startsWith(item.who.toLowerCase());
 
   return (
     <a
       href={item.href}
       onClick={handleClick}
       className={cn(
-        "flex items-start gap-3 rounded-md px-2 py-4 transition-colors hover:bg-paper active:bg-bone/40 sm:gap-4 sm:py-5",
-        unread ? "bg-saffron/5" : ""
+        "flex items-start gap-3 rounded-md py-4 pr-2 transition-colors hover:bg-paper active:bg-bone/40 sm:gap-4 sm:py-5",
+        item.unread
+          ? "border-l-2 border-saffron bg-saffron/6 pl-3 sm:pl-4"
+          : "border-l-2 border-transparent pl-3 sm:pl-4"
       )}
     >
       <div className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-bone">
-        {icon}
-        {unread ? (
+        <Icon className="size-4 text-ink" />
+        {item.unread ? (
           <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-saffron ring-2 ring-cream" />
         ) : null}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-base text-ink">
-          <span className="font-semibold">{item.who}</span> {item.text}
+        <p className={cn("text-base text-ink", item.unread && "font-medium")}>
+          {startsWithWho ? (
+            <>
+              <span className="font-semibold">{item.message.slice(0, item.who.length)}</span>
+              {item.message.slice(item.who.length)}
+            </>
+          ) : (
+            item.message
+          )}
         </p>
-        <p className="mt-1 text-xs text-ash">{item.when}</p>
+        <time
+          dateTime={item.createdAt}
+          title={absoluteTime(item.createdAt)}
+          className="mt-1 block text-xs text-ash"
+        >
+          {relativeTime(item.createdAt, now)}
+        </time>
       </div>
       <Avatar name={item.who} size="sm" className="hidden shrink-0 sm:inline-flex" />
     </a>

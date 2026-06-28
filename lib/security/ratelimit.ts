@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Lightweight per-user write throttle. Counts the user's own recent rows in a
  * table over a sliding window and reports whether they are over the cap. Uses
  * the caller's RLS-scoped client (a user can always read their own rows), so no
- * extra table or infra is needed — real abuse protection, zero dependencies.
+ * extra table or infra is needed - real abuse protection, zero dependencies.
  *
  * Returns true when the action should be BLOCKED (limit exceeded).
  */

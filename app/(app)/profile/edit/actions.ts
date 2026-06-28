@@ -17,6 +17,16 @@ export async function updateProfileAction(formData: FormData) {
   const cover_url = (formData.get("cover_url") as string | null)?.trim() || undefined;
   // Explicit removal: the user cleared their avatar without picking a new one.
   const avatarRemoved = formData.get("avatar_removed") === "true";
+  // Banner: a preset id (empty = an uploaded cover is used) + the uploaded
+  // cover's focal point. cover_removed fires when the user switched to a preset.
+  const banner_preset = (formData.get("banner_preset") as string | null)?.trim() ?? null;
+  const coverRemoved = formData.get("cover_removed") === "true";
+  const focalRaw = {
+    x: Number(formData.get("cover_focal_x")),
+    y: Number(formData.get("cover_focal_y")),
+  };
+  const clampFocal = (n: number) =>
+    Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50;
 
   // Social links. Always send the object so cleared fields are persisted as removed.
   const linkField = (key: string) =>
@@ -41,7 +51,20 @@ export async function updateProfileAction(formData: FormData) {
   };
   if (avatar_url) payload.avatar_url = avatar_url;
   else if (avatarRemoved) payload.avatar_url = ""; // clear the saved avatar
-  if (cover_url) payload.cover_url = cover_url;
+
+  // Banner: preset and uploaded cover are mutually exclusive.
+  if (banner_preset) {
+    // A preset was chosen -> store it and clear any uploaded cover.
+    payload.banner_preset = banner_preset;
+    payload.cover_url = "";
+  } else {
+    // Upload mode -> no preset, keep/replace the cover + persist the focal point.
+    payload.banner_preset = "";
+    if (cover_url) payload.cover_url = cover_url;
+    else if (coverRemoved) payload.cover_url = "";
+    payload.cover_focal_x = clampFocal(focalRaw.x);
+    payload.cover_focal_y = clampFocal(focalRaw.y);
+  }
 
   const result = await updateProfile(payload);
   if (!result.ok) {

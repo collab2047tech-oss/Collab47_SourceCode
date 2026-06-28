@@ -3,7 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 /**
  * Server-side admin check. The ONLY source of truth for moderation privilege.
  * Must be called inside every moderation server action / db function BEFORE any
- * service-role operation — the admin route layout only guards page rendering,
+ * service-role operation - the admin route layout only guards page rendering,
  * not server actions (which are independently reachable POST endpoints).
  *
  * Fail-closed: no Supabase, no user, no ADMIN_HANDLES, or a handle not on the

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useRef, useState } from "react";
+import { useTransition, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
@@ -9,6 +9,11 @@ import { updateProfileAction } from "@/app/(app)/profile/edit/actions";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { prepareImageForUpload, IMAGE_ACCEPT } from "@/lib/media/compress";
 import type { ProfileLinks } from "@/lib/supabase/types";
+import { ProfileBanner } from "@/components/composite/ProfileBanner";
+import { BANNER_PRESETS, BANNER_FAMILIES, DEFAULT_BANNER, type BannerFamily } from "@/lib/data/banners";
+import { Check, Move, RotateCcw, Upload } from "lucide-react";
+
+const MAX_COVER_BYTES = 1_048_576; // 1 MB hard cap
 
 const BRANCHES = [
   "CSE",
@@ -48,8 +53,13 @@ interface ProfileEditFormProps {
   city: string;
   avatar_url: string | null;
   cover_url: string | null;
+  banner_preset: string | null;
+  cover_focal_x: number;
+  cover_focal_y: number;
   links?: ProfileLinks | null;
 }
+
+type BannerMode = "preset" | "upload";
 
 export function ProfileEditForm({
   name,
@@ -61,17 +71,29 @@ export function ProfileEditForm({
   city,
   avatar_url,
   cover_url,
+  banner_preset,
+  cover_focal_x,
+  cover_focal_y,
   links,
 }: ProfileEditFormProps) {
   const [isPending, startTransition] = useTransition();
   const [bioLen, setBioLen] = useState(bio.length);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(avatar_url);
-  const [coverPreview, setCoverPreview] = useState<string | null>(cover_url);
   // Tracks intent to clear the saved avatar so "Remove" actually persists.
   const [avatarRemoved, setAvatarRemoved] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ---- Banner state -------------------------------------------------------
+  // A banner is EITHER an uploaded cover (with focal point) OR a preset id.
+  const [bannerMode, setBannerMode] = useState<BannerMode>(cover_url ? "upload" : "preset");
+  const [presetId, setPresetId] = useState<string>(banner_preset || DEFAULT_BANNER);
+  const [coverPreview, setCoverPreview] = useState<string | null>(cover_url);
+  const [focalX, setFocalX] = useState<number>(cover_focal_x ?? 50);
+  const [focalY, setFocalY] = useState<number>(cover_focal_y ?? 50);
+  const [family, setFamily] = useState<BannerFamily>("gradient");
+  const stageRef = useRef<HTMLDivElement>(null);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -83,7 +105,33 @@ export function ProfileEditForm({
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setCoverPreview(URL.createObjectURL(file));
+    if (!file) return;
+    setError(null);
+    setCoverPreview(URL.createObjectURL(file));
+    setBannerMode("upload");
+    setFocalX(50);
+    setFocalY(50);
+  }
+
+  // Drag-to-reposition: map the pointer to a 0..100 focal point.
+  const repositionFromPointer = useCallback((clientX: number, clientY: number) => {
+    const el = stageRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, Math.round(((clientX - r.left) / r.width) * 100)));
+    const y = Math.min(100, Math.max(0, Math.round(((clientY - r.top) / r.height) * 100)));
+    setFocalX(x);
+    setFocalY(y);
+  }, []);
+
+  function handleStagePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    repositionFromPointer(e.clientX, e.clientY);
+  }
+  function handleStagePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.buttons !== 1) return;
+    repositionFromPointer(e.clientX, e.clientY);
   }
 
   async function uploadImage(
@@ -110,7 +158,9 @@ export function ProfileEditForm({
     data.delete("avatar");
     data.delete("cover");
     const avatarFile = avatarInputRef.current?.files?.[0] ?? null;
-    const coverFile = coverInputRef.current?.files?.[0] ?? null;
+    // Only treat the cover input as "uploading" when we are in upload mode AND
+    // a fresh file is staged. Picking a preset must never re-upload.
+    const coverFile = bannerMode === "upload" ? (coverInputRef.current?.files?.[0] ?? null) : null;
 
     setError(null);
     startTransition(async () => {
@@ -130,6 +180,11 @@ export function ProfileEditForm({
           }
           if (coverFile) {
             const toUpload = await prepareImageForUpload(coverFile);
+            // Hard 1 MB guard the brief requires (compression targets ~1 MB).
+            if (toUpload.size > MAX_COVER_BYTES) {
+              setError("Cover image is too large after compression. Please use an image under 1 MB.");
+              return;
+            }
             data.set("cover_url", await uploadImage(sb, user.id, toUpload, "covers"));
           }
         } catch (err) {
@@ -137,6 +192,22 @@ export function ProfileEditForm({
           return;
         }
       }
+
+      // Banner persistence rules (mutually exclusive):
+      if (bannerMode === "preset") {
+        // Preset chosen -> store the preset id, clear the uploaded cover.
+        data.set("banner_preset", presetId);
+        data.set("cover_url", "");
+        data.set("cover_removed", "true");
+      } else {
+        // Upload mode -> store focal point, clear the preset.
+        data.set("banner_preset", "");
+        data.set("cover_focal_x", String(focalX));
+        data.set("cover_focal_y", String(focalY));
+        // If the user is in upload mode but never staged a new file, keep the
+        // existing cover_url by NOT setting it (action leaves it unchanged).
+      }
+
       // Persist avatar removal (only when the user did not pick a new file).
       if (avatarRemoved && !avatarFile) {
         data.set("avatar_url", "");
@@ -153,25 +224,151 @@ export function ProfileEditForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Cover upload */}
+      {/* ---- Banner editor: presets OR upload + reposition ---- */}
       <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
-        <h2 className="font-serif text-2xl text-ink">Cover photo</h2>
-        <p className="mt-1 text-sm text-ash">Displayed at the top of your profile.</p>
-        <button
-          type="button"
-          className="group mt-4 relative block h-36 w-full rounded-lg border border-bone bg-cream overflow-hidden cursor-pointer sm:h-40"
-          onClick={() => coverInputRef.current?.click()}
-          aria-label="Change cover photo"
-        >
-          {coverPreview ? (
-            <img src={coverPreview} alt="Cover preview" className="size-full object-cover" />
-          ) : (
-            <div className="size-full bg-[linear-gradient(135deg,#0B1220_0%,#1a2744_55%,#0A0F1C_100%)]" />
-          )}
-          <div className="absolute inset-0 flex items-center justify-center bg-ink/30 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-            <span className="rounded-full border border-cream/30 bg-ink/40 px-3 py-1 text-sm font-medium text-cream backdrop-blur">Change cover</span>
+        <h2 className="font-serif text-2xl text-ink">Banner</h2>
+        <p className="mt-1 text-sm text-ash">
+          Pick a built-in banner or upload your own. This is what everyone sees at the top of your profile.
+        </p>
+
+        {/* Live preview - exactly what visitors will see */}
+        <div className="mt-4">
+          <ProfileBanner
+            coverUrl={bannerMode === "upload" ? coverPreview : null}
+            bannerPreset={bannerMode === "preset" ? presetId : null}
+            focalX={focalX}
+            focalY={focalY}
+            className="h-32 rounded-xl sm:h-40"
+            priority
+          />
+        </div>
+
+        {/* Mode tabs */}
+        <div className="mt-4 inline-flex rounded-lg border border-bone bg-cream p-1">
+          {([
+            { id: "preset" as BannerMode, label: "Presets" },
+            { id: "upload" as BannerMode, label: "Upload" },
+          ]).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setBannerMode(m.id)}
+              className={
+                "rounded-md px-4 py-1.5 text-sm font-medium transition-colors " +
+                (bannerMode === m.id ? "bg-paper text-ink shadow-sm" : "text-ash hover:text-ink")
+              }
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        {/* PRESETS */}
+        {bannerMode === "preset" ? (
+          <div className="mt-4">
+            {/* Family filter */}
+            <div className="flex flex-wrap gap-2">
+              {BANNER_FAMILIES.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFamily(f.id)}
+                  className={
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                    (family === f.id ? "border-transparent bg-ink text-cream" : "border-bone text-ash hover:text-ink")
+                  }
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Preset grid */}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {BANNER_PRESETS.filter((b) => b.family === family).map((b) => {
+                const selected = bannerMode === "preset" && presetId === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      setPresetId(b.id);
+                      setBannerMode("preset");
+                    }}
+                    aria-pressed={selected}
+                    className="group relative block overflow-hidden rounded-lg text-left"
+                    style={{ boxShadow: selected ? "0 0 0 2px #2C5BFF" : "0 0 0 1px #DDE3EE" }}
+                  >
+                    <ProfileBanner bannerPreset={b.id} className="h-16 sm:h-20" />
+                    {selected ? (
+                      <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-paper shadow">
+                        <Check className="size-3" strokeWidth={3} style={{ color: "#2C5BFF" }} />
+                      </span>
+                    ) : null}
+                    <span className="absolute bottom-1 left-1.5 rounded bg-ink/55 px-1.5 py-0.5 text-[10px] font-medium text-cream backdrop-blur-sm">
+                      {b.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </button>
+        ) : null}
+
+        {/* UPLOAD + REPOSITION */}
+        {bannerMode === "upload" ? (
+          <div className="mt-4">
+            {coverPreview ? (
+              <>
+                <div
+                  ref={stageRef}
+                  onPointerDown={handleStagePointerDown}
+                  onPointerMove={handleStagePointerMove}
+                  className="relative h-40 w-full cursor-grab touch-none select-none overflow-hidden rounded-xl border border-bone bg-cream active:cursor-grabbing sm:h-52"
+                  role="slider"
+                  aria-label="Drag to reposition your cover"
+                  aria-valuetext={`Focal point ${focalX}% from left, ${focalY}% from top`}
+                >
+                  <img
+                    src={coverPreview}
+                    alt="Cover preview"
+                    className="pointer-events-none absolute inset-0 size-full object-cover"
+                    style={{ objectPosition: `${focalX}% ${focalY}%` }}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <span className="flex items-center gap-1.5 rounded-full border border-cream/30 bg-ink/45 px-3 py-1 text-xs font-medium text-cream backdrop-blur">
+                      <Move className="size-3.5" /> Drag to reposition
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => coverInputRef.current?.click()}>
+                    <Upload className="size-3.5" /> Replace image
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => { setFocalX(50); setFocalY(50); }}
+                    className="inline-flex items-center gap-1.5 text-xs text-ash transition-colors hover:text-ink"
+                  >
+                    <RotateCcw className="size-3.5" /> Reset to center
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-ash">Images are compressed to under 1 MB. Drag the image to choose what shows.</p>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-bone bg-cream text-ash transition-colors hover:border-saffron hover:text-ink sm:h-52"
+              >
+                <Upload className="size-6" strokeWidth={1.5} />
+                <span className="text-sm font-medium">Upload a cover image</span>
+                <span className="text-xs">Up to 1 MB. We compress it for you.</span>
+              </button>
+            )}
+          </div>
+        ) : null}
+
         <input
           ref={coverInputRef}
           type="file"
@@ -252,7 +449,7 @@ export function ProfileEditForm({
             label="City"
             name="city"
             defaultValue={city}
-            placeholder="e.g. Amritsar"
+            placeholder="e.g. your city"
           />
         </div>
         <div className="mt-4 flex w-full flex-col gap-2">

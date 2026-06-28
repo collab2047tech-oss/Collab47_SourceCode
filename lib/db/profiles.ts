@@ -1,6 +1,51 @@
+import { cache } from "react";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
-import type { Profile } from "@/lib/supabase/types";
+import type { AccountType, Profile } from "@/lib/supabase/types";
+
+// ---------------------------------------------------------------------------
+// Change-limit helpers (full name + handle: one change per 7 days)
+// ---------------------------------------------------------------------------
+
+/** A name/handle may be changed once every 7 days. */
+export const CHANGE_WINDOW_DAYS = 7;
+const CHANGE_WINDOW_MS = CHANGE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+/** State of a single rate-limited field, computed from its last-changed stamp. */
+export interface ChangeWindow {
+  /** True when the field is currently locked (a change happened < 7 days ago). */
+  locked: boolean;
+  /** ISO timestamp when the field unlocks again, or null if never changed. */
+  nextAt: string | null;
+}
+
+/**
+ * Compute whether a field is changeable now, given its last-changed timestamp.
+ * A null timestamp (never changed) is always allowed. The server is the source
+ * of truth; the UI uses this purely to render advisory hints.
+ */
+export function computeChangeWindow(lastAt: string | null | undefined): ChangeWindow {
+  if (!lastAt) return { locked: false, nextAt: null };
+  const last = new Date(lastAt).getTime();
+  if (Number.isNaN(last)) return { locked: false, nextAt: null };
+  const next = last + CHANGE_WINDOW_MS;
+  if (Date.now() >= next) return { locked: false, nextAt: null };
+  return { locked: true, nextAt: new Date(next).toISOString() };
+}
+
+/** Format a date as e.g. "Jul 2" using the India locale. No em dashes. */
+function formatChangeDate(d: Date): string {
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+/** Friendly, exact lockout message for a rate-limited field. */
+function changeLimitMessage(field: "name" | "username", nextAt: Date): string {
+  const msUntil = nextAt.getTime() - Date.now();
+  const daysLeft = Math.max(1, Math.ceil(msUntil / (24 * 60 * 60 * 1000)));
+  const dayWord = daysLeft === 1 ? "day" : "days";
+  return `You can change your ${field} again in ${daysLeft} ${dayWord} (next change available on ${formatChangeDate(nextAt)}).`;
+}
 
 export async function getProfileByHandle(handle: string): Promise<Profile | null> {
   const sb = await getSupabaseServer();
@@ -9,23 +54,33 @@ export async function getProfileByHandle(handle: string): Promise<Profile | null
   return (data as Profile) ?? null;
 }
 
-export async function getMyProfile(): Promise<Profile | null> {
+export const getMyProfile = cache(async (): Promise<Profile | null> => {
   const sb = await getSupabaseServer();
   if (!sb) return null;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
   const { data } = await sb.from("profiles").select("*").eq("id", user.id).maybeSingle();
   return (data as Profile) ?? null;
-}
+});
 
 export async function upsertOnboardingProfile(payload: {
   handle: string;
   name: string;
-  college: string;
-  branch: string;
-  year_of_study: string;
-  city: string;
-  birthdate: string | null;
+  account_type: AccountType;
+  /** Listed institution or free text. Maps to the `college` column for
+   *  student/researcher/faculty (their lab/institution lives here too). */
+  college?: string;
+  /** Organization / company name for institution + industry account types. */
+  organization?: string;
+  /** Branch / field / department / industry depending on account type. */
+  branch?: string;
+  /** Student only. */
+  year_of_study?: string;
+  /** Role / job title (industry) - persisted into the `branch`-adjacent flow
+   *  is avoided; we keep role separate via bio-less mapping into `branch` only
+   *  when meaningful. Stored explicitly here for clarity. */
+  city?: string;
+  birthdate?: string | null;
   interests: string[];
 }) {
   const sb = await getSupabaseServer();
@@ -42,12 +97,24 @@ export async function upsertOnboardingProfile(payload: {
     .maybeSingle();
   if (clash) return { ok: false, error: "That username is taken. Pick another." };
 
-  const { error } = await sb.from("profiles").upsert({
+  // Persist only the fields relevant to the chosen account type. Unused
+  // columns are written as null so a re-onboard never leaves stale data.
+  const row = {
     id: user.id,
-    ...payload,
+    handle: payload.handle,
+    name: payload.name,
+    account_type: payload.account_type,
+    college: payload.college?.trim() || null,
+    organization: payload.organization?.trim() || null,
+    branch: payload.branch?.trim() || null,
+    year_of_study: payload.year_of_study?.trim() || null,
+    city: payload.city?.trim() || null,
     birthdate: payload.birthdate || null,
+    interests: payload.interests,
     onboarded: true,
-  });
+  };
+
+  const { error } = await sb.from("profiles").upsert(row);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
@@ -65,6 +132,11 @@ export async function updateProfile(payload: {
   city?: string;
   avatar_url?: string;
   cover_url?: string;
+  /** Built-in banner preset id. Empty string clears it (stored as null). */
+  banner_preset?: string;
+  /** Uploaded-cover focal point, 0..100. */
+  cover_focal_x?: number;
+  cover_focal_y?: number;
   /** Optional: social links keyed by platform (website/github/linkedin/...). */
   links?: Record<string, string>;
   /** Optional: new handle. Validated for format and uniqueness before saving. */
@@ -79,8 +151,48 @@ export async function updateProfile(payload: {
   if (!user) return { ok: false, error: "Not authenticated" };
 
   // Validate and check uniqueness of handle if provided.
-  const { handle, links, ...rest } = payload;
-  const updateFields: Record<string, unknown> = { ...rest, updated_at: new Date().toISOString() };
+  const { handle, links, banner_preset, ...rest } = payload;
+  const now = new Date();
+  const updateFields: Record<string, unknown> = { ...rest, updated_at: now.toISOString() };
+
+  // Fetch the current identity fields in one read. Used to (1) detect whether
+  // name/handle actually CHANGED (an unchanged value must not consume the
+  // 7-day window) and (2) enforce the change limit against the stored stamps.
+  const { data: currentRow } = await sb
+    .from("profiles")
+    .select("name, handle, last_name_change_at, last_handle_change_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  const current = (currentRow ?? null) as {
+    name: string | null;
+    handle: string | null;
+    last_name_change_at: string | null;
+    last_handle_change_at: string | null;
+  } | null;
+
+  // Name change limit: enforce only when the value actually differs.
+  if (rest.name !== undefined) {
+    const nextName = rest.name.trim();
+    if (current && nextName !== (current.name ?? "")) {
+      const win = computeChangeWindow(current.last_name_change_at);
+      if (win.locked && win.nextAt) {
+        return { ok: false, error: changeLimitMessage("name", new Date(win.nextAt)) };
+      }
+      updateFields.name = nextName;
+      updateFields.last_name_change_at = now.toISOString();
+    } else {
+      // Unchanged: do not stamp, do not write (keeps the value as-is).
+      delete updateFields.name;
+    }
+  }
+
+  // banner_preset: empty string means "no preset" -> store null so the upload
+  // path is unambiguous. A non-empty value is the chosen preset id.
+  if (banner_preset !== undefined) {
+    updateFields.banner_preset = banner_preset.trim() === "" ? null : banner_preset.trim();
+  }
+  // cover_url cleared via empty string -> store null (consistent with banner).
+  if (rest.cover_url === "") updateFields.cover_url = null;
 
   // Store only non-empty link values; an empty object clears all links.
   if (links !== undefined) {
@@ -93,17 +205,27 @@ export async function updateProfile(payload: {
   }
 
   if (handle !== undefined) {
-    if (!/^[a-z0-9_]{3,32}$/.test(handle)) {
-      return { ok: false, error: "Handle must be 3–32 lowercase letters, digits, or underscores." };
+    // Only enforce format / uniqueness / rate-limit when the handle CHANGES.
+    if (current && handle !== (current.handle ?? "")) {
+      if (!/^[a-z0-9_]{3,32}$/.test(handle)) {
+        return { ok: false, error: "Handle must be 3-32 lowercase letters, digits, or underscores." };
+      }
+      const { data: clash } = await sb
+        .from("profiles")
+        .select("id")
+        .eq("handle", handle)
+        .neq("id", user.id)
+        .maybeSingle();
+      if (clash) return { ok: false, error: "That handle is already taken. Pick another." };
+
+      const win = computeChangeWindow(current.last_handle_change_at);
+      if (win.locked && win.nextAt) {
+        return { ok: false, error: changeLimitMessage("username", new Date(win.nextAt)) };
+      }
+      updateFields.handle = handle;
+      updateFields.last_handle_change_at = now.toISOString();
     }
-    const { data: clash } = await sb
-      .from("profiles")
-      .select("id")
-      .eq("handle", handle)
-      .neq("id", user.id)
-      .maybeSingle();
-    if (clash) return { ok: false, error: "That handle is already taken. Pick another." };
-    updateFields.handle = handle;
+    // Unchanged handle: leave it untouched (no stamp, no write).
   }
 
   const { error } = await sb
@@ -141,13 +263,103 @@ export async function updatePrivacy(payload: {
 
   const merged = { ...(current?.privacy as Record<string, unknown> ?? {}), ...payload };
 
+  // Keep the first-class `is_private` column in sync with privacy.public_profile
+  // so RLS (which references is_private) and the jsonb stay consistent. When the
+  // caller does not touch public_profile, leave is_private untouched.
+  const update: Record<string, unknown> = { privacy: merged };
+  if (payload.public_profile !== undefined) {
+    update.is_private = payload.public_profile === false;
+  }
+
   const { error } = await sb
     .from("profiles")
-    .update({ privacy: merged })
+    .update(update)
     .eq("id", user.id);
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Private-profile read gating (Instagram-style)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether `viewerId` may see a profile's CONTENT (posts + project details).
+ * A public profile is always viewable. A private profile is viewable only by
+ * the owner or an accepted connection. This is the server-side gate that runs
+ * BEFORE we query posts; RLS (migration 0030) is the deeper defense-in-depth
+ * layer that also blocks a direct API bypass.
+ *
+ * Basics (banner, name, college/role, counts) are always visible per product;
+ * only the content list is gated here.
+ */
+export async function canViewProfileContent(
+  viewerId: string | null,
+  profile: Pick<Profile, "id" | "privacy">
+): Promise<boolean> {
+  const isPrivate =
+    (profile.privacy as { public_profile?: boolean } | null)?.public_profile === false;
+  if (!isPrivate) return true;
+  if (viewerId && viewerId === profile.id) return true;
+  if (!viewerId) return false;
+
+  const sb = await getSupabaseServer();
+  if (!sb) return false;
+  // Canonical pair ordering matches the connections table (user_a_id < user_b_id).
+  const [a, b] = viewerId < profile.id ? [viewerId, profile.id] : [profile.id, viewerId];
+  const { data } = await sb
+    .from("connections")
+    .select("status")
+    .eq("user_a_id", a)
+    .eq("user_b_id", b)
+    .eq("status", "accepted")
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/**
+ * Real counts for the private (and public) profile header, fetched without
+ * leaking any content. Uses head:true count queries so no rows are returned -
+ * just the aggregate. Connections + projects are world-readable.
+ *
+ * Posts are counted via the service-role admin client when available so a
+ * STRANGER viewing a private profile still sees the TRUE post total (the count
+ * is "basic info" per product) while the new posts RLS keeps the post BODIES
+ * hidden. We never return any post content here, only the integer.
+ */
+export async function getPublicProfileCounts(
+  profileId: string
+): Promise<{ connections: number; posts: number; projects: number }> {
+  const sb = await getSupabaseServer();
+  if (!sb) return { connections: 0, posts: 0, projects: 0 };
+
+  // Post count via admin client (accurate even for a stranger on a private
+  // profile). Falls back to the user-scoped client if the service key is unset.
+  const postCounter = getAdminClient() ?? sb;
+
+  const [connRes, postRes, projRes] = await Promise.all([
+    sb
+      .from("connections")
+      .select("user_a_id", { count: "exact", head: true })
+      .or(`user_a_id.eq.${profileId},user_b_id.eq.${profileId}`)
+      .eq("status", "accepted"),
+    postCounter
+      .from("posts")
+      .select("id", { count: "exact", head: true })
+      .eq("author_id", profileId)
+      .is("deleted_at", null),
+    sb
+      .from("project_members")
+      .select("project_id", { count: "exact", head: true })
+      .eq("user_id", profileId),
+  ]);
+
+  return {
+    connections: (connRes as { count: number | null }).count ?? 0,
+    posts: (postRes as { count: number | null }).count ?? 0,
+    projects: (projRes as { count: number | null }).count ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------

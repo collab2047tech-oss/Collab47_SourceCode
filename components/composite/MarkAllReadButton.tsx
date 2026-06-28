@@ -1,30 +1,30 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { CheckCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { markAllReadAction } from "@/app/(app)/notifications/actions";
 
 interface Props {
   /** Whether there are any unread notifications. Disables the button when false. */
   hasUnread: boolean;
+  /**
+   * Called when clicked. The parent list owns the optimistic flip (rows go read
+   * + the bell badge zeroes instantly) and fires the server action in the
+   * background, so this button just delegates.
+   */
+  onMarkAll: () => void;
 }
 
-export function MarkAllReadButton({ hasUnread }: Props) {
-  const [isPending, startTransition] = useTransition();
-  // Once clicked, treat as done locally so the button reflects the new state
-  // immediately even before the revalidation round-trip resolves.
+export function MarkAllReadButton({ hasUnread, onMarkAll }: Props) {
+  // Once clicked, reflect "done" locally so the label/disabled state updates
+  // instantly even though the parent's optimistic flip is what clears the rows.
   const [done, setDone] = useState(false);
-
-  const disabled = !hasUnread || done || isPending;
+  const disabled = !hasUnread || done;
 
   function handleClick() {
     if (disabled) return;
     setDone(true);
-    startTransition(async () => {
-      const res = await markAllReadAction();
-      if (!res.ok) setDone(false);
-    });
+    onMarkAll();
   }
 
   return (
@@ -40,12 +40,8 @@ export function MarkAllReadButton({ hasUnread }: Props) {
       )}
     >
       <CheckCheck className="size-4 shrink-0" />
-      <span className="hidden sm:inline">
-        {isPending ? "Marking..." : "Mark all as read"}
-      </span>
-      <span className="sm:hidden">
-        {isPending ? "Marking..." : "Mark read"}
-      </span>
+      <span className="hidden sm:inline">Mark all as read</span>
+      <span className="sm:hidden">Mark read</span>
     </button>
   );
 }

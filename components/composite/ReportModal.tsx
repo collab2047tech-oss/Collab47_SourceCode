@@ -8,10 +8,16 @@ import { cn } from "@/lib/cn";
 interface ReportModalProps {
   open: boolean;
   onClose: () => void;
-  targetType: "post" | "profile";
+  targetType: "post" | "profile" | "news";
   targetId: string;
   onSubmit: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
 }
+
+const TITLE_BY_TYPE: Record<ReportModalProps["targetType"], string> = {
+  post: "Report this post",
+  profile: "Report this profile",
+  news: "Report this story",
+};
 
 const CATEGORIES = [
   { id: "spam", label: "Spam or scam", desc: "Promotional, fake, or repetitive content." },
@@ -80,7 +86,7 @@ export function ReportModal({ open, onClose, targetType, targetId, onSubmit }: R
           <div>
             <p className="text-caption">Report</p>
             <h2 className="mt-1 font-serif text-2xl text-ink">
-              {targetType === "post" ? "Report this post" : "Report this profile"}
+              {TITLE_BY_TYPE[targetType]}
             </h2>
           </div>
           <button onClick={onClose} className="rounded-full p-1 text-ash transition-colors hover:bg-bone">

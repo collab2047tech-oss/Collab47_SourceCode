@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/primitives/Avatar";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
 import {
   Home,
   Compass,
@@ -14,9 +15,10 @@ import {
   Settings,
   Plus,
   Bell,
-  Search,
   Briefcase,
+  CalendarDays,
   Newspaper,
+  BarChart3,
   Menu,
   X,
 } from "lucide-react";
@@ -27,8 +29,10 @@ const nav = [
   { href: "/news", label: "News", icon: Newspaper },
   { href: "/network", label: "Network", icon: Users },
   { href: "/collabs", label: "Collabs", icon: Briefcase },
+  { href: "/events", label: "Events", icon: CalendarDays },
   { href: "/messages", label: "Messages", icon: MessageSquare },
-  { href: "/notifications", label: "Inbox", icon: Bell },
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -51,10 +55,13 @@ export function AppShell({
   children,
   me,
   unreadCount = 0,
+  messagesUnread = 0,
 }: {
   children: React.ReactNode;
   me: { name: string; handle: string; avatar_url: string | null } | null;
   unreadCount?: number;
+  /** Unread DM count, shown on the Messages nav item. */
+  messagesUnread?: number;
 }) {
   const path = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -63,6 +70,17 @@ export function AppShell({
   const badge = unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : null;
 
   const isActive = (href: string) => path === href || path?.startsWith(href + "/");
+
+  // The DM badge clears the moment the user is on any /messages route, matching
+  // the optimistic mark-read in the thread. The count is sourced from real
+  // conversation data (getMessageUnreadCount).
+  const onMessages = isActive("/messages");
+  const dmBadge =
+    !onMessages && messagesUnread > 0
+      ? messagesUnread > 9
+        ? "9+"
+        : String(messagesUnread)
+      : null;
 
   // Close the "More" sheet on navigation.
   useEffect(() => {
@@ -107,6 +125,7 @@ export function AppShell({
           <nav className="mt-8 flex flex-col gap-1">
             {nav.map((n) => {
               const active = isActive(n.href);
+              const showDm = n.href === "/messages" && dmBadge;
               return (
                 <Link
                   key={n.href}
@@ -119,6 +138,11 @@ export function AppShell({
                 >
                   <n.icon className="size-4" />
                   {n.label}
+                  {showDm ? (
+                    <span className="ml-auto inline-flex min-w-4 items-center justify-center rounded-full bg-saffron px-1 text-[10px] font-semibold text-cream">
+                      {dmBadge}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
@@ -143,19 +167,7 @@ export function AppShell({
           >
             C47.
           </Link>
-          <form
-            action="/explore"
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-bone bg-paper px-4 py-2 transition-colors focus-within:border-saffron/40 md:max-w-md"
-          >
-            <button type="submit" aria-label="Search" className="shrink-0 text-ash hover:text-ink">
-              <Search className="size-4" />
-            </button>
-            <input
-              name="q"
-              placeholder="Search people, posts, projects"
-              className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-ash"
-            />
-          </form>
+          <GlobalSearch className="min-w-0 flex-1 md:max-w-md" />
           <Link
             href="/notifications"
             aria-label="Notifications"
@@ -227,6 +239,7 @@ export function AppShell({
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around border-t border-bone bg-cream/95 px-1 py-1.5 backdrop-blur-md md:hidden">
         {BOTTOM_NAV.map((n) => {
           const active = isActive(n.href);
+          const showDm = n.href === "/messages" && dmBadge;
           return (
             <Link
               key={n.href}
@@ -237,7 +250,14 @@ export function AppShell({
                 active ? "text-saffron" : "text-ink/60 hover:text-ink"
               )}
             >
-              <n.icon className={cn("size-5 transition-transform", active && "scale-110")} />
+              <span className="relative">
+                <n.icon className={cn("size-5 transition-transform", active && "scale-110")} />
+                {showDm ? (
+                  <span className="absolute -right-1.5 -top-1 flex min-w-3.5 items-center justify-center rounded-full bg-saffron px-0.5 text-[9px] font-semibold leading-none text-cream">
+                    {dmBadge}
+                  </span>
+                ) : null}
+              </span>
               <span className="truncate">{n.label}</span>
             </Link>
           );

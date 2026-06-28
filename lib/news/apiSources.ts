@@ -1,7 +1,7 @@
 /**
  * Keyed news API adapters. Each returns ParsedArticle[] (with `content` for the
  * summariser where the API provides it). Server-only. An adapter with no key or
- * a failed request simply returns [] — one bad source never kills the run.
+ * a failed request simply returns [] - one bad source never kills the run.
  */
 
 import type { ParsedArticle } from "./parser";

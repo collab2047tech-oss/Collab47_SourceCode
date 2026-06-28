@@ -64,30 +64,30 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="min-h-dvh bg-cream">
-      <div className="container-edit flex min-h-dvh items-center justify-center py-20">
-        <Reveal className="w-full max-w-md">
-          <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
+ <main className="min-h-dvh bg-cream">
+ <div className="container-edit flex min-h-dvh items-center justify-center py-20">
+ <Reveal className="w-full max-w-md">
+ <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
             Collab47.
           </Link>
 
           {done ? (
             <>
-              <h1 className="mt-12 font-serif text-5xl text-ink">
-                Password <span className="italic text-saffron">updated.</span>
+ <h1 className="mt-12 font-serif text-5xl text-ink">
+ Password <span className="text-saffron">updated.</span>
               </h1>
-              <p className="mt-4 text-body text-ash">Signing you in…</p>
+ <p className="mt-4 text-body text-ash">Signing you in…</p>
             </>
           ) : (
             <>
-              <h1 className="mt-12 font-serif text-5xl text-ink">
-                Set a new <span className="italic text-saffron">password.</span>
+ <h1 className="mt-12 font-serif text-5xl text-ink">
+ Set a new <span className="text-saffron">password.</span>
               </h1>
-              <p className="mt-4 text-body text-ash">
+ <p className="mt-4 text-body text-ash">
                 Choose a password you will remember this time.
               </p>
 
-              <form onSubmit={updatePassword} className="mt-10 space-y-4">
+ <form onSubmit={updatePassword} className="mt-10 space-y-4">
                 <Input
                   label="New password"
                   type="password"
@@ -111,25 +111,25 @@ export default function ResetPasswordPage() {
                 <Button
                   type="submit"
                   size="lg"
-                  className="mt-4 w-full justify-center"
+ className="mt-4 w-full justify-center"
                   disabled={loading || !ready}
                 >
                   {loading ? "Saving…" : "Update password"}
-                  {!loading && <ArrowRight className="size-4" />}
+ {!loading && <ArrowRight className="size-4" />}
                 </Button>
               </form>
 
               {error ? (
-                <p className="mt-4 rounded-md bg-ember/10 px-3 py-2 text-sm text-ember">
+ <p className="mt-4 rounded-md bg-ember/10 px-3 py-2 text-sm text-ember">
                   {error}{" "}
-                  <Link href="/forgot-password" className="underline underline-offset-4">
+ <Link href="/forgot-password" className="underline underline-offset-4">
                     Request a new link
                   </Link>
                 </p>
               ) : null}
 
-              <p className="mt-8 text-center text-sm text-ash">
-                <Link href="/login" className="text-saffron underline underline-offset-4">
+ <p className="mt-8 text-center text-sm text-ash">
+ <Link href="/login" className="text-saffron underline underline-offset-4">
                   Back to sign in
                 </Link>
               </p>

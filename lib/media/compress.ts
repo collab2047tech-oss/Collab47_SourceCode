@@ -27,7 +27,7 @@ async function heicToJpeg(file: File): Promise<File> {
  * Prepare any image for upload: convert HEIC/HEIF -> JPEG, then compress to
  * ~1 MB / 1600 px. Accepts every browser-renderable format (JPEG/PNG/WebP/GIF/
  * AVIF/HEIC...). On any failure the most-usable version we have is returned so
- * the upload still succeeds — we never block the user on a transient error.
+ * the upload still succeeds - we never block the user on a transient error.
  */
 export async function compressImage(file: File): Promise<File> {
   let working = file;
@@ -37,7 +37,7 @@ export async function compressImage(file: File): Promise<File> {
     try {
       working = await heicToJpeg(file);
     } catch {
-      // Conversion failed — fall through and try to upload the original.
+      // Conversion failed - fall through and try to upload the original.
       return file;
     }
   }
@@ -60,18 +60,18 @@ export async function compressImage(file: File): Promise<File> {
   }
 }
 
-/** Alias — clearer name at call sites. */
+/** Alias - clearer name at call sites. */
 export const prepareImageForUpload = compressImage;
 
 // ---------------------------------------------------------------------------
 // Accept-attribute strings + validation for file <input>s
 // ---------------------------------------------------------------------------
 
-/** Broad accept for image inputs — every common format incl. Apple HEIC/HEIF. */
+/** Broad accept for image inputs - every common format incl. Apple HEIC/HEIF. */
 export const IMAGE_ACCEPT =
   "image/*,.heic,.heif,.avif,.webp,.jpg,.jpeg,.png,.gif";
 
-/** Broad accept for video inputs — every common container. */
+/** Broad accept for video inputs - every common container. */
 export const VIDEO_ACCEPT =
   "video/*,.mp4,.mov,.m4v,.webm,.avi,.mkv,.3gp";
 

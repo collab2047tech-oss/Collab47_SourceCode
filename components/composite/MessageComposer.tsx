@@ -1,45 +1,54 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { sendMessageAction } from "@/app/(app)/messages/actions";
 import { prepareImageForUpload, IMAGE_ACCEPT } from "@/lib/media/compress";
 import { Paperclip, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useThread } from "@/components/messages/ThreadProvider";
+import { useMessagesStore } from "@/components/messages/MessagesProvider";
 
 interface MessageComposerProps {
   conversationId: string;
-  /** Current user's id — stamped on typing broadcasts so peers can filter self. */
+  /** Current user's id - stamped on typing broadcasts so peers can filter self. */
   currentUserId?: string;
   canCompose?: boolean;
-  blockedReason?: string;
   /** Reason shown when canCompose is false (e.g. you blocked / were blocked). */
   cannotComposeReason?: string;
 }
 
 const TYPING_DEBOUNCE_MS = 800;
 
+/** A pending send's source data, kept so a failed send can be retried as-is. */
+interface PendingPayload {
+  body: string;
+  file: File | null;
+  localImageUrl?: string;
+}
+
 export function MessageComposer({
   conversationId,
   currentUserId,
   canCompose = true,
-  blockedReason,
   cannotComposeReason,
 }: MessageComposerProps) {
-  const router = useRouter();
+  const { pushOptimistic, confirmOptimistic, failOptimistic, blockedByMenu } =
+    useThread();
+  const store = useMessagesStore();
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [hint, setHint] = useState<string | null>(null);
-  const [localBlockedReason, setLocalBlockedReason] = useState<string | null>(
-    blockedReason ?? null
-  );
+  const [errorNote, setErrorNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
+  // Keep each pending send's payload so a failed bubble can be retried with the
+  // exact same clientId (deterministic reconciliation - no duplicate row).
+  const pendingRef = useRef<Map<string, PendingPayload>>(new Map());
 
   // Maintain ONE subscribed channel for typing broadcasts. Sending on an
   // unsubscribed channel is dropped, so we subscribe up front and reuse it.
@@ -73,9 +82,6 @@ export function MessageComposer({
     const file = e.target.files?.[0] ?? null;
     setImageFile(file);
     if (file) {
-      // HEIC/HEIF can't be rendered by browsers, so a data-URL preview shows a
-      // broken image. Skip the inline preview for those — the file still
-      // converts to JPEG and uploads fine on send.
       const isHeic =
         /image\/hei[cf]/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
       if (isHeic) {
@@ -96,92 +102,126 @@ export function MessageComposer({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!body.trim() && !imageFile) return;
-
-    const sb = getSupabaseBrowser();
-
-    startTransition(async () => {
-      // Upload image CLIENT-SIDE to Storage; only the URL goes to the action.
+  /**
+   * The actual network send, run OFF the critical path. The temp bubble is
+   * already on screen by the time this runs. Uploads the image, calls the
+   * action, then reconciles (confirm) or rolls the bubble to "failed".
+   */
+  const runSend = useCallback(
+    async (clientId: string, payload: PendingPayload) => {
+      const sb = getSupabaseBrowser();
       let image_url: string | undefined;
-      if (imageFile && sb) {
+
+      if (payload.file && sb) {
         try {
-          // Routes HEIC/HEIF (iPhone photos) -> JPEG and compresses all formats.
-          const toUpload = await prepareImageForUpload(imageFile);
+          const toUpload = await prepareImageForUpload(payload.file);
           const ext = toUpload.name.split(".").pop()?.toLowerCase() ?? "jpg";
-          const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-          const { error } = await sb.storage.from("message-media").upload(path, toUpload, { upsert: false });
+          const path = `${conversationId}/${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}.${ext}`;
+          const { error } = await sb.storage
+            .from("message-media")
+            .upload(path, toUpload, { upsert: false });
           if (error) throw error;
           const { data } = sb.storage.from("message-media").getPublicUrl(path);
           image_url = data.publicUrl;
         } catch {
-          setLocalBlockedReason("Image upload failed. Try a smaller file.");
+          failOptimistic(clientId, "Image upload failed.");
+          setErrorNote("Image upload failed. Tap the message to retry.");
           return;
         }
       }
 
       const fd = new FormData();
       fd.set("conversationId", conversationId);
-      fd.set("body", body.trim());
+      fd.set("body", payload.body);
+      fd.set("client_id", clientId);
       if (image_url) fd.set("image_url", image_url);
 
       const result = await sendMessageAction(fd);
 
-      if (result?.blockedReason) {
-        setLocalBlockedReason(`Cannot send: ${result.blockedReason}`);
-        return;
-      }
-
       if (result?.ok) {
-        setBody("");
-        setImageFile(null);
-        setImagePreview(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+        pendingRef.current.delete(clientId);
+        confirmOptimistic(clientId);
+        // Reorder the rail like WhatsApp; reconciled by the realtime echo too.
+        store?.bumpToTop(conversationId, {
+          last: payload.body || "Photo",
+          lastMessageAt: new Date().toISOString(),
+          unread: false,
+        });
         if (result.isRequest) {
           setHint("Your message went to their requests.");
           setTimeout(() => setHint(null), 4000);
-        } else {
-          setHint(null);
         }
-        setLocalBlockedReason(null);
-        // Fallback in case realtime is unavailable: re-fetch the server
-        // component so the just-sent message renders. Realtime INSERT handler
-        // in MessageThread dedupes by id, so this never double-renders.
-        router.refresh();
+      } else {
+        failOptimistic(clientId, result?.blockedReason ?? result?.error);
+        if (result?.blockedReason) {
+          setErrorNote(`Cannot send: ${result.blockedReason}`);
+        }
       }
-    });
+    },
+    [conversationId, confirmOptimistic, failOptimistic, store]
+  );
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim() && !imageFile) return;
+    setErrorNote(null);
+
+    const clientId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const text = body.trim();
+    const file = imageFile;
+    const localImageUrl = imagePreview ?? undefined;
+
+    // INSTANT: render the temp bubble, clear the input, keep focus, scroll.
+    pushOptimistic({ clientId, body: text, localImageUrl });
+    pendingRef.current.set(clientId, { body: text, file, localImageUrl });
+    setBody("");
+    removeImage();
+    inputRef.current?.focus();
+
+    // Background: upload + send + reconcile.
+    void runSend(clientId, { body: text, file, localImageUrl });
   }
 
-  if (!canCompose) {
+  // Retry a failed bubble (re-runs the same payload + clientId).
+  useEffect(() => {
+    function onRetry(e: Event) {
+      const detail = (e as CustomEvent).detail as { clientId?: string };
+      if (!detail?.clientId) return;
+      const payload = pendingRef.current.get(detail.clientId);
+      if (!payload) return;
+      void runSend(detail.clientId, payload);
+    }
+    window.addEventListener("c47:dm:retry", onRetry as EventListener);
+    return () =>
+      window.removeEventListener("c47:dm:retry", onRetry as EventListener);
+  }, [runSend]);
+
+  // Blocked from the menu (ChatMenu dispatches via ThreadProvider state).
+  if (!canCompose || blockedByMenu) {
     return (
-      <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
+      <footer className="border-t border-bone bg-paper px-3 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
         <p className="text-center text-sm text-ash">
-          {cannotComposeReason ?? "You cannot message this person."}
+          {blockedByMenu
+            ? "You blocked this person. Unblock from the menu to message them."
+            : cannotComposeReason ?? "You cannot message this person."}
         </p>
       </footer>
     );
   }
 
-  if (localBlockedReason && !body && !imageFile) {
-    return (
-      <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
-        <p className="text-center text-sm text-ember">{localBlockedReason}</p>
-      </footer>
-    );
-  }
-
   return (
-    <footer className="border-t border-bone bg-paper px-3 py-3 sm:px-6 sm:py-4">
-      {localBlockedReason && (
-        <p className="mb-2 text-sm text-ember">{localBlockedReason}</p>
-      )}
-      {hint && (
-        <p className="mb-2 text-sm text-ash">{hint}</p>
-      )}
+    <footer className="border-t border-bone bg-paper px-3 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      {errorNote && <p className="mb-2 text-sm text-ember">{errorNote}</p>}
+      {hint && <p className="mb-2 text-sm text-ash">{hint}</p>}
 
       {imagePreview && (
         <div className="relative mb-3 inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imagePreview}
             alt="Attachment preview"
@@ -233,10 +273,11 @@ export function MessageComposer({
             onChange={handleImageChange}
           />
           <input
+            ref={inputRef}
             value={body}
             onChange={handleBodyChange}
             placeholder="Write a message"
-            className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-ash"
+            className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ash"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -246,7 +287,7 @@ export function MessageComposer({
           />
           <button
             type="submit"
-            disabled={isPending || (!body.trim() && !imageFile)}
+            disabled={!body.trim() && !imageFile}
             aria-label="Send message"
             className={cn(
               "flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron text-cream transition-all hover:bg-saffron-dk active:scale-90",

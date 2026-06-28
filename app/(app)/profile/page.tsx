@@ -2,132 +2,131 @@ import Link from "next/link";
 import { Reveal } from "@/components/motion/Reveal";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
-import { Tag } from "@/components/primitives/Tag";
 import { CountUp } from "@/components/motion/CountUp";
 import { ProfileTabs } from "@/components/composite/ProfileTabs";
+import { normalizeVerified } from "@/lib/ui/verified";
+import { ProfileBanner } from "@/components/composite/ProfileBanner";
+import { ProfileStrength } from "./ProfileStrength";
+import { computeStrength } from "./strength";
 import { getMyProfile } from "@/lib/db/profiles";
 import { getProfilePosts } from "@/lib/db/posts";
 import { getMyConnections } from "@/lib/db/social";
+import { getVerifiedProjectsForUser } from "@/lib/db/projects";
+import { getResume } from "@/lib/db/resume";
+import { ProfileResume } from "@/components/composite/ProfileResume";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { MapPin, GraduationCap, Pencil, CheckCircle2 } from "lucide-react";
 import { ShareButton } from "@/components/composite/ShareButton";
+import type { ProfileLinks } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
+
+const SOCIAL_LABELS: Record<string, string> = {
+  website: "Website",
+  github: "GitHub",
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  twitter: "Twitter / X",
+  youtube: "YouTube",
+};
+
+function buildSocialHref(platform: string, raw: string): string {
+  const value = raw.trim();
+  if (/^https?:\/\//i.test(value)) return value;
+  switch (platform) {
+    case "website": return `https://${value}`;
+    case "github": return `https://github.com/${value.replace(/^@/, "")}`;
+    case "linkedin": return `https://linkedin.com/in/${value.replace(/^@/, "")}`;
+    case "instagram": return `https://instagram.com/${value.replace(/^@/, "")}`;
+    case "twitter": return `https://twitter.com/${value.replace(/^@/, "")}`;
+    case "youtube": return `https://youtube.com/@${value.replace(/^@/, "")}`;
+    default: return value;
+  }
+}
+
+function buildSocialLinks(links: ProfileLinks | null | undefined) {
+  if (!links) return [];
+  const order = ["website", "github", "linkedin", "instagram", "twitter", "youtube"] as const;
+  return order
+    .filter((p) => typeof links[p] === "string" && (links[p] as string).trim() !== "")
+    .map((platform) => ({
+      platform,
+      label: SOCIAL_LABELS[platform],
+      href: buildSocialHref(platform, links[platform] as string),
+    }));
+}
 
 export default async function ProfilePage() {
   const profile = await getMyProfile();
   if (!profile) redirect("/onboarding");
 
-  const [posts, connections] = await Promise.all([
+  const sb = await getSupabaseServer();
+
+  // Fold every read into one parallel batch.
+  const [posts, connections, verifiedProjects, resume, projectCountRes, projRowsRes] = await Promise.all([
     getProfilePosts(profile.id, 24),
     getMyConnections("all"),
+    getVerifiedProjectsForUser(profile.id),
+    getResume(profile.id),
+    sb
+      ? sb.from("project_members").select("project_id", { count: "exact", head: true }).eq("user_id", profile.id)
+      : Promise.resolve({ count: 0 } as { count: number }),
+    sb
+      ? sb.from("projects").select("id, short_id, title, brief, status, slot_count").eq("author_id", profile.id).order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] } as { data: unknown[] }),
   ]);
 
-  // Real project count + the user's own projects (for the Projects tab).
-  let projectCount = 0;
-  let myProjects: import("@/components/composite/ProfileTabs").ProfileProject[] = [];
-  const sb = await getSupabaseServer();
-  if (sb) {
-    const { count } = await sb
-      .from("project_members")
-      .select("project_id", { count: "exact", head: true })
-      .eq("user_id", profile.id);
-    projectCount = count ?? 0;
-
-    const { data: projRows } = await sb
-      .from("projects")
-      .select("id, short_id, title, brief, status, slot_count")
-      .eq("author_id", profile.id)
-      .order("created_at", { ascending: false });
-    myProjects = (projRows as typeof myProjects) ?? [];
-  }
-
-  // Profile completeness as a lightweight "score".
-  const fields = [profile.name, profile.bio, profile.college, profile.branch, profile.city, profile.avatar_url];
-  const score = Math.round((fields.filter(Boolean).length / fields.length) * 100);
+  const projectCount = (projectCountRes as { count: number | null }).count ?? 0;
+  const myProjects = ((projRowsRes as { data: unknown[] }).data ?? []) as import("@/components/composite/ProfileTabs").ProfileProject[];
 
   const stats = {
     connections: connections.length,
     posts: posts.length,
     projects: projectCount,
-    score,
   };
 
+  // Owner-only profile strength (never rendered on the visitor page).
+  const strength = computeStrength(profile, {
+    posts: posts.length,
+    projects: projectCount,
+    connections: connections.length,
+  });
+
   const p = profile;
+  const socialLinks = buildSocialLinks(p.links);
 
   return (
     <div className="min-h-dvh bg-cream">
       {/* ------------------------------------------------------------------ */}
-      {/* COVER BAND - full-width, no container constraint                    */}
+      {/* BANNER - shared component, identical to the visitor view            */}
       {/* ------------------------------------------------------------------ */}
       <Reveal y={0}>
-        <div
-          className="relative h-40 w-full overflow-hidden sm:h-52 md:h-65"
-        >
-          {/* Cover: the user's uploaded image when present, else the brand gradient */}
-          {p.cover_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={p.cover_url}
-              alt=""
-              className="absolute inset-0 size-full object-cover"
-            />
-          ) : (
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(135deg, #0B1220 0%, #1a2744 40%, #2C5BFF22 70%, #0B1220 100%)",
-              }}
-            />
-          )}
-          {/* Subtle noise texture overlay */}
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.03]"
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-            }}
-          />
-          {/* Cobalt accent glow - top right */}
-          <div
-            className="pointer-events-none absolute right-0 top-0 h-full w-1/2 opacity-20"
-            style={{
-              background:
-                "radial-gradient(ellipse at 80% 20%, #2C5BFF 0%, transparent 60%)",
-            }}
-          />
-        </div>
+        <ProfileBanner
+          coverUrl={p.cover_url}
+          bannerPreset={p.banner_preset}
+          focalX={p.cover_focal_x}
+          focalY={p.cover_focal_y}
+          priority
+          className="h-40 sm:h-52 md:h-65"
+        />
       </Reveal>
 
       {/* ------------------------------------------------------------------ */}
-      {/* PROFILE HEADER - avatar overlaps cover                             */}
+      {/* PROFILE HEADER - avatar overlaps the banner, identity sits on paper */}
       {/* ------------------------------------------------------------------ */}
       <div className="mx-auto max-w-5xl px-4 md:px-8">
         <Reveal delay={0.05}>
-          <div className="-mt-14 flex flex-col gap-5 sm:-mt-16 md:-mt-24 md:flex-row md:items-end md:justify-between md:gap-6">
-            {/* LEFT: avatar + identity */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:gap-6">
-              {/* Avatar with gradient ring (story-bubble effect) */}
-              <div
-                className="relative shrink-0 self-start rounded-full p-0.75"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #2C5BFF 0%, #5a7dff 50%, #2C5BFF 100%)",
-                  boxShadow: "0 0 0 3px #F5F7FB",
-                }}
-              >
-                <Avatar
-                  name={p.name}
-                  src={p.avatar_url ?? undefined}
-                  size="2xl"
-                  className="ring-0"
-                />
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
+              {/* Avatar overlaps the banner (image, not text -> always legible).
+                  Clean white ring (no purple gradient) - crisp on any banner. */}
+              <div className="-mt-14 shrink-0 self-start sm:-mt-16 md:-mt-20">
+                <Avatar name={p.name} src={p.avatar_url ?? undefined} size="2xl" className="ring-4 ring-paper shadow-[0_0_0_1px_#DDE3EE]" />
               </div>
 
-              {/* Name + verified + headline */}
-              <div className="pb-1">
+              {/* Identity CARD on solid paper -> name contrast guaranteed on any banner. */}
+              <div className="rounded-2xl border border-bone bg-paper px-5 py-5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1
                     className="font-serif text-3xl leading-tight tracking-tight text-ink wrap-break-word sm:text-4xl md:text-5xl"
@@ -138,10 +137,7 @@ export default async function ProfilePage() {
                   {p.verified ? (
                     <span
                       className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                      style={{
-                        background: "rgba(44,91,255,0.10)",
-                        color: "#2C5BFF",
-                      }}
+                      style={{ background: "rgba(44,91,255,0.10)", color: "#2C5BFF" }}
                     >
                       <CheckCircle2 className="size-3.5" strokeWidth={2.5} />
                       Verified
@@ -149,29 +145,20 @@ export default async function ProfilePage() {
                   ) : null}
                 </div>
 
-                {/* Headline: college · branch */}
+                <p className="mt-1 text-sm text-ash">@{p.handle}</p>
+
                 {(p.college || p.branch || p.city) ? (
-                  <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-ash">
+                  <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ash">
                     {p.college ? (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <GraduationCap className="size-3.5 shrink-0" strokeWidth={1.75} />
                         {p.college}
-                        {p.branch ? (
-                          <span className="text-bone">
-                            &nbsp;·&nbsp;
-                            <span className="text-ash">{p.branch}</span>
-                          </span>
-                        ) : null}
-                        {p.year_of_study ? (
-                          <span className="text-bone">
-                            &nbsp;&middot;&nbsp;
-                            <span className="text-ash">&apos;{p.year_of_study}</span>
-                          </span>
-                        ) : null}
+                        {p.branch ? <span className="text-ink">&nbsp;&middot; {p.branch}</span> : null}
+                        {p.year_of_study ? <span className="text-ink">&nbsp;&middot; &apos;{p.year_of_study}</span> : null}
                       </span>
                     ) : null}
                     {p.city ? (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <MapPin className="size-3.5 shrink-0" strokeWidth={1.75} />
                         {p.city}
                       </span>
@@ -179,11 +166,8 @@ export default async function ProfilePage() {
                   </p>
                 ) : null}
 
-                {/* Bio teaser under headline */}
                 {p.bio ? (
-                  <p className="mt-3 max-w-lg text-sm leading-relaxed text-ash">
-                    {p.bio}
-                  </p>
+                  <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-ink">{p.bio}</p>
                 ) : null}
               </div>
             </div>
@@ -202,30 +186,44 @@ export default async function ProfilePage() {
         </Reveal>
 
         {/* ---------------------------------------------------------------- */}
-        {/* STATS STRIP                                                       */}
+        {/* PROFILE STRENGTH - OWNER ONLY                                     */}
+        {/* ---------------------------------------------------------------- */}
+        <Reveal delay={0.1}>
+          <ProfileStrength isOwner score={strength.score} items={strength.items} todo={strength.todo} />
+        </Reveal>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* STATS STRIP (no score here - that is owner-only above)            */}
         {/* ---------------------------------------------------------------- */}
         <Reveal delay={0.12}>
-          <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-bone bg-bone sm:grid-cols-4">
+          <div className="mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-bone bg-bone">
             {[
               { label: "Connections", value: stats.connections },
               { label: "Posts", value: stats.posts },
               { label: "Projects", value: stats.projects },
-              { label: "Profile score", value: stats.score, suffix: "%" },
             ].map((s) => (
               <div
                 key={s.label}
                 className="flex flex-col items-center justify-center bg-paper px-4 py-5 text-center transition-colors hover:bg-cream"
               >
-                <div
-                  className="font-serif text-3xl font-normal text-ink"
-                  style={{ letterSpacing: "-0.02em" }}
-                >
+                <div className="font-serif text-3xl font-normal text-ink" style={{ letterSpacing: "-0.02em" }}>
                   <CountUp to={s.value} />
-                  {s.suffix ?? ""}
                 </div>
                 <p className="mt-1 text-caption tracking-widest">{s.label}</p>
               </div>
             ))}
+          </div>
+        </Reveal>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* BACKGROUND - Experience / Education / Skills (owner editor)       */}
+        {/* ---------------------------------------------------------------- */}
+        <Reveal delay={0.14}>
+          <div className="mt-10">
+            <h2 className="mb-5 font-serif text-2xl text-ink" style={{ letterSpacing: "-0.01em" }}>
+              Background
+            </h2>
+            <ProfileResume resume={resume} isOwner />
           </div>
         </Reveal>
 
@@ -235,10 +233,17 @@ export default async function ProfilePage() {
         <ProfileTabs
           posts={posts}
           projects={myProjects}
+          verifiedProjects={normalizeVerified(verifiedProjects as unknown[])}
           bio={p.bio}
           college={p.college}
           branch={p.branch}
+          city={p.city}
+          year_of_study={p.year_of_study}
+          accountType={p.account_type}
+          interests={p.interests}
+          socialLinks={socialLinks}
           currentUserId={p.id}
+          isOwner
         />
       </div>
 

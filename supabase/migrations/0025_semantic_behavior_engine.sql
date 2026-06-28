@@ -2,7 +2,7 @@
 -- Feed engine upgrade: zero-cost semantic + behavioural signals.
 --   - pg_trgm: typo-tolerant fuzzy matching (trigram GIN indexes).
 --   - feed_events: real behavioural-signal capture (impression/dwell/click/
---     expand/save/skip) — the fuel for engagement-rate, dedup, and learning.
+--     expand/save/skip) - the fuel for engagement-rate, dedup, and learning.
 --   - bump_impressions(): SECURITY DEFINER so a viewer (not the author) can
 --     increment a post's impression counter.
 --   - ranker_weights: store for weights LEARNED from behaviour (nightly fit).

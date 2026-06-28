@@ -62,10 +62,12 @@ export interface SendMessageResult {
   isRequest?: boolean;
   blockedReason?: string;
   error?: string;
+  /** Echoed back so the composer can reconcile its optimistic temp bubble. */
+  clientId?: string;
 }
 
 export async function getMyConversations(
-  bucket: "main" | "requests"
+  bucket: "main" | "requests" | "all"
 ): Promise<ConversationPreview[]> {
   const sb = await getSupabaseServer();
   if (!sb) return [];
@@ -172,12 +174,17 @@ export async function getMyConversations(
 
 export async function getConversationMessages(
   conversationId: string,
-  limit = 50
+  opts: { limit?: number; before?: string } = {}
 ): Promise<MessageWithSender[]> {
+  const { limit = 50, before } = opts;
   const sb = await getSupabaseServer();
   if (!sb) return [];
 
-  const { data } = await sb
+  // Keyset pagination on created_at: with no `before` we return the newest page;
+  // with a `before` cursor we return the page of OLDER messages immediately
+  // preceding it (for the "Load earlier" affordance). Always fetched newest
+  // first then reversed so the caller gets ascending (display) order.
+  let query = sb
     .from("messages")
     .select(
       "*, sender:profiles!messages_sender_id_fkey(id, handle, name, avatar_url, college)"
@@ -186,6 +193,9 @@ export async function getConversationMessages(
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  if (before) query = query.lt("created_at", before);
+
+  const { data } = await query;
   if (!data) return [];
 
   // Return in ascending order for display
@@ -194,7 +204,7 @@ export async function getConversationMessages(
 
 /**
  * Resolve the other member's profile for ANY conversation the current user
- * belongs to — even one with zero messages. Also reports whether the thread is
+ * belongs to - even one with zero messages. Also reports whether the thread is
  * currently a pending request, whether the current user is the request SENDER,
  * and whether composing is blocked (block list or applicant->author rule).
  */
@@ -529,7 +539,7 @@ export async function computeIsRequest(
     if (app) return { is_request: false, project_override: true };
   }
 
-  // 5. Applicant->author block — ONLY for a true cold contact. Connected users
+  // 5. Applicant->author block - ONLY for a true cold contact. Connected users
   //    and anyone with an existing thread were already allowed above, so this
   //    now blocks only a stranger applicant cold-messaging the author.
   if (recipientProjects && recipientProjects.length > 0) {
@@ -654,10 +664,13 @@ export async function sendMessage({
   conversationId,
   body,
   imageUrl,
+  clientId,
 }: {
   conversationId: string;
   body: string;
   imageUrl?: string;
+  /** Client-generated id so the realtime echo reconciles the optimistic bubble. */
+  clientId?: string;
 }): Promise<SendMessageResult> {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: false, error: "Supabase not configured" };
@@ -731,6 +744,7 @@ export async function sendMessage({
       body,
       image_url: imageUrl ?? null,
       is_request: isRequest,
+      client_id: clientId ?? null,
     })
     .select("id")
     .single();
@@ -767,7 +781,24 @@ export async function sendMessage({
     } catch { /* best-effort */ }
   })();
 
-  return { ok: true, messageId: msg.id, isRequest };
+  return { ok: true, messageId: msg.id, isRequest, clientId };
+}
+
+/**
+ * Total unread messages across all of the current user's NON-request
+ * conversations. Drives the live count on the Messages nav item + rail tab.
+ * Reuses the same membership/last_read_at + message data shape that the inbox
+ * derives, but only sums unread so callers get a single number cheaply.
+ */
+export async function getMessageUnreadCount(): Promise<number> {
+  const sb = await getSupabaseServer();
+  if (!sb) return 0;
+
+  // Aggregate the unread count in SQL via the `unread_message_count()` RPC so we
+  // no longer pull every message row to count in JS. The RPC returns an integer
+  // of the caller's unread non-request conversations.
+  const { data, error } = await sb.rpc("unread_message_count");
+  return error ? 0 : (typeof data === "number" ? data : 0);
 }
 
 export async function acceptMessageRequest(
@@ -875,7 +906,7 @@ export async function markRead(
   const now = new Date().toISOString();
 
   // Update last_read_at for current user in this conversation. This is always
-  // recorded — it drives the unread badge and is private to the reader.
+  // recorded - it drives the unread badge and is private to the reader.
   await sb
     .from("conversation_members")
     .update({ last_read_at: now })

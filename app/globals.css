@@ -23,9 +23,10 @@
   --color-navy: #0B1220;
   --color-gold: #F5A623;
 
-  /* Type families */
-  --font-serif: "Fraunces", "Times New Roman", serif;
-  --font-sans: "Hanken Grotesk", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Type families - simple, clean, highly readable (no cursive/high-contrast).
+     "serif" token kept for code compat but is now a clean display sans (Sora). */
+  --font-serif: "Sora", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
   --font-indic: "Noto Sans Devanagari", var(--font-sans);
 
@@ -154,7 +155,7 @@ body {
 /* ------------------------------------------------------------
    SHARED COMPONENT UTILITIES (added for surface agents).
    Canonical building blocks so every surface stays consistent.
-   These are additive — they do not touch the tokens above.
+   These are additive - they do not touch the tokens above.
    ------------------------------------------------------------ */
 
 /* Canonical card: hairline bone border on white paper, lg radius. */
@@ -194,6 +195,15 @@ body {
 @keyframes c47-fade-up {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Instagram-style heart burst on double-tap-to-like (PostMedia). */
+@keyframes heartburst {
+  0%   { opacity: 0; transform: scale(0.3); }
+  20%  { opacity: 0.95; transform: scale(1.15); }
+  45%  { transform: scale(0.95); }
+  70%  { opacity: 0.95; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1); }
 }
 
 /* Container */
@@ -238,7 +248,7 @@ body {
   border-radius: 4px;
 }
 
-/* Reduced motion — global safety net. Collapses animation/transition
+/* Reduced motion - global safety net. Collapses animation/transition
    timing AND neutralizes hover/stagger transforms so nothing moves. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

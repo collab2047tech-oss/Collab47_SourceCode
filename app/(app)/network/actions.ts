@@ -1,53 +1,35 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import {
   followUser, unfollowUser,
   requestConnection, acceptConnection, cancelConnection,
 } from "@/lib/db/social";
 
+/**
+ * Network mutations. The cards flip their state OPTIMISTICALLY on the client
+ * (instant) and call these in the background. We deliberately do NOT call
+ * revalidatePath here: a server revalidation refetches the page tree and would
+ * clobber the optimistic state mid-interaction (the ~1s "did it work?" lag the
+ * founder reported). The server is the source of truth on the next natural
+ * navigation; until then the optimistic local state is correct and instant.
+ */
+
 export async function followUserAction(targetUserId: string) {
-  const res = await followUser(targetUserId);
-  if (res.ok) {
-    // Revalidate every surface that renders suggested people so an
-    // already-followed person stops appearing / shows the right button state.
-    revalidatePath("/network");
-    revalidatePath("/explore");
-    revalidatePath("/home");
-  }
-  return res;
+  return followUser(targetUserId);
 }
 
 export async function unfollowUserAction(targetUserId: string) {
-  const res = await unfollowUser(targetUserId);
-  if (res.ok) {
-    revalidatePath("/network");
-    revalidatePath("/explore");
-    revalidatePath("/home");
-  }
-  return res;
+  return unfollowUser(targetUserId);
 }
 
 export async function requestConnectionAction(targetUserId: string) {
-  const res = await requestConnection(targetUserId);
-  if (res.ok) {
-    revalidatePath("/network");
-    revalidatePath("/u/[handle]", "page");
-  }
-  return res;
+  return requestConnection(targetUserId);
 }
 
 export async function acceptConnectionAction(otherUserId: string) {
-  const res = await acceptConnection(otherUserId);
-  if (res.ok) revalidatePath("/network");
-  return res;
+  return acceptConnection(otherUserId);
 }
 
 export async function cancelConnectionAction(otherUserId: string) {
-  const res = await cancelConnection(otherUserId);
-  if (res.ok) {
-    revalidatePath("/network");
-    revalidatePath("/u/[handle]", "page");
-  }
-  return res;
+  return cancelConnection(otherUserId);
 }

@@ -1,4 +1,4 @@
-// Neural ranker inference — pure JS forward pass, zero runtime/library/API cost.
+// Neural ranker inference - pure JS forward pass, zero runtime/library/API cost.
 // Supports a logistic-regression head (1-layer NN) and a 2-layer MLP. Weights are
 // trained OFFLINE (scripts/train-ranker.mjs, free CI) and loaded at serve time.
 

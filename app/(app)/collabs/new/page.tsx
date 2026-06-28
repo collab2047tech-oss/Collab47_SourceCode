@@ -34,7 +34,7 @@ export default function NewProjectPage() {
         <ArrowLeft className="size-4" /> Back to Collabs
       </Link>
       <p className="mt-6 text-caption text-ash">Collab Projects</p>
-      <h1 className="mt-2 font-serif text-h1 text-ink">
+      <h1 className="mt-2 font-serif text-3xl leading-tight text-ink sm:text-h1">
         Post a{" "}
         <span className="italic text-saffron">brief.</span>
       </h1>

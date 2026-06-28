@@ -5,10 +5,13 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal, Stagger } from "@/components/motion/Reveal";
-import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Pin, BookOpen, Layers, Star, Info, Trash2, BadgeCheck, ExternalLink, MapPin, GraduationCap, Calendar, Briefcase, Tag as TagIcon } from "lucide-react";
 import { Avatar } from "@/components/primitives/Avatar";
 import type { PostWithAuthor, RepostedOriginal } from "@/lib/db/posts";
 import { deletePostAction } from "@/app/(app)/home/actions";
+import type { VerifiedContribution } from "@/lib/ui/verified";
+
+export type { VerifiedContribution } from "@/lib/ui/verified";
 
 type TabId = "posts" | "projects" | "highlights" | "about";
 
@@ -24,11 +27,20 @@ export interface ProfileProject {
 interface ProfileTabsProps {
   posts: PostWithAuthor[];
   projects?: ProfileProject[];
+  /** Verified contributions (shown on the visitor page + owner page). */
+  verifiedProjects?: VerifiedContribution[];
   bio?: string | null;
   college?: string | null;
   branch?: string | null;
+  city?: string | null;
+  year_of_study?: string | null;
+  accountType?: string | null;
+  interests?: string[];
+  socialLinks?: { platform: string; label: string; href: string }[];
   /** The viewing user's id. When it matches a post's author, delete is shown. */
   currentUserId?: string;
+  /** Owner-only controls (delete posts). Visitors pass false. */
+  isOwner?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +126,7 @@ function RepostCard({ post }: { post: PostWithAuthor }) {
       <div className="mb-3 flex items-center gap-1.5 text-xs text-ash">
         <Repeat2 className="size-3.5" strokeWidth={1.75} />
         <span>You reposted</span>
-        <span className="text-bone">&middot;</span>
+        <span className="text-ash" aria-hidden>&middot;</span>
         <span>{timeAgo(post.created_at)}</span>
       </div>
 
@@ -149,7 +161,7 @@ function EmbeddedOriginal({ original }: { original: RepostedOriginal | null }) {
           {original.author?.handle ? (
             <span className="truncate text-xs text-ash">@{original.author.handle}</span>
           ) : null}
-          <span className="text-xs text-bone select-none">&middot;</span>
+          <span className="text-xs text-ash select-none" aria-hidden>&middot;</span>
           <span className="text-xs text-ash">{timeAgo(original.created_at)}</span>
         </div>
       </div>
@@ -268,7 +280,7 @@ function PostCard({ post }: { post: PostWithAuthor }) {
             <MessageCircle className="size-3.5" strokeWidth={1.75} />
             {post.comment_count.toLocaleString("en-IN")}
           </span>
-          <span className="ml-auto text-[11px] text-bone">
+          <span className="ml-auto text-[11px] text-ash">
             {timeAgo(post.created_at)}
           </span>
         </div>
@@ -314,6 +326,46 @@ function ProjectCard({ project }: { project: ProfileProject }) {
 }
 
 // ---------------------------------------------------------------------------
+// Verified Contribution Card
+// ---------------------------------------------------------------------------
+
+function VerifiedContributionCard({ contribution }: { contribution: VerifiedContribution }) {
+  const { role, project } = contribution;
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-bone bg-paper px-5 py-4 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag variant="moss" className="text-xs">Verified contributor</Tag>
+          {role === "owner" ? <Tag variant="saffron" className="text-xs">Author</Tag> : null}
+        </div>
+        <Link
+          href={`/c/${project.short_id}`}
+          className="mt-2 block text-sm font-medium text-ink hover:underline"
+        >
+          {project.title}
+        </Link>
+        <p className="mt-0.5 text-xs text-ash">
+          {project.author ? `by @${project.author.handle}` : null}
+          {project.delivered_at
+            ? `${project.author ? " " : ""}delivered ${new Date(project.delivered_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`
+            : ""}
+        </p>
+      </div>
+      {project.deliverable_url ? (
+        <a
+          href={project.deliverable_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex shrink-0 items-center gap-1 text-xs text-ash transition-colors hover:text-ink"
+        >
+          View <ExternalLink className="size-3" />
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Empty State
 // ---------------------------------------------------------------------------
 
@@ -351,16 +403,38 @@ const TAB_ICONS: Record<TabId, React.ReactNode> = {
   about: <Info className="size-3.5" strokeWidth={1.75} />,
 };
 
-export function ProfileTabs({ posts, projects = [], bio, college, branch, currentUserId }: ProfileTabsProps) {
+export function ProfileTabs({
+  posts,
+  projects = [],
+  verifiedProjects = [],
+  bio,
+  college,
+  branch,
+  city,
+  year_of_study,
+  accountType,
+  interests = [],
+  socialLinks = [],
+  currentUserId,
+  isOwner = false,
+}: ProfileTabsProps) {
   const [tab, setTab] = useState<TabId>("posts");
   const highlights = posts.filter((p) => p.is_pinned || p.is_highlight);
+  const projectsCount = projects.length + verifiedProjects.length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: "posts", label: "Posts", count: posts.length },
-    { id: "projects", label: "Projects", count: projects.length },
+    { id: "projects", label: "Projects", count: projectsCount },
     { id: "highlights", label: "Highlights", count: highlights.length },
     { id: "about", label: "About" },
   ];
+
+  const yearLabel = year_of_study
+    ? { "1": "1st Year", "2": "2nd Year", "3": "3rd Year", "4": "4th Year", "5": "5th Year" }[year_of_study] ?? `Year ${year_of_study}`
+    : null;
+  const accountLabel = accountType
+    ? accountType.charAt(0).toUpperCase() + accountType.slice(1)
+    : null;
 
   return (
     <>
@@ -427,7 +501,7 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
                 <ManagedPostCard
                   key={p.id}
                   post={p}
-                  canManage={!!currentUserId && currentUserId === p.author_id}
+                  canManage={isOwner && !!currentUserId && currentUserId === p.author_id}
                 />
               ))}
             </Stagger>
@@ -440,26 +514,52 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
       {/* ------------------------------------------------------------------ */}
       {tab === "projects" && (
         <Reveal delay={0.05}>
-          {projects.length === 0 ? (
+          {projectsCount === 0 ? (
             <EmptyState
               icon={<Layers className="size-5" strokeWidth={1.5} />}
-              message="No projects posted yet. Start a collaboration brief."
+              message={isOwner ? "No projects posted yet. Start a collaboration brief." : "No projects to show yet."}
               cta={
-                <Link
-                  href="/collabs/new"
-                  className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
-                  style={{ background: "#2C5BFF" }}
-                >
-                  Post a brief
-                </Link>
+                isOwner ? (
+                  <Link
+                    href="/collabs/new"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
+                    style={{ background: "#2C5BFF" }}
+                  >
+                    Post a brief
+                  </Link>
+                ) : undefined
               }
             />
           ) : (
-            <Stagger className="mt-8 grid gap-4 sm:grid-cols-2" step={0.05}>
-              {projects.map((pr) => (
-                <ProjectCard key={pr.id} project={pr} />
-              ))}
-            </Stagger>
+            <div className="mt-8 flex flex-col gap-8">
+              {projects.length > 0 ? (
+                <div>
+                  <h3 className="mb-4 flex items-center gap-2 text-caption text-ash">
+                    <Layers className="size-4" strokeWidth={1.75} />
+                    {isOwner ? "Your projects" : "Authored projects"}
+                  </h3>
+                  <Stagger className="grid gap-4 sm:grid-cols-2" step={0.05}>
+                    {projects.map((pr) => (
+                      <ProjectCard key={pr.id} project={pr} />
+                    ))}
+                  </Stagger>
+                </div>
+              ) : null}
+
+              {verifiedProjects.length > 0 ? (
+                <div>
+                  <h3 className="mb-4 flex items-center gap-2 text-caption text-ash">
+                    <BadgeCheck className="size-4 text-saffron" strokeWidth={1.75} />
+                    Verified contributions
+                  </h3>
+                  <Stagger className="flex flex-col gap-3" step={0.05}>
+                    {verifiedProjects.map((m) => (
+                      <VerifiedContributionCard key={m.project.id} contribution={m} />
+                    ))}
+                  </Stagger>
+                </div>
+              ) : null}
+            </div>
           )}
         </Reveal>
       )}
@@ -472,7 +572,7 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
           {highlights.length === 0 ? (
             <EmptyState
               icon={<Star className="size-5" strokeWidth={1.5} />}
-              message="Pin a post or save a repost to feature it here as a highlight."
+              message={isOwner ? "Pin a post or save a repost to feature it here as a highlight." : "No highlights yet."}
             />
           ) : (
             <>
@@ -545,69 +645,105 @@ export function ProfileTabs({ posts, projects = [], bio, college, branch, curren
       {/* ------------------------------------------------------------------ */}
       {tab === "about" && (
         <Reveal delay={0.05}>
-          <div className="mt-8 space-y-6">
-            {/* Bio block */}
-            <div className="rounded-xl border border-bone bg-paper p-6">
-              <h2
-                className="mb-3 font-serif text-lg text-ink"
-                style={{ letterSpacing: "-0.01em" }}
-              >
-                Bio
-              </h2>
-              {bio ? (
-                <p className="leading-relaxed text-ash">{bio}</p>
-              ) : (
-                <p className="text-sm text-bone">No bio added yet.</p>
-              )}
-            </div>
+          {(() => {
+            const detailRows: { icon: React.ReactNode; label: string; value: string }[] = [];
+            if (college) detailRows.push({ icon: <GraduationCap className="size-4" strokeWidth={1.75} />, label: "College", value: college });
+            if (branch) detailRows.push({ icon: <Layers className="size-4" strokeWidth={1.75} />, label: "Branch", value: branch });
+            if (yearLabel) detailRows.push({ icon: <Calendar className="size-4" strokeWidth={1.75} />, label: "Year", value: yearLabel });
+            if (city) detailRows.push({ icon: <MapPin className="size-4" strokeWidth={1.75} />, label: "City", value: city });
+            if (accountLabel) detailRows.push({ icon: <Briefcase className="size-4" strokeWidth={1.75} />, label: "Account", value: accountLabel });
 
-            {/* Education block */}
-            {(college || branch) ? (
-              <div className="rounded-xl border border-bone bg-paper p-6">
-                <h2
-                  className="mb-4 font-serif text-lg text-ink"
-                  style={{ letterSpacing: "-0.01em" }}
-                >
-                  Education
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {college ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full border border-bone px-4 py-1.5 text-sm text-ink"
-                    >
-                      <span
-                        className="size-1.5 rounded-full"
+            const hasAnything = !!bio || detailRows.length > 0 || interests.length > 0 || socialLinks.length > 0;
+            if (!hasAnything) {
+              return (
+                <EmptyState
+                  icon={<Info className="size-5" strokeWidth={1.5} />}
+                  message={isOwner ? "Add your bio, education, and interests to help others know who you are." : "This profile has no details yet."}
+                  cta={
+                    isOwner ? (
+                      <Link
+                        href="/profile/edit"
+                        className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
                         style={{ background: "#2C5BFF" }}
-                      />
-                      {college}
-                    </span>
-                  ) : null}
-                  {branch ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-bone px-4 py-1.5 text-sm text-ash">
-                      {branch}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
+                      >
+                        Complete profile
+                      </Link>
+                    ) : undefined
+                  }
+                />
+              );
+            }
 
-            {/* Empty fallback when no bio or education */}
-            {!bio && !college && !branch ? (
-              <EmptyState
-                icon={<Info className="size-5" strokeWidth={1.5} />}
-                message="Add your bio and education to help others know who you are."
-                cta={
-                  <Link
-                    href="/profile/edit"
-                    className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
-                    style={{ background: "#2C5BFF" }}
-                  >
-                    Complete profile
-                  </Link>
-                }
-              />
-            ) : null}
-          </div>
+            return (
+              <div className="mt-8 space-y-6">
+                {/* Bio block */}
+                {bio ? (
+                  <div className="rounded-xl border border-bone bg-paper p-6">
+                    <h2 className="mb-3 font-serif text-lg text-ink" style={{ letterSpacing: "-0.01em" }}>Bio</h2>
+                    <p className="whitespace-pre-line leading-relaxed text-ink">{bio}</p>
+                  </div>
+                ) : null}
+
+                {/* Details block */}
+                {detailRows.length > 0 ? (
+                  <div className="rounded-xl border border-bone bg-paper p-6">
+                    <h2 className="mb-4 font-serif text-lg text-ink" style={{ letterSpacing: "-0.01em" }}>Details</h2>
+                    <dl className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                      {detailRows.map((row) => (
+                        <div key={row.label} className="flex items-center gap-3">
+                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cream text-ash">
+                            {row.icon}
+                          </span>
+                          <span className="min-w-0">
+                            <dt className="text-[11px] uppercase tracking-wider text-ash">{row.label}</dt>
+                            <dd className="truncate text-sm font-medium text-ink">{row.value}</dd>
+                          </span>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ) : null}
+
+                {/* Interests block */}
+                {interests.length > 0 ? (
+                  <div className="rounded-xl border border-bone bg-paper p-6">
+                    <h2 className="mb-4 flex items-center gap-2 font-serif text-lg text-ink" style={{ letterSpacing: "-0.01em" }}>
+                      <TagIcon className="size-4 text-ash" strokeWidth={1.75} /> Interests
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                      {interests.map((i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-bone px-3.5 py-1.5 text-sm text-ink">
+                          <span className="size-1.5 rounded-full" style={{ background: "#2C5BFF" }} />
+                          {i}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Links block */}
+                {socialLinks.length > 0 ? (
+                  <div className="rounded-xl border border-bone bg-paper p-6">
+                    <h2 className="mb-4 font-serif text-lg text-ink" style={{ letterSpacing: "-0.01em" }}>Links</h2>
+                    <div className="flex flex-wrap gap-2">
+                      {socialLinks.map((l) => (
+                        <a
+                          key={l.platform}
+                          href={l.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-bone bg-paper px-4 py-1.5 text-sm text-ink transition-colors hover:border-saffron hover:text-saffron-dk"
+                        >
+                          {l.label}
+                          <ExternalLink className="size-3.5 text-ash" strokeWidth={1.75} />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })()}
         </Reveal>
       )}
     </>

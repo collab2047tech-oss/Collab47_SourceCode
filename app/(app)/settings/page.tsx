@@ -1,5 +1,5 @@
 import { SettingsView, type SettingsInitial } from "@/components/composite/SettingsView";
-import { getMyProfile } from "@/lib/db/profiles";
+import { getMyProfile, computeChangeWindow } from "@/lib/db/profiles";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -21,6 +21,15 @@ export default async function SettingsPage() {
       }
     : null;
 
+  // 7-day change windows for name + handle, computed from the stored stamps.
+  // These are advisory hints; the server (updateProfile) is the real gate.
+  const profileRow = profile as typeof profile & {
+    last_name_change_at?: string | null;
+    last_handle_change_at?: string | null;
+  };
+  const nameChange = computeChangeWindow(profileRow.last_name_change_at ?? null);
+  const handleChange = computeChangeWindow(profileRow.last_handle_change_at ?? null);
+
   const initial: SettingsInitial = {
     name: profile.name ?? "",
     handle: profile.handle ?? "",
@@ -31,6 +40,8 @@ export default async function SettingsPage() {
     dm_permission: profile.dm_permission ?? "everyone",
     privacy,
     notificationPrefs: profile.notification_prefs ?? null,
+    nameChange,
+    handleChange,
   };
 
   return <SettingsView initial={initial} />;

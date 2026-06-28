@@ -31,19 +31,14 @@ export const NEWS_SOURCES: NewsSource[] = [
     type: "rss",
     url: "https://www.moneycontrol.com/rss/latestnews.xml",
   },
-  {
-    name: "Hacker News",
-    type: "rss",
-    url: "https://hnrss.org/frontpage",
-  },
-  {
-    name: "GDELT",
-    type: "gdelt",
-    url: "https://api.gdeltproject.org/api/v2/doc/doc?query=india%20students&mode=ArtList&format=json&maxrecords=20",
-  },
-  {
-    name: "NewsAPI",
-    type: "newsapi",
-    url: "https://newsapi.org/v2/top-headlines?country=in",
-  },
+  // REMOVED: Hacker News (hnrss.org/frontpage). Its <description> is pure
+  // metadata - "Article URL: ... Comments URL: ... Points: N # Comments: N" -
+  // with no article body. That boilerplate leaked into excerpts/summaries and
+  // rendered as junk cards. A headline-only tech feed isn't worth that risk.
+  // NOTE: The GDELT "india students" source and the legacy NewsAPI
+  // top-headlines feed were removed in Phase 4. They shipped image-less,
+  // body-less, frequently off-topic items (the worst "trash" cards). Indian
+  // coverage now comes from The Hindu, LiveMint, MoneyControl and the keyed
+  // JSON APIs (NewsData / GNews / Mediastack / NYT / Guardian) which all carry
+  // real article text.
 ];

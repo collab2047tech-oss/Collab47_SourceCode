@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Nav } from "@/components/landing/Nav";
+import { PublicTopNav } from "@/components/layout/PublicTopNav";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Button } from "@/components/primitives/Button";
@@ -31,7 +31,7 @@ export default async function ProjectPage({
   if (!project) {
     return (
       <main className="min-h-dvh bg-cream">
-        <Nav />
+        <PublicTopNav />
         <div className="container-edit pt-40">
           <h1 className="font-serif text-4xl text-ink sm:text-5xl">
             Project{" "}
@@ -81,7 +81,7 @@ export default async function ProjectPage({
 
   return (
     <main className="min-h-dvh bg-cream">
-      <Nav />
+      <PublicTopNav />
       <div className="container-edit max-w-3xl pt-28 pb-20 md:pt-32">
         <Reveal>
           <Link

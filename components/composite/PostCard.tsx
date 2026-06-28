@@ -23,6 +23,10 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useTransition } from "react";
 import { cn } from "@/lib/cn";
+import { PostMedia } from "./post/PostMedia";
+import { ReactionSummary } from "./post/ReactionSummary";
+import { useFeedRealtime } from "./FeedRealtimeProvider";
+import { absoluteTime } from "@/lib/ui/toCardPost";
 import { ReportModal } from "./ReportModal";
 import { submitReportAction } from "@/app/(app)/home/report-actions";
 import {
@@ -58,11 +62,11 @@ type ReactionMeta = {
 
 const REACTIONS: ReactionMeta[] = [
   { kind: "like",       label: "Like",       icon: <ThumbsUp  className="size-4" />, color: "text-saffron" },
-  { kind: "celebrate",  label: "Celebrate",  icon: <PartyPopper className="size-4" />, color: "text-amber-500" },
-  { kind: "support",    label: "Support",    icon: <HandHeart className="size-4" />, color: "text-rose-400" },
-  { kind: "love",       label: "Love",       icon: <Heart     className="size-4" />, color: "text-red-500" },
-  { kind: "insightful", label: "Insightful", icon: <Lightbulb className="size-4" />, color: "text-blue-400" },
-  { kind: "funny",      label: "Funny",      icon: <Laugh     className="size-4" />, color: "text-green-500" },
+  { kind: "celebrate",  label: "Celebrate",  icon: <PartyPopper className="size-4" />, color: "text-gold" },
+  { kind: "support",    label: "Support",    icon: <HandHeart className="size-4" />, color: "text-moss" },
+  { kind: "love",       label: "Love",       icon: <Heart     className="size-4" />, color: "text-ember" },
+  { kind: "insightful", label: "Insightful", icon: <Lightbulb className="size-4" />, color: "text-saffron-dk" },
+  { kind: "funny",      label: "Funny",      icon: <Laugh     className="size-4" />, color: "text-gold" },
 ];
 
 function getReactionMeta(kind?: string): ReactionMeta {
@@ -72,11 +76,14 @@ function getReactionMeta(kind?: string): ReactionMeta {
 /** The original post embedded inside a repost (LinkedIn-style nested card). */
 export interface EmbeddedOriginal {
   short_id: string;
-  author: { name: string; handle: string; college: string };
+  author: { name: string; handle: string; college: string; avatar_url?: string | null };
   time: string;
   body: string;
   tags?: string[];
-  image?: string;
+  /** All images on the original (gallery), not just the first. */
+  images?: string[];
+  /** Video on the original, if any. */
+  video?: string | null;
   stats: { likes: number; comments: number };
 }
 
@@ -84,12 +91,17 @@ export interface Post {
   id: string;
   short_id: string;
   author_id: string;
-  author: { name: string; handle: string; college: string };
+  author: { name: string; handle: string; college: string; avatar_url?: string | null };
   time: string;
+  /** Raw ISO created_at, for absolute time on hover. */
+  created_at?: string;
   body: string;
   tags?: string[];
-  image?: string;
-  stats: { likes: number; comments: number; saves: number };
+  /** All images (gallery). The card renders 1 full / 2-4 grid / 5+ with "+N". */
+  images?: string[];
+  /** Inline video, if any. */
+  video?: string | null;
+  stats: { likes: number; comments: number; saves: number; reposts: number };
   variant?: "standard" | "project" | "news";
   is_pinned?: boolean;
   is_repost?: boolean;
@@ -102,6 +114,8 @@ export interface Post {
   saved?: boolean;
   /** The viewer's current reaction kind, undefined if no reaction. */
   reaction?: string;
+  /** Optimistic "Posting..." state for a just-submitted post (pre-confirm). */
+  pending?: boolean;
 }
 
 export interface PostCardProps {
@@ -125,6 +139,11 @@ export function PostCard({
   const [liked, setLiked] = useState(post.liked ?? false);
   const [saved, setSaved] = useState(post.saved ?? false);
   const [likes, setLikes] = useState(post.stats.likes);
+  // All four counts are stateful so they update both OPTIMISTICALLY (viewer's own
+  // action) and LIVE (another user's action, via the realtime channel below).
+  const [comments, setComments] = useState(post.stats.comments);
+  const [reposts, setReposts] = useState(post.stats.reposts);
+  const [saves, setSaves] = useState(post.stats.saves);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -135,16 +154,44 @@ export function PostCard({
   const [shareCopied, setShareCopied] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // LIVE counts: subscribe this card to realtime UPDATEs on its post. Any user's
+  // reaction/comment/repost/save ticks the numbers here without a refresh. The
+  // payload is authoritative (absolute counts), so it converges with the
+  // viewer's own optimistic bumps instead of double-counting.
+  // Timestamp of the viewer's last own count-mutating action. The realtime echo
+  // of that same action (and any in-flight stale echoes during a rapid toggle)
+  // would otherwise snap the optimistic number to a momentarily-wrong value -
+  // visible bounce. So we ignore echoes for a short window after a local action;
+  // the optimistic value is already authoritative once the action settles, and
+  // OTHER users' ticks resume applying right after the window.
+  const localActionAt = useRef(0);
+  const touchLocal = () => {
+    localActionAt.current = Date.now();
+  };
+  const { register } = useFeedRealtime();
+  useEffect(() => {
+    return register(post.id, (c) => {
+      if (Date.now() - localActionAt.current < 1500) return; // skip self/echo bounce
+      setLikes(c.like_count);
+      setComments(c.comment_count);
+      setReposts(c.repost_count);
+      setSaves(c.bookmark_count);
+    });
+  }, [post.id, register]);
+
   const isOwner = Boolean(currentUserId) && currentUserId === post.author_id;
   const isPinned = post.is_pinned ?? false;
   const isRepost = post.is_repost ?? false;
+  const isPostingOptimistic = post.pending ?? false;
 
   function toggleLike() {
     setReactionPopoverOpen(false);
+    touchLocal();
     if (liked) {
       // Remove reaction
       const prevReaction = reaction;
@@ -175,8 +222,26 @@ export function PostCard({
     }
   }
 
+  /** Double-tap-to-like (Instagram): like only when not already liked. */
+  function likeIfNeeded() {
+    if (liked) return;
+    touchLocal();
+    setLiked(true);
+    setReaction("like");
+    setLikes((c) => c + 1);
+    startTransition(async () => {
+      const res = await likePostAction(post.id);
+      if (!res.ok) {
+        setLiked(false);
+        setReaction(undefined);
+        setLikes((c) => Math.max(0, c - 1));
+      }
+    });
+  }
+
   function pickReaction(kind: ReactionKind) {
     setReactionPopoverOpen(false);
+    touchLocal();
     const prevLiked = liked;
     const prevReaction = reaction;
     const prevLikes = likes;
@@ -204,10 +269,17 @@ export function PostCard({
 
   function toggleSave() {
     const next = !saved;
+    // Optimistic: flip saved + bump the saved count instantly; realtime echo
+    // reconciles to the authoritative count.
+    touchLocal();
     setSaved(next);
+    setSaves((c) => Math.max(0, next ? c + 1 : c - 1));
     startTransition(async () => {
       const res = await (next ? bookmarkPostAction(post.id) : unbookmarkPostAction(post.id));
-      if (!res.ok) setSaved(!next);
+      if (!res.ok) {
+        setSaved(!next);
+        setSaves((c) => Math.max(0, next ? c - 1 : c + 1));
+      }
     });
   }
 
@@ -219,7 +291,7 @@ export function PostCard({
         await navigator.share({ title: `${post.author.name} on Collab47`, url });
         return;
       } catch {
-        /* cancelled or unsupported — fall back to copying */
+        /* cancelled or unsupported - fall back to copying */
       }
     }
     try {
@@ -239,12 +311,19 @@ export function PostCard({
       setMenuError("You can only repost an original post.");
       return;
     }
+    // Optimistic: bump the repost count + show the toast instantly; revert the
+    // count if the action fails (realtime echo reconciles on success). targetId
+    // is always this post here (repost-of cases early-returned above), so the
+    // bump and the trigger's repost_count UPDATE target the same row.
+    touchLocal();
+    setReposts((c) => c + 1);
     startTransition(async () => {
       const res = await repostPostAction(targetId);
       if (res.ok) {
         setRepostToast(true);
         setTimeout(() => setRepostToast(false), 2500);
       } else {
+        setReposts((c) => Math.max(0, c - 1));
         setMenuError(res.error ?? "Could not repost.");
       }
     });
@@ -346,10 +425,20 @@ export function PostCard({
       className={cn(
         "group relative border-b border-bone bg-paper transition-colors duration-200",
         "hover:bg-cream/60",
-        isPinned && "bg-saffron/2",
-        isPending && "opacity-70"
+        isPinned && "border-l-2 border-l-saffron bg-saffron/6",
+        (isPending || isPostingOptimistic) && "opacity-70"
       )}
     >
+      {/* Optimistic "Posting..." badge for a just-submitted post. */}
+      {isPostingOptimistic ? (
+        <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 sm:px-5">
+          <span className="size-1.5 animate-pulse rounded-full bg-saffron" />
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-saffron">
+            Posting...
+          </span>
+        </div>
+      ) : null}
+
       {/* Pinned badge */}
       {isPinned ? (
         <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 sm:px-5">
@@ -377,11 +466,11 @@ export function PostCard({
             tabIndex={-1}
             aria-hidden="true"
           >
-            <Avatar name={post.author.name} size="md" className="ring-2 ring-bone hover:ring-saffron/30 transition-all" />
+            <Avatar name={post.author.name} src={post.author.avatar_url ?? undefined} size="md" className="ring-2 ring-bone hover:ring-saffron/30 transition-all" />
           </a>
         ) : (
           <span className="shrink-0 mt-0.5" aria-hidden="true">
-            <Avatar name={post.author.name} size="md" className="ring-2 ring-bone transition-all" />
+            <Avatar name={post.author.name} src={post.author.avatar_url ?? undefined} size="md" className="ring-2 ring-bone transition-all" />
           </span>
         )}
 
@@ -404,12 +493,17 @@ export function PostCard({
               ) : null}
               {post.author.college ? (
                 <>
-                  <span className="text-xs text-bone select-none">&middot;</span>
+                  <span className="text-xs text-ash/60 select-none">&middot;</span>
                   <span className="text-xs text-ash truncate">{post.author.college}</span>
                 </>
               ) : null}
-              <span className="text-xs text-bone select-none">&middot;</span>
-              <span className="text-xs text-ash">{post.time}</span>
+              <span className="text-xs text-ash/60 select-none">&middot;</span>
+              <span
+                className="text-xs text-ash"
+                title={post.created_at ? absoluteTime(post.created_at) : undefined}
+              >
+                {post.time}
+              </span>
             </div>
 
             {/* 3-dot menu */}
@@ -420,7 +514,7 @@ export function PostCard({
                 aria-label="Post options"
                 className={cn(
                   "flex size-7 items-center justify-center rounded-full text-ash",
-                  "opacity-0 group-hover:opacity-100 transition-all",
+                  "opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all",
                   "hover:bg-bone hover:text-ink disabled:opacity-30",
                   menuOpen && "opacity-100 bg-bone text-ink"
                 )}
@@ -451,13 +545,28 @@ export function PostCard({
             </div>
           </div>
 
-          {/* Reposter's own added body (optional thought above the original) */}
+          {/* Body - clamped to ~6 lines with an in-place "see more" (no navigation,
+              no fetch). Long posts no longer make a card a full screen tall. */}
           {post.body ? (
-            <Link href={`/p/${post.short_id}`} className="block">
-              <p className="mt-2.5 text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word">
+            <div className="mt-2.5">
+              <p
+                className={cn(
+                  "text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word",
+                  !expanded && "line-clamp-6"
+                )}
+              >
                 {post.body}
               </p>
-            </Link>
+              {!expanded && post.body.length > 320 ? (
+                <button
+                  type="button"
+                  onClick={() => setExpanded(true)}
+                  className="mt-0.5 text-sm font-medium text-saffron transition-colors hover:text-saffron-dk"
+                >
+                  see more
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {isRepost ? (
@@ -480,20 +589,13 @@ export function PostCard({
                 </div>
               ) : null}
 
-              {/* Image (click opens the post) */}
-              {post.image ? (
-                <Link
-                  href={`/p/${post.short_id}`}
-                  className="mt-4 block aspect-video w-full overflow-hidden rounded-xl border border-bone bg-bone/40"
-                >
-                  <img
-                    src={post.image}
-                    alt=""
-                    loading="lazy"
-                    className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                  />
-                </Link>
-              ) : null}
+              {/* Real media gallery + inline video. Double-tap an image to like. */}
+              <PostMedia
+                images={post.images ?? []}
+                video={post.video ?? null}
+                shortId={post.short_id}
+                onDoubleLike={likeIfNeeded}
+              />
             </>
           )}
 
@@ -507,8 +609,17 @@ export function PostCard({
             </p>
           ) : null}
 
+          {/* Honest social-proof row (real aggregate counts only, live) */}
+          <ReactionSummary
+            likes={likes}
+            comments={comments}
+            reposts={reposts}
+            saves={saves}
+            viewerReaction={liked ? reaction : undefined}
+          />
+
           {/* Action bar */}
-          <div className="mt-4 -ml-2 flex items-center justify-between sm:justify-start sm:gap-1">
+          <div className="mt-2.5 -ml-2 flex items-center justify-between sm:justify-start sm:gap-1">
             {/* Reaction control */}
             <div
               ref={reactionRef}
@@ -516,7 +627,7 @@ export function PostCard({
               onMouseEnter={openReactionPopover}
               onMouseLeave={cancelReactionPopover}
             >
-              {/* Reaction popover — left-anchored but clamped so it never spills
+              {/* Reaction popover - left-anchored but clamped so it never spills
                   past the viewport edge on phones. */}
               {reactionPopoverOpen ? (
                 <div
@@ -596,7 +707,7 @@ export function PostCard({
             {/* Comment - links to full post thread */}
             <Link
               href={`/p/${post.short_id}`}
-              aria-label={`${post.stats.comments} comments`}
+              aria-label={`${comments} comments`}
               className={cn(
                 "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
                 "text-ash transition-all duration-150",
@@ -604,8 +715,8 @@ export function PostCard({
               )}
             >
               <MessageCircle className="size-4" />
-              {post.stats.comments > 0 ? (
-                <span className="tabular-nums text-xs">{post.stats.comments}</span>
+              {comments > 0 ? (
+                <span className="tabular-nums text-xs">{comments}</span>
               ) : null}
             </Link>
 
@@ -695,7 +806,12 @@ function EmbeddedOriginalCard({ original }: { original?: EmbeddedOriginal | null
     >
       {/* Original author row */}
       <div className="flex items-center gap-2.5">
-        <Avatar name={original.author.name} size="sm" className="shrink-0 ring-1 ring-bone" />
+        <Avatar
+          name={original.author.name}
+          src={original.author.avatar_url ?? undefined}
+          size="sm"
+          className="shrink-0 ring-1 ring-bone"
+        />
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
           <span className="text-sm font-semibold text-ink truncate">{original.author.name}</span>
           {original.author.handle ? (
@@ -703,11 +819,11 @@ function EmbeddedOriginalCard({ original }: { original?: EmbeddedOriginal | null
           ) : null}
           {original.author.college ? (
             <>
-              <span className="text-xs text-bone select-none">&middot;</span>
+              <span className="text-xs text-ash/60 select-none">&middot;</span>
               <span className="text-xs text-ash truncate">{original.author.college}</span>
             </>
           ) : null}
-          <span className="text-xs text-bone select-none">&middot;</span>
+          <span className="text-xs text-ash/60 select-none">&middot;</span>
           <span className="text-xs text-ash">{original.time}</span>
         </div>
       </div>
@@ -730,12 +846,14 @@ function EmbeddedOriginalCard({ original }: { original?: EmbeddedOriginal | null
         </div>
       ) : null}
 
-      {/* Original image */}
-      {original.image ? (
-        <div className="mt-3 aspect-video w-full overflow-hidden rounded-lg border border-bone bg-bone/40">
-          <img src={original.image} alt="" loading="lazy" className="size-full object-cover" />
-        </div>
-      ) : null}
+      {/* Original media (gallery + video), compact + non-linking - the whole
+          embedded card is already a Link, so tiles must not nest anchors. */}
+      <PostMedia
+        images={original.images ?? []}
+        video={original.video ?? null}
+        shortId={original.short_id}
+        compact
+      />
 
       {/* Original engagement counts */}
       {(original.stats.likes > 0 || original.stats.comments > 0) ? (

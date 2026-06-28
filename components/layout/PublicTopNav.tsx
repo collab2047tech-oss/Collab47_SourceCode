@@ -3,7 +3,8 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Nav } from "@/components/landing/Nav";
 import { getMyProfile } from "@/lib/db/profiles";
 import { getUnreadCount } from "@/lib/db/notifications";
-import { Home, Compass, Users, Briefcase, MessageSquare, Newspaper, Bell } from "lucide-react";
+import { getSupabaseServer } from "@/lib/supabase/server";
+import { Home, Compass, Users, Briefcase, CalendarDays, MessageSquare, Newspaper, Bell } from "lucide-react";
 import { PublicMobileMenu } from "./PublicTopNavMobile";
 
 const LINKS = [
@@ -12,6 +13,7 @@ const LINKS = [
   { href: "/news", label: "News", icon: Newspaper },
   { href: "/network", label: "Network", icon: Users },
   { href: "/collabs", label: "Collabs", icon: Briefcase },
+  { href: "/events", label: "Events", icon: CalendarDays },
   { href: "/messages", label: "Messages", icon: MessageSquare },
 ];
 
@@ -22,10 +24,22 @@ const LINKS = [
  * so they never see "Sign up / Log in" while logged in.
  */
 export async function PublicTopNav() {
-  const profile = await getMyProfile();
+  // Decide signed-in vs signed-out from the AUTH SESSION, never from the profile
+  // row. getMyProfile() can return null for a genuinely-authenticated user
+  // (onboarding incomplete, profile-read race, or a transient session refresh) -
+  // and falling back to the marketing nav there is exactly the "I see Log in /
+  // Get started while logged in" bug. Only a missing USER means signed out.
+  const sb = await getSupabaseServer();
+  const { data: { user } } = sb
+    ? await sb.auth.getUser()
+    : { data: { user: null } };
 
   // Signed out -> marketing nav.
-  if (!profile) return <Nav />;
+  if (!user) return <Nav />;
+
+  // Signed in: render app navigation even if the profile row isn't ready yet.
+  const profile = await getMyProfile();
+  const displayName = profile?.name ?? "You";
 
   const unread = await getUnreadCount();
   const badge = unread > 9 ? "9+" : unread > 0 ? String(unread) : null;
@@ -69,14 +83,14 @@ export async function PublicTopNav() {
           </Link>
           <Link href="/profile" aria-label="Your profile" className="shrink-0">
             <Avatar
-              name={profile.name}
-              src={profile.avatar_url ?? undefined}
+              name={displayName}
+              src={profile?.avatar_url ?? undefined}
               size="sm"
               className="ring-2 ring-bone transition-all hover:ring-saffron/40"
             />
           </Link>
           {/* Mobile menu: exposes app navigation on small screens.
-              (Defines its own links — passing icon fns server->client 500s.) */}
+              (Defines its own links - passing icon fns server->client 500s.) */}
           <PublicMobileMenu />
         </div>
       </div>

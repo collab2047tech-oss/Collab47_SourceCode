@@ -26,7 +26,7 @@ export interface PostWithAuthor extends Post {
   reposted_from?: RepostedOriginal | null;
 }
 
-// Author embed fragment (profiles FK — works fine).
+// Author embed fragment (profiles FK - works fine).
 const AUTHOR_EMBED =
   "author:profiles!posts_author_id_fkey(handle,name,avatar_url,college)";
 
@@ -242,7 +242,7 @@ export interface CommentWithAuthor {
   body: string;
   created_at: string;
   parent_comment_id: string | null;
-  /** The author's user id — needed so the UI can show "Delete" only to the author. */
+  /** The author's user id - needed so the UI can show "Delete" only to the author. */
   author_id: string;
   author: { handle: string; name: string; avatar_url: string | null };
 }

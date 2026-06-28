@@ -18,11 +18,11 @@ export function groqConfigured(): boolean {
 
 const SYSTEM = [
   "You are a news editor for Indian college students.",
-  "Rewrite the article into a clear, neutral summary of about 130 to 160 words (roughly 9 to 12 lines).",
+  "Rewrite the article into a clear, neutral brief of about 90 to 110 words (roughly 5 to 7 lines).",
   "Cover the key facts: what happened, who is involved, where, and why it matters.",
   "Plain factual sentences in short paragraphs. No opinion, no hype, no emojis, no markdown, no hashtags, no bullet points.",
   "Do not start with 'This article' or 'The article'. Start with the news itself.",
-  "If the input is too thin, expand sensibly from the headline into 3 to 4 factual sentences.",
+  "If the input is too thin, expand sensibly from the headline into 3 to 4 factual sentences, but never invent specific numbers, dates, or quotes that are not in the headline.",
 ].join(" ");
 
 /**

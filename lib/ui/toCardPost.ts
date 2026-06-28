@@ -13,6 +13,21 @@ export function relativeTime(iso: string): string {
   return `${Math.floor(days / 7)}w`;
 }
 
+/** Absolute, locale-aware timestamp for the "hover for exact time" affordance. */
+export function absoluteTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
 // Map a DB post row to the shape PostCard renders.
 export function toCardPost(p: PostWithAuthor): CardPost {
   return {
@@ -23,15 +38,21 @@ export function toCardPost(p: PostWithAuthor): CardPost {
       name: p.author?.name ?? "Unknown",
       handle: p.author?.handle ?? "",
       college: p.author?.college ?? "",
+      avatar_url: p.author?.avatar_url ?? null,
     },
     time: relativeTime(p.created_at),
+    created_at: p.created_at,
     body: p.body,
     tags: p.hashtags ?? [],
-    image: p.image_urls?.[0],
+    // Carry EVERY image and the video, not just image_urls[0]. The card renders
+    // a real media gallery / inline <video> from these.
+    images: p.image_urls ?? [],
+    video: p.video_url ?? null,
     stats: {
       likes: p.like_count ?? 0,
       comments: p.comment_count ?? 0,
       saves: p.bookmark_count ?? 0,
+      reposts: p.repost_count ?? 0,
     },
     variant: "standard",
     is_pinned: p.is_pinned,
@@ -44,11 +65,13 @@ export function toCardPost(p: PostWithAuthor): CardPost {
               name: p.reposted_from.author?.name ?? "Unknown",
               handle: p.reposted_from.author?.handle ?? "",
               college: p.reposted_from.author?.college ?? "",
+              avatar_url: p.reposted_from.author?.avatar_url ?? null,
             },
             time: relativeTime(p.reposted_from.created_at),
             body: p.reposted_from.body,
             tags: p.reposted_from.hashtags ?? [],
-            image: p.reposted_from.image_urls?.[0],
+            images: p.reposted_from.image_urls ?? [],
+            video: p.reposted_from.video_url ?? null,
             stats: {
               likes: p.reposted_from.like_count ?? 0,
               comments: p.reposted_from.comment_count ?? 0,

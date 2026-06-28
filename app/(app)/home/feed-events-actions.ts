@@ -12,7 +12,7 @@ export interface FeedEventInput {
 }
 
 /**
- * Record real feed interaction events — the behavioural fuel that powers
+ * Record real feed interaction events - the behavioural fuel that powers
  * engagement-rate, dedup ("seen"), and the learned ranker. Fire-and-forget from
  * the client (IntersectionObserver beacons). User-scoped by RLS.
  */

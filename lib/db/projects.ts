@@ -248,7 +248,7 @@ export async function acceptApplicant(input: {
   const admin = getAdminClient();
   if (!admin) return { ok: false, error: "Server not configured." };
 
-  // The applicant must have a pending application — guards against accepting a
+  // The applicant must have a pending application - guards against accepting a
   // user who never applied (or whose application was already resolved).
   const { data: application } = await admin
     .from("project_applications")
@@ -269,7 +269,7 @@ export async function acceptApplicant(input: {
     .maybeSingle();
 
   // Enforce the 5-member cap on ACCEPT (owner counts toward the 5). Applying is
-  // never blocked — only the act of accepting a 6th member is.
+  // never blocked - only the act of accepting a 6th member is.
   if (!alreadyMember) {
     const { count: memberCount } = await admin
       .from("project_members")
@@ -552,7 +552,7 @@ export async function markProjectDelivered(input: {
           userId: m.user_id,
           kind: "project_accepted",
           actorName: actor.name,
-          text: `${actor.name} marked your project delivered — you're now a Verified contributor`,
+          text: `${actor.name} marked your project delivered - you're now a Verified contributor`,
           href: `/c/${project.short_id as string}`,
         });
       }

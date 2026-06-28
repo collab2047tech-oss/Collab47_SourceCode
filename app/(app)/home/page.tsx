@@ -1,20 +1,17 @@
 import Link from "next/link";
-import { PostComposer } from "@/components/composite/PostComposer";
-import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Reveal } from "@/components/motion/Reveal";
-import { HomeFeed } from "@/components/composite/HomeFeed";
-import { FeedFilters } from "@/components/composite/FeedFilters";
-import { getForYouFeed, getRecentFeed, getPopularFeed, getTrendingFeed } from "@/lib/db/feed";
-import { getMyEngagementState } from "@/lib/db/engagement";
-import { getSuggestedConnections } from "@/lib/db/social";
+import { FeedClient } from "@/components/composite/FeedClient";
+import { NewsRail } from "@/components/composite/NewsRail";
+import { SuggestedFollowRow } from "@/components/composite/SuggestedFollowRow";
+import { getFeedPage, recentIsDiscovery, type FeedPrefs } from "@/lib/db/feed";
+import { getSuggestedPeople, getRelationshipStates } from "@/lib/db/social";
 import { getMyProfile } from "@/lib/db/profiles";
-import { getNewsForUser } from "@/lib/news/fetch";
-import { toCardPost, relativeTime } from "@/lib/ui/toCardPost";
+import { getRankedNewsForUser } from "@/lib/news/fetch";
+import { toCardsWithEng } from "@/lib/ui/withEng";
 import { createPostAction } from "./actions";
 import {
   TrendingUp,
-  ExternalLink,
   Sparkles,
   Hash,
 } from "lucide-react";
@@ -23,44 +20,35 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const profile = await getMyProfile();
-  const branch = profile?.branch ?? undefined;
-  const city = profile?.city ?? undefined;
-  const feedPrefs =
-    (profile?.feed_prefs as { only_follows?: boolean; hide_news?: boolean; hide_projects?: boolean } | null) ?? null;
-
-  const [forYouRaw, recentRaw, popularRaw, trendingRaw, suggested, branchNews, latestNews] =
-    await Promise.all([
-      getForYouFeed(20),
-      getRecentFeed(20),
-      getPopularFeed(20),
-      getTrendingFeed(20),
-      getSuggestedConnections(5),
-      getNewsForUser(branch, city, 12),
-      getNewsForUser(undefined, undefined, 15),
-    ]);
-
-  const newsRaw = branchNews.length > 0 ? branchNews : latestNews;
-
-  const allIds = [
-    ...new Set([...forYouRaw, ...recentRaw, ...popularRaw, ...trendingRaw].map((p) => p.id)),
-  ];
-  const eng = await getMyEngagementState(allIds);
-  const withEng = (p: (typeof forYouRaw)[number]) => {
-    const card = toCardPost(p);
-    card.liked = eng.likes.has(p.id);
-    card.saved = eng.bookmarks.has(p.id);
-    card.reaction = eng.reactions.get(p.id);
-    return card;
+  const rawPrefs =
+    (profile?.feed_prefs as { only_follows?: boolean; hide_projects?: boolean } | null) ?? null;
+  const prefs: FeedPrefs = {
+    only_follows: Boolean(rawPrefs?.only_follows),
+    hide_projects: Boolean(rawPrefs?.hide_projects),
   };
 
-  const forYou = forYouRaw.map(withEng);
-  const recent = recentRaw.map(withEng);
-  const popular = popularRaw.map(withEng);
-  const trendingPosts = trendingRaw.map(withEng);
+  // Only the DEFAULT tab (For you) is fetched server-side. The other tabs lazy-
+  // load their first page on first activation. This cuts first-paint work ~4x
+  // versus the old eager 4-feed fetch.
+  const [foryouPage, isRecentDiscovery, suggested, news] = await Promise.all([
+    getFeedPage("foryou", { prefs, limit: 12 }),
+    recentIsDiscovery(),
+    getSuggestedPeople(5),
+    getRankedNewsForUser(6),
+  ]);
 
-  // Trending hashtags from the live "for you" pool
+  // Follow state for the rail people so the optimistic Follow button starts in
+  // the correct state instead of always reading "Follow". This and the card
+  // hydration both depend only on the first batch above and are independent of
+  // each other, so run them concurrently instead of serially.
+  const [suggestedRel, forYou] = await Promise.all([
+    getRelationshipStates(suggested.map((p) => p.id)),
+    toCardsWithEng(foryouPage.posts),
+  ]);
+
+  // Trending hashtags from the live "for you" pool (also feeds composer tags).
   const counts = new Map<string, number>();
-  for (const p of forYouRaw) {
+  for (const p of foryouPage.posts) {
     for (const t of p.hashtags ?? []) {
       const tag = t.toLowerCase();
       counts.set(tag, (counts.get(tag) ?? 0) + 1);
@@ -71,7 +59,6 @@ export default async function HomePage() {
     .slice(0, 6)
     .map(([tag, count]) => ({ tag, count }));
 
-  const brief = newsRaw[0] ?? null;
   const interests = profile?.interests ?? [];
 
   // ---------------------------------------------------------------------------
@@ -117,21 +104,15 @@ export default async function HomePage() {
         </div>
         <div className="space-y-1">
           {suggested.map((p) => (
-            <Link
+            <SuggestedFollowRow
               key={p.id}
-              href={`/u/${p.handle}`}
-              className="group -mx-1.5 flex items-center gap-2.5 rounded-lg p-1.5 transition-colors hover:bg-bone/50"
-            >
-              <Avatar name={p.name} src={p.avatar_url ?? undefined} size="sm" className="shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink transition-colors group-hover:text-saffron">
-                  {p.name}
-                </p>
-                <p className="truncate text-xs text-ash">
-                  {[p.branch, p.college].filter(Boolean).join(" - ")}
-                </p>
-              </div>
-            </Link>
+              id={p.id}
+              name={p.name}
+              handle={p.handle}
+              avatarUrl={p.avatar_url}
+              subtitle={[p.branch, p.college].filter(Boolean).join(" - ") || null}
+              initialFollowing={suggestedRel[p.id]?.isFollowing ?? false}
+            />
           ))}
         </div>
       </section>
@@ -161,30 +142,10 @@ export default async function HomePage() {
       </section>
     ) : null;
 
-  const briefCard = brief ? (
-    <section className="card card-hover px-4 py-4">
-      <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-ash">Daily brief</p>
-      <a href={brief.url} target="_blank" rel="noopener noreferrer" className="group block">
-        <div className="mb-2 flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-saffron">
-            {brief.source}
-          </span>
-          <span className="select-none text-bone">&middot;</span>
-          <span className="text-xs text-ash">{relativeTime(brief.published_at)}</span>
-        </div>
-        <h3
-          className="text-sm font-medium leading-snug text-ink transition-colors group-hover:text-saffron"
-          style={{ fontFamily: "var(--font-serif)" }}
-        >
-          {brief.title}
-        </h3>
-        <div className="mt-2 flex items-center gap-1 text-xs text-ash transition-colors group-hover:text-saffron">
-          <ExternalLink className="size-3" />
-          <span>Read more</span>
-        </div>
-      </a>
-    </section>
-  ) : null;
+  // Daily brief - the full viewer-ranked news rail (internal /news/[id] links,
+  // Save / discuss / share on each story). Fetched once above, shared by the
+  // desktop rail and the slimmed mobile rail.
+  const briefCard = news.length > 0 ? <NewsRail items={news} /> : null;
 
   return (
     <div className="mx-auto max-w-270">
@@ -193,30 +154,24 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
 
         {/* ---------------------------------------------------------------- */}
-        {/* CENTER — composer + tabs + feed                                  */}
+        {/* CENTER - composer + filters + tabs + feed (one client island)    */}
         {/* ---------------------------------------------------------------- */}
         <div className="min-w-0">
           <Reveal>
-            <div id="composer" className="scroll-mt-24">
-              <PostComposer action={createPostAction} />
-            </div>
+            <FeedClient
+              initialForYou={{ posts: forYou, nextCursor: foryouPage.nextCursor }}
+              recentIsDiscovery={isRecentDiscovery}
+              initialPrefs={prefs}
+              currentUserId={profile?.id ?? ""}
+              me={{
+                name: profile?.name ?? "You",
+                handle: profile?.handle ?? "",
+                avatar_url: profile?.avatar_url ?? null,
+              }}
+              suggestedTags={trending.map((t) => t.tag)}
+              createAction={createPostAction}
+            />
           </Reveal>
-
-          <FeedFilters
-            initial={{
-              only_follows: Boolean(feedPrefs?.only_follows),
-              hide_news: Boolean(feedPrefs?.hide_news),
-              hide_projects: Boolean(feedPrefs?.hide_projects),
-            }}
-          />
-
-          <HomeFeed
-            forYou={forYou}
-            recent={recent}
-            popular={popular}
-            trending={trendingPosts}
-            currentUserId={profile?.id ?? ""}
-          />
 
           {/* Mobile-only slimmed rail below the feed. Keeps the most useful
               discovery surfaces (People + Daily brief) without clutter. */}
@@ -233,10 +188,12 @@ export default async function HomePage() {
         </div>
 
         {/* ---------------------------------------------------------------- */}
-        {/* RIGHT RAIL — Trending + People + Interests + Daily brief         */}
+        {/* RIGHT RAIL - Trending + People + Interests + Daily brief         */}
+        {/* Sticky + self-scrolling so it stays visible as the infinite      */}
+        {/* feed grows, and never traps the page scroll.                     */}
         {/* ---------------------------------------------------------------- */}
         <aside className="hidden lg:block">
-          <div className="sticky top-24 space-y-4">
+          <div className="sticky top-20 max-h-[calc(100vh-6rem)] space-y-4 overflow-y-auto no-scrollbar pb-6">
             {trendingCard ? <Reveal>{trendingCard}</Reveal> : null}
             {peopleCard ? <Reveal delay={0.06}>{peopleCard}</Reveal> : null}
             {interestsCard ? <Reveal delay={0.12}>{interestsCard}</Reveal> : null}

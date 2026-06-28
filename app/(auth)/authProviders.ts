@@ -6,7 +6,7 @@
  * that, so we gate the UI on explicit public env flags. When a flag is unset
  * (the default), the corresponding button renders as a disabled "Coming soon"
  * control instead of a live button that would throw a raw Supabase error like
- * "Unsupported provider" / "phone signups are disabled" — i.e. no dead buttons.
+ * "Unsupported provider" / "phone signups are disabled" - i.e. no dead buttons.
  *
  * To turn a method on, set the flag to "true" in the environment AND enable the
  * provider in Supabase:

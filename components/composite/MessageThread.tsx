@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { Avatar } from "@/components/primitives/Avatar";
 import { cn } from "@/lib/cn";
-import { markReadAction } from "@/app/(app)/messages/actions";
-import type { MessageWithSender } from "@/lib/db/messages";
+import { ArrowDown, Clock, Loader2, AlertCircle, ChevronUp } from "lucide-react";
+import { useThread, type ThreadMessage } from "@/components/messages/ThreadProvider";
 
 interface MessageThreadProps {
   conversationId: string;
-  initialMessages: MessageWithSender[];
   currentUserId: string;
 }
 
@@ -22,140 +21,93 @@ function formatTime(iso: string): string {
 }
 
 function groupByDate(
-  messages: MessageWithSender[]
-): Array<{ label: string; messages: MessageWithSender[] }> {
-  const groups: Record<string, MessageWithSender[]> = {};
+  messages: ThreadMessage[]
+): Array<{ label: string; messages: ThreadMessage[] }> {
+  const groups: Record<string, ThreadMessage[]> = {};
+  const order: string[] = [];
   for (const msg of messages) {
     const day = new Date(msg.created_at).toLocaleDateString([], {
       month: "short",
       day: "numeric",
     });
-    if (!groups[day]) groups[day] = [];
+    if (!groups[day]) {
+      groups[day] = [];
+      order.push(day);
+    }
     groups[day].push(msg);
   }
-  return Object.entries(groups).map(([label, messages]) => ({
-    label,
-    messages,
-  }));
+  return order.map((label) => ({ label, messages: groups[label] }));
 }
+
+const NEAR_BOTTOM_PX = 120;
 
 export function MessageThread({
   conversationId,
-  initialMessages,
   currentUserId,
 }: MessageThreadProps) {
-  const [messages, setMessages] = useState<MessageWithSender[]>(initialMessages);
+  const { messages, lastSeenOwnId, loadEarlier, hasMore, loadingEarlier } =
+    useThread();
   const [typingVisible, setTypingVisible] = useState(false);
+  const [newCount, setNewCount] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduce = useReducedMotion();
 
-  // Merge fresh server data when the page revalidates (router.refresh after a
-  // send). useState only seeds on mount, so without this a just-sent message
-  // would not appear until a full reload if realtime is delayed/unavailable.
-  useEffect(() => {
-    setMessages((prev) => {
-      const seen = new Set(prev.map((m) => m.id));
-      const added = initialMessages.filter((m) => !seen.has(m.id));
-      if (added.length === 0) return prev;
-      return [...prev, ...added].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-    });
-  }, [initialMessages]);
+  // Track whether the user is near the bottom so new messages don't hijack a
+  // scrolled-up reader. Also remember the last message id we accounted for.
+  const isNearBottomRef = useRef(true);
+  const lastCountRef = useRef(messages.length);
+  const lastBottomIdRef = useRef<string | null>(null);
+  const didInitialScrollRef = useRef(false);
 
-  const scrollToBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    bottomRef.current?.scrollIntoView({ behavior });
+    setNewCount(0);
   }, []);
 
-  // Scroll on mount and when messages change
+  // First mount: jump to bottom INSTANTLY (no top->bottom slide).
+  useLayoutEffect(() => {
+    if (didInitialScrollRef.current) return;
+    scrollToBottom("auto");
+    didInitialScrollRef.current = true;
+    lastBottomIdRef.current = messages[messages.length - 1]?.id ?? null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    isNearBottomRef.current = distance < NEAR_BOTTOM_PX;
+    if (isNearBottomRef.current && newCount > 0) setNewCount(0);
+  }
+
+  // On a new message: auto-scroll if the reader is near the bottom OR the new
+  // message is their own; otherwise surface the "new messages" pill.
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    if (!didInitialScrollRef.current) return;
+    if (messages.length <= lastCountRef.current) {
+      lastCountRef.current = messages.length;
+      return;
+    }
+    lastCountRef.current = messages.length;
+    const last = messages[messages.length - 1];
+    if (!last || last.id === lastBottomIdRef.current) return;
+    lastBottomIdRef.current = last.id;
 
-  // Mark read on mount and visibility change
-  useEffect(() => {
-    markReadAction(conversationId);
+    const isOwn = last.sender_id === currentUserId;
+    if (isOwn || isNearBottomRef.current) {
+      scrollToBottom(reduce ? "auto" : "smooth");
+    } else {
+      setNewCount((n) => n + 1);
+    }
+  }, [messages, currentUserId, reduce, scrollToBottom]);
 
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        markReadAction(conversationId);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [conversationId]);
-
-  // Realtime subscription
+  // Typing indicator rides a separate broadcast channel.
   useEffect(() => {
     const sb = getSupabaseBrowser();
     if (!sb) return;
-
-    const channel = sb
-      .channel(`messages:conversation_id=eq.${conversationId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload) => {
-          const newMsg = payload.new as MessageWithSender;
-
-          // Fetch sender profile to attach
-          const { data: senderProfile } = await sb
-            .from("profiles")
-            .select("id, handle, name, avatar_url, college")
-            .eq("id", newMsg.sender_id)
-            .maybeSingle();
-
-          const msgWithSender: MessageWithSender = {
-            ...newMsg,
-            sender: senderProfile ?? {
-              id: newMsg.sender_id,
-              handle: "",
-              name: "Unknown",
-              avatar_url: null,
-              college: null,
-            },
-          };
-
-          setMessages((prev) => {
-            // Avoid duplicate if already in state
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, msgWithSender];
-          });
-
-          if (newMsg.sender_id !== currentUserId) {
-            markReadAction(conversationId);
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          // Keep read receipts ("Seen") and any other field edits live without
-          // a refresh. Merge by id so we don't lose the attached sender profile.
-          const updated = payload.new as MessageWithSender;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === updated.id ? { ...m, ...updated, sender: m.sender } : m
-            )
-          );
-        }
-      )
-      .subscribe();
-
-    // Typing indicator rides a separate broadcast channel (`typing:<id>`) that
-    // the composer subscribes to and sends on. Ignore our own broadcasts.
     const typingChannel = sb
       .channel(`typing:${conversationId}`)
       .on("broadcast", { event: "typing" }, (payload) => {
@@ -166,106 +118,198 @@ export function MessageThread({
         }
       })
       .subscribe();
-
     return () => {
-      sb.removeChannel(channel);
       sb.removeChannel(typingChannel);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
   }, [conversationId, currentUserId]);
 
+  // "Load earlier" preserving scroll position: measure height before/after.
+  const handleLoadEarlier = useCallback(async () => {
+    const el = scrollRef.current;
+    const prevHeight = el?.scrollHeight ?? 0;
+    const prevTop = el?.scrollTop ?? 0;
+    await loadEarlier();
+    requestAnimationFrame(() => {
+      const next = scrollRef.current;
+      if (!next) return;
+      next.scrollTop = prevTop + (next.scrollHeight - prevHeight);
+    });
+  }, [loadEarlier]);
+
   const groups = groupByDate(messages);
 
-  // "Seen" indicator: the id of the current user's most recent message that the
-  // other party has read (read_at set). Honors read receipts — the server only
-  // stamps read_at when the reader has the privacy setting enabled.
-  const lastSeenOwnId = (() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (m.sender_id === currentUserId && m.read_at) return m.id;
-    }
-    return null;
-  })();
-
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-6 no-scrollbar sm:px-6 sm:py-8">
-      {messages.length === 0 && (
-        <div className="flex h-full flex-col items-center justify-center text-center">
-          <p className="text-sm text-ash">No messages yet.</p>
-          <p className="mt-1 text-sm text-ash">Start the conversation.</p>
-        </div>
-      )}
+    <div className="relative min-h-0 flex-1">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto px-3 py-6 no-scrollbar sm:px-6 sm:py-8"
+      >
+        {hasMore && messages.length > 0 && (
+          <div className="mb-4 flex justify-center">
+            <button
+              onClick={handleLoadEarlier}
+              disabled={loadingEarlier}
+              className="flex items-center gap-1.5 rounded-full border border-bone bg-paper px-4 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-bone active:scale-95 disabled:opacity-50"
+            >
+              {loadingEarlier ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <ChevronUp className="size-3.5" />
+              )}
+              {loadingEarlier ? "Loading" : "Load earlier"}
+            </button>
+          </div>
+        )}
 
-      {groups.map((group) => (
-        <div key={group.label}>
-          <p className="text-caption mb-4 mt-2 text-center">{group.label}</p>
-          <div className="space-y-2">
-            {group.messages.map((msg) => {
-              const isOwn = msg.sender_id === currentUserId;
-              return (
-                <motion.div
-                  key={msg.id}
-                  initial={reduce ? false : { opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: reduce ? 0 : 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className={cn("flex items-end gap-2", isOwn ? "justify-end" : "justify-start")}
-                >
-                  {!isOwn && (
-                    <Avatar
-                      name={msg.sender?.name ?? "?"}
-                      src={msg.sender?.avatar_url ?? undefined}
-                      size="xs"
-                      className="mb-1 shrink-0"
-                    />
-                  )}
-                  <div
-                    className={cn(
-                      "min-w-0 max-w-[78%] rounded-2xl px-4 py-2.5 text-sm sm:max-w-md",
-                      isOwn
-                        ? "rounded-br-md bg-saffron text-cream"
-                        : "rounded-bl-md border border-bone bg-paper text-ink"
-                    )}
-                  >
-                    {msg.image_url && (
-                      <img
-                        src={msg.image_url}
-                        alt="Image attachment"
-                        className="mb-2 max-h-48 w-full max-w-full rounded-lg object-cover"
-                      />
-                    )}
-                    {msg.body && (
-                      <p className="whitespace-pre-wrap break-words">{msg.body}</p>
-                    )}
-                    <p
+        {messages.length === 0 && (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <p className="text-sm text-ash">No messages yet.</p>
+            <p className="mt-1 text-sm text-ash">Start the conversation.</p>
+          </div>
+        )}
+
+        {groups.map((group) => (
+          <div key={group.label}>
+            <p className="text-caption mb-4 mt-2 text-center">{group.label}</p>
+            <div className="space-y-2">
+              <AnimatePresence initial={false}>
+                {group.messages.map((msg) => {
+                  const isOwn = msg.sender_id === currentUserId;
+                  const imageSrc = msg.image_url ?? msg.localImageUrl ?? null;
+                  return (
+                    <motion.div
+                      key={msg.client_id ?? msg.id}
+                      layout={reduce ? false : "position"}
+                      initial={reduce ? false : { opacity: 0, y: 6, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: reduce ? 0 : 0.22,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
                       className={cn(
-                        "mt-1 flex items-center gap-1 text-[10px]",
-                        isOwn ? "justify-end text-cream/70" : "text-ash"
+                        "flex items-end gap-2",
+                        isOwn ? "justify-end" : "justify-start"
                       )}
                     >
-                      {formatTime(msg.created_at)}
-                      {isOwn && msg.id === lastSeenOwnId && (
-                        <span className="font-medium">· Seen</span>
+                      {!isOwn && (
+                        <Avatar
+                          name={msg.sender?.name ?? "?"}
+                          src={msg.sender?.avatar_url ?? undefined}
+                          size="xs"
+                          className="mb-1 shrink-0"
+                        />
                       )}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+                      <div
+                        className={cn(
+                          "min-w-0 max-w-[78%] rounded-2xl px-4 py-2.5 text-sm sm:max-w-md",
+                          isOwn
+                            ? "rounded-br-md bg-saffron text-cream"
+                            : "rounded-bl-md border border-bone bg-paper text-ink",
+                          msg.status === "failed" && "opacity-80"
+                        )}
+                      >
+                        {imageSrc && (
+                          <div className="mb-2 overflow-hidden rounded-lg">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imageSrc}
+                              alt="Image attachment"
+                              className={cn(
+                                "max-h-60 w-full max-w-full object-cover transition-opacity",
+                                msg.status === "sending" && "opacity-70"
+                              )}
+                            />
+                          </div>
+                        )}
+                        {msg.body && (
+                          <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                        )}
+                        <p
+                          className={cn(
+                            "mt-1 flex items-center justify-end gap-1 text-[10px]",
+                            isOwn ? "text-cream/90" : "text-ash"
+                          )}
+                        >
+                          {msg.status === "sending" ? (
+                            <>
+                              <Clock className="size-3 animate-pulse" />
+                              <span>Sending</span>
+                            </>
+                          ) : (
+                            <>
+                              {formatTime(msg.created_at)}
+                              {isOwn && msg.id === lastSeenOwnId && (
+                                <span className="font-medium text-cream">
+                                  {" "}· Seen
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      {isOwn && msg.status === "failed" && (
+                        <RetryFailed clientId={msg.client_id} />
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
-      {typingVisible && (
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-bone bg-paper px-4 py-3">
-            <span className="size-1.5 animate-bounce rounded-full bg-ash [animation-delay:-0.2s]" />
-            <span className="size-1.5 animate-bounce rounded-full bg-ash [animation-delay:-0.1s]" />
-            <span className="size-1.5 animate-bounce rounded-full bg-ash" />
+        {typingVisible && (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-2xl rounded-bl-md border border-bone bg-paper px-4 py-3">
+              <span className="size-1.5 animate-bounce rounded-full bg-ash [animation-delay:-0.2s]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-ash [animation-delay:-0.1s]" />
+              <span className="size-1.5 animate-bounce rounded-full bg-ash" />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <div ref={bottomRef} />
+        <div ref={bottomRef} />
+      </div>
+
+      {/* "New messages" pill - high contrast saffron, only when scrolled up. */}
+      <AnimatePresence>
+        {newCount > 0 && (
+          <motion.button
+            initial={reduce ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? undefined : { opacity: 0, y: 8 }}
+            transition={{ duration: reduce ? 0 : 0.2 }}
+            onClick={() => scrollToBottom(reduce ? "auto" : "smooth")}
+            className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-saffron px-4 py-2 text-xs font-semibold text-cream shadow-lg transition-transform active:scale-95"
+          >
+            <ArrowDown className="size-3.5" />
+            {newCount} new {newCount === 1 ? "message" : "messages"}
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+/** Tap-to-retry affordance on a failed own message. The composer owns the
+ * actual re-send (it has the upload + action wiring); we only signal intent. */
+function RetryFailed({ clientId }: { clientId: string | null }) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (!clientId) return;
+        window.dispatchEvent(
+          new CustomEvent("c47:dm:retry", { detail: { clientId } })
+        );
+      }}
+      aria-label="Retry sending"
+      className="mb-1 flex items-center gap-1 rounded-full bg-cream px-2 py-1 text-[10px] font-semibold text-ember transition-colors hover:bg-bone"
+    >
+      <AlertCircle className="size-3" />
+      Not delivered · Retry
+    </button>
   );
 }

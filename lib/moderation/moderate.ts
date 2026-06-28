@@ -1,8 +1,8 @@
 /**
- * moderateContent — two-layer content moderation. Server-only.
+ * moderateContent - two-layer content moderation. Server-only.
  *
  * Layer 1: Synchronous regex hard-rules (guardrail.ts). Fast, deterministic.
- * Layer 2: Groq Llama-Guard-3-8B AI toxicity check. Best-effort — any
+ * Layer 2: Groq Llama-Guard-3-8B AI toxicity check. Best-effort - any
  *           failure (no key, network error, 429, timeout) silently passes.
  *
  * Endpoint: POST https://api.groq.com/openai/v1/chat/completions
@@ -26,7 +26,7 @@ export async function moderateContent(
   // ── Layer 2: Groq Llama-Guard (best-effort) ──────────────────────────────
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    // No key configured — skip AI layer, rules already passed.
+    // No key configured - skip AI layer, rules already passed.
     return { ok: true };
   }
 
@@ -44,7 +44,7 @@ export async function moderateContent(
       signal: AbortSignal.timeout(8000),
     });
 
-    // Graceful degradation on rate-limit or server error — never block the user.
+    // Graceful degradation on rate-limit or server error - never block the user.
     if (!res.ok) {
       return { ok: true };
     }
@@ -62,7 +62,7 @@ export async function moderateContent(
 
     return { ok: true };
   } catch {
-    // Network error, AbortError (timeout), JSON parse failure — pass through.
+    // Network error, AbortError (timeout), JSON parse failure - pass through.
     return { ok: true };
   }
 }

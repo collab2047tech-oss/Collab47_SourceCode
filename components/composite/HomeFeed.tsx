@@ -1,53 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { PostCard, type Post as CardPost } from "@/components/composite/PostCard";
 import { cn } from "@/lib/cn";
-import { Rss, Clock, Flame, TrendingUp } from "lucide-react";
+import { Rss, Clock, Flame, TrendingUp, Check, Loader2, Users } from "lucide-react";
 import { FeedTracker } from "@/components/composite/FeedTracker";
+import type { FeedTab } from "@/lib/db/feed";
 
 interface HomeFeedProps {
-  forYou: CardPost[];
-  recent: CardPost[];
-  popular: CardPost[];
-  trending: CardPost[];
+  tab: FeedTab;
+  onTabChange: (tab: FeedTab) => void;
+  posts: CardPost[];
+  /** Whether this tab can load more (cursor present). */
+  hasMore: boolean;
+  /** True while this tab is fetching its first page or next page. */
+  loading: boolean;
+  /** Recent tab is showing a global discovery stream (viewer follows nobody). */
+  recentIsDiscovery: boolean;
+  onLoadMore: () => void;
   currentUserId: string;
 }
 
-type Tab = "foryou" | "recent" | "popular" | "trending";
+const TABS: { id: FeedTab; label: string; icon: React.ElementType }[] = [
+  { id: "foryou", label: "For you", icon: Rss },
+  { id: "recent", label: "Recent", icon: Clock },
+  { id: "popular", label: "Popular", icon: Flame },
+  { id: "trending", label: "Trending", icon: TrendingUp },
+];
 
-export function HomeFeed({ forYou, recent, popular, trending, currentUserId }: HomeFeedProps) {
-  const [tab, setTab] = useState<Tab>("foryou");
+export function HomeFeed({
+  tab,
+  onTabChange,
+  posts,
+  hasMore,
+  loading,
+  recentIsDiscovery,
+  onLoadMore,
+  currentUserId,
+}: HomeFeedProps) {
   const reduce = useReducedMotion();
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const tabs: { id: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { id: "foryou", label: "For you", icon: Rss, count: forYou.length },
-    { id: "recent", label: "Recent", icon: Clock, count: recent.length },
-    { id: "popular", label: "Popular", icon: Flame, count: popular.length },
-    { id: "trending", label: "Trending", icon: TrendingUp, count: trending.length },
-  ];
-
-  const posts =
-    tab === "foryou" ? forYou : tab === "recent" ? recent : tab === "popular" ? popular : trending;
+  // Infinite scroll: prefetch 800px before the user reaches the bottom.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) onLoadMore();
+      },
+      { rootMargin: "800px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loading, onLoadMore, tab]);
 
   return (
     <>
       {/* Real behavioural-signal capture (impressions + dwell) for the ranker. */}
       <FeedTracker />
-      {/* Sticky tab bar — horizontally scrollable on mobile, never overflows the page. */}
+
+      {/* Sticky tab bar - horizontally scrollable on mobile, never overflows. */}
       <div
         className={cn(
-          "sticky top-16 z-30 -mx-4 md:-mx-8",
+          // Bleed edge-to-edge on mobile/tablet (single column), but NOT at lg+
+          // where a right rail exists - the -mx bleed would overlap the rail's
+          // Trending card. lg:mx-0 keeps the bar inside its own column.
+          "sticky top-16 z-30 -mx-4 md:-mx-8 lg:mx-0",
           "border-b border-bone bg-cream/90 backdrop-blur-md"
         )}
       >
         <div
           role="tablist"
           aria-label="Feed sort"
-          className="flex items-center gap-0 overflow-x-auto px-4 no-scrollbar md:px-8"
+          className="flex items-center gap-0 overflow-x-auto px-4 no-scrollbar md:px-8 lg:px-5"
         >
-          {tabs.map((t) => {
+          {TABS.map((t) => {
             const Icon = t.icon;
             const active = tab === t.id;
             return (
@@ -55,26 +84,15 @@ export function HomeFeed({ forYou, recent, popular, trending, currentUserId }: H
                 key={t.id}
                 role="tab"
                 aria-selected={active}
-                onClick={() => setTab(t.id)}
+                onClick={() => onTabChange(t.id)}
                 className={cn(
                   "relative flex shrink-0 items-center gap-2 px-3.5 py-3.5 text-sm font-medium",
-                  "min-h-11 transition-colors active:scale-95",
-                  "sm:px-4",
+                  "min-h-11 transition-colors active:scale-95 sm:px-4",
                   active ? "text-ink" : "text-ash hover:text-ink"
                 )}
               >
                 <Icon className="size-3.5 shrink-0" />
                 <span>{t.label}</span>
-                {t.count > 0 ? (
-                  <span
-                    className={cn(
-                      "hidden rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums leading-none transition-colors sm:inline-block",
-                      active ? "bg-saffron/15 text-saffron-dk" : "bg-bone text-ash"
-                    )}
-                  >
-                    {t.count}
-                  </span>
-                ) : null}
                 {active ? (
                   <motion.span
                     layoutId={reduce ? undefined : "home-feed-tab-underline"}
@@ -89,24 +107,31 @@ export function HomeFeed({ forYou, recent, popular, trending, currentUserId }: H
       </div>
 
       {/* Content */}
-      <div className="mt-0">
-        <PostsTab key={tab} posts={posts} tab={tab} currentUserId={currentUserId} />
-      </div>
+      <PostsList
+        key={tab}
+        tab={tab}
+        posts={posts}
+        hasMore={hasMore}
+        loading={loading}
+        recentIsDiscovery={recentIsDiscovery}
+        sentinelRef={sentinelRef}
+        currentUserId={currentUserId}
+      />
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Posts tab
+// Posts list (first page animates in; appended pages render with no pop-in)
 // ---------------------------------------------------------------------------
 
-const EMPTY_COPY: Record<Tab, { title: string; body: string }> = {
+const EMPTY_COPY: Record<FeedTab, { title: string; body: string }> = {
   foryou: {
     title: "Your feed is just getting started",
     body: "Follow people or post something. Your personalised feed grows from there.",
   },
   recent: {
-    title: "Nobody in your feed yet",
+    title: "Nothing new yet",
     body: "Follow people to see their latest posts here. Head to Explore to find builders.",
   },
   popular: {
@@ -115,14 +140,30 @@ const EMPTY_COPY: Record<Tab, { title: string; body: string }> = {
   },
   trending: {
     title: "Nothing trending yet",
-    body: "Hot posts from the last 6 hours, tuned to your branch and city, appear here.",
+    body: "Posts accelerating in the last few hours, tuned to your branch and city, appear here.",
   },
 };
 
-function PostsTab({ posts, tab, currentUserId }: { posts: CardPost[]; tab: Tab; currentUserId: string }) {
+function PostsList({
+  tab,
+  posts,
+  hasMore,
+  loading,
+  recentIsDiscovery,
+  sentinelRef,
+  currentUserId,
+}: {
+  tab: FeedTab;
+  posts: CardPost[];
+  hasMore: boolean;
+  loading: boolean;
+  recentIsDiscovery: boolean;
+  sentinelRef: React.RefObject<HTMLDivElement>;
+  currentUserId: string;
+}) {
   const reduce = useReducedMotion();
 
-  if (posts.length === 0) {
+  if (posts.length === 0 && !loading) {
     const copy = EMPTY_COPY[tab];
     return (
       <div className="px-6 py-16 text-center">
@@ -134,22 +175,77 @@ function PostsTab({ posts, tab, currentUserId }: { posts: CardPost[]; tab: Tab; 
       </div>
     );
   }
+
+  // Only the first ~6 cards get an entrance animation; appended pages do not
+  // pop in on scroll (LinkedIn/X behaviour).
   return (
-    <div className="divide-y-0">
+    <div>
+      {tab === "recent" && recentIsDiscovery && posts.length > 0 ? (
+        <div className="flex items-center gap-2 border-b border-bone bg-cream/60 px-4 py-2.5 text-xs text-ash sm:px-5">
+          <Users className="size-3.5 shrink-0 text-saffron" />
+          <span>
+            You are not following anyone yet - here is what is new across Collab47.
+          </span>
+        </div>
+      ) : null}
+
       {posts.map((p, i) => (
         <motion.div
           key={p.id}
-          initial={reduce ? false : { opacity: 0, y: 12 }}
+          initial={reduce || i >= 6 ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{
             duration: reduce ? 0 : 0.5,
-            delay: reduce ? 0 : Math.min(i * 0.05, 0.4),
+            delay: reduce ? 0 : Math.min(i * 0.05, 0.3),
             ease: [0.16, 1, 0.3, 1],
           }}
         >
           <PostCard post={p} currentUserId={currentUserId} />
         </motion.div>
       ))}
+
+      {/* Loading skeletons while a page is in flight. */}
+      {loading ? (
+        <div aria-hidden className="divide-y divide-bone">
+          {[0, 1, 2].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      ) : null}
+
+      {/* Sentinel that triggers the next page. */}
+      {hasMore ? <div ref={sentinelRef} className="h-px w-full" /> : null}
+
+      {/* Terminal "all caught up" state. */}
+      {!hasMore && !loading && posts.length > 0 ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-ash">
+          <Check className="size-4 text-moss" />
+          <span>You are all caught up.</span>
+        </div>
+      ) : null}
+
+      {loading && posts.length === 0 ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-ash">
+          <Loader2 className="size-4 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="flex gap-3 px-4 py-5 sm:px-5">
+      <div className="size-10 shrink-0 animate-pulse rounded-full bg-bone" />
+      <div className="min-w-0 flex-1 space-y-3">
+        <div className="h-3 w-1/3 animate-pulse rounded bg-bone" />
+        <div className="space-y-2">
+          <div className="h-3 w-full animate-pulse rounded bg-bone" />
+          <div className="h-3 w-4/5 animate-pulse rounded bg-bone" />
+        </div>
+        <div className="h-40 w-full animate-pulse rounded-xl bg-bone/70" />
+      </div>
     </div>
   );
 }

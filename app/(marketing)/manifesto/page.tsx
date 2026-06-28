@@ -7,34 +7,34 @@ import { Reveal } from "@/components/motion/Reveal";
 
 export default function ManifestoPage() {
   return (
-    <main className="bg-cream text-ink">
+ <main className="bg-cream text-ink">
       <Nav />
 
       {/* ============================================================
           TITLE BLOCK
           ============================================================ */}
-      <section className="section pt-28 sm:pt-32 md:pt-40">
-        <div className="container-edit">
+ <section className="section pt-28 sm:pt-32 md:pt-40">
+ <div className="container-edit">
           <Reveal>
-            <p className="text-caption">
-              Manifesto. Issue 01. June 2026.
+ <p className="text-caption">
+              Manifesto.
             </p>
           </Reveal>
 
           <Reveal delay={0.08}>
-            <h1 className="mt-6 max-w-5xl text-[2.5rem] leading-[1.05] tracking-tight font-serif sm:mt-8 sm:text-display-lg md:text-display-xl">
+ <h1 className="mt-6 max-w-5xl text-[2.5rem] leading-[1.05] tracking-tight font-serif sm:mt-8 sm:text-display-lg md:text-display-xl">
               Built where the next 40 million Indians{" "}
-              <span className="italic text-saffron">actually are.</span>
+ <span className="text-saffron">actually are.</span>
             </h1>
           </Reveal>
 
           <Reveal delay={0.18}>
-            <div className="mt-12 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-bone pt-6">
-              <p className="text-caption">By</p>
-              <p className="font-serif text-h2">
-                Akshpreet Singh, <span className="italic">CEO.</span>
+ <div className="mt-12 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-bone pt-6">
+ <p className="text-caption">By</p>
+ <p className="font-serif text-h2">
+ Akshpreet Singh, <span className="">CEO.</span>
               </p>
-              <p className="text-body-sm text-ash">
+ <p className="text-body-sm text-ash">
                 With the founding team.
               </p>
             </div>
@@ -45,20 +45,20 @@ export default function ManifestoPage() {
       {/* ============================================================
           ESSAY BODY
           ============================================================ */}
-      <article className="pb-24">
-        <div className="container-edit">
-          <div className="mx-auto max-w-2xl">
+ <article className="pb-24">
+ <div className="container-edit">
+ <div className="mx-auto max-w-2xl">
             {/* Dropcap intro paragraph */}
             <Reveal>
               <p
-                className="text-body-lg leading-[1.7] text-ink/90"
+ className="text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
-                <span className="float-left mr-3 mt-2 font-serif text-7xl leading-none text-saffron">
+ <span className="float-left mr-3 mt-2 font-serif text-7xl leading-none text-saffron">
                   S
                 </span>
                 omewhere in Lucknow, a second-year B.Com student is teaching
-                herself product analytics on a borrowed laptop. In Amritsar, a
+                herself product analytics on a borrowed laptop. In Indore, a
                 mechanical engineering student is fabricating a working drone
                 in his uncle's workshop. In Bhubaneswar, a designer is
                 shipping illustration commissions to clients in Berlin she
@@ -71,7 +71,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-8 text-body-lg leading-[1.7] text-ink/90"
+ className="mt-8 text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 LinkedIn was not built for them, and it shows. It is a
@@ -88,7 +88,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-8 text-body-lg leading-[1.7] text-ink/90"
+ className="mt-8 text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 The Indian student platforms understood the demographic but
@@ -104,9 +104,9 @@ export default function ManifestoPage() {
 
             {/* PULL QUOTE 1 */}
             <Reveal delay={0.05}>
-              <figure className="my-12 rule-top sm:my-16">
+ <figure className="my-12 rule-top sm:my-16">
                 <blockquote
-                  className="text-[1.85rem] leading-[1.12] tracking-tight font-serif italic text-saffron sm:text-display-md"
+ className="text-[1.85rem] leading-[1.12] tracking-tight font-serif text-saffron sm:text-display-md"
                   style={{ maxWidth: "22ch" }}
                 >
                   The cost of being invisible at eighteen is not an
@@ -117,7 +117,7 @@ export default function ManifestoPage() {
 
             <Reveal>
               <p
-                className="text-body-lg leading-[1.7] text-ink/90"
+ className="text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 Collab47 is the opposite premise. We start with what a student
@@ -136,7 +136,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-8 text-body-lg leading-[1.7] text-ink/90"
+ className="mt-8 text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 We are building this in India because India is the only place
@@ -154,7 +154,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-8 text-body-lg leading-[1.7] text-ink/90"
+ className="mt-8 text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 The pedigree problem is the quiet violence at the centre of
@@ -173,9 +173,9 @@ export default function ManifestoPage() {
 
             {/* PULL QUOTE 2 */}
             <Reveal delay={0.05}>
-              <figure className="my-12 rule-top sm:my-16">
+ <figure className="my-12 rule-top sm:my-16">
                 <blockquote
-                  className="text-[1.85rem] leading-[1.12] tracking-tight font-serif italic text-saffron sm:text-display-md"
+ className="text-[1.85rem] leading-[1.12] tracking-tight font-serif text-saffron sm:text-display-md"
                   style={{ maxWidth: "24ch" }}
                 >
                   We surface merit, not pedigree. The rest is footnote.
@@ -185,13 +185,12 @@ export default function ManifestoPage() {
 
             <Reveal>
               <p
-                className="text-body-lg leading-[1.7] text-ink/90"
+ className="text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 A note on how we are funding this. Collab47 is bootstrapped.
-                Six cofounders, our own capital, a small floor in Amritsar,
-                and an unreasonable conviction that this is worth doing
-                slowly and well. Zero ads on the student surface. No selling
+                Six cofounders, our own capital, and an unreasonable
+                conviction that this is worth doing slowly and well. Zero ads on the student surface. No selling
                 of student data to coaching cartels. No paid visibility for
                 the loud. Real opportunities, vetted, from real companies and
                 real labs. When we do raise, it will be from people who
@@ -203,7 +202,7 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-8 text-body-lg leading-[1.7] text-ink/90"
+ className="mt-8 text-body-lg leading-[1.7] text-ink/90"
                 style={{ maxWidth: "65ch" }}
               >
                 If you are reading this and you are eighteen, or you teach
@@ -220,10 +219,10 @@ export default function ManifestoPage() {
 
             <Reveal delay={0.05}>
               <p
-                className="mt-10 font-indic text-[2.25rem] leading-tight text-ink sm:text-display-md"
+ className="mt-10 font-serif text-[2.25rem] leading-tight text-ink sm:text-display-md"
                 style={{ maxWidth: "65ch" }}
               >
-                शुभम् भवतु.
+                Let the work speak.
               </p>
             </Reveal>
           </div>
@@ -233,26 +232,26 @@ export default function ManifestoPage() {
       {/* ============================================================
           SIGN-OFF
           ============================================================ */}
-      <section className="border-t border-bone bg-paper">
-        <div className="container-edit py-20">
-          <div className="mx-auto max-w-2xl">
+ <section className="border-t border-bone bg-paper">
+ <div className="container-edit py-20">
+ <div className="mx-auto max-w-2xl">
             <Reveal>
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+ <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p
-                    className="font-serif text-4xl italic text-ink sm:text-5xl"
+ className="font-serif text-4xl text-ink sm:text-5xl"
                     style={{ fontFamily: "var(--font-serif)" }}
                   >
                     Akshpreet
                   </p>
-                  <p className="mt-3 text-caption">
+ <p className="mt-3 text-caption">
                     Akshpreet Singh / CEO, Collab47
                   </p>
                 </div>
-                <div className="text-left sm:text-right">
-                  <p className="text-caption">Filed from</p>
-                  <p className="mt-2 font-serif text-h2 text-ink">
-                    Amritsar . June 2026
+ <div className="text-left sm:text-right">
+ <p className="text-caption">Filed from</p>
+ <p className="mt-2 font-serif text-h2 text-ink">
+                    India . 2026
                   </p>
                 </div>
               </div>
@@ -264,15 +263,15 @@ export default function ManifestoPage() {
       {/* ============================================================
           CTA STRIP
           ============================================================ */}
-      <section className="bg-ink text-cream">
-        <div className="container-edit py-24 md:py-32">
+ <section className="bg-ink text-cream">
+ <div className="container-edit py-24 md:py-32">
           <Reveal>
-            <div className="flex flex-col items-start gap-10 md:flex-row md:items-end md:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-caption text-cream/60">Closing note</p>
-                <h2 className="mt-6 text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:text-display-md lg:text-display-lg">
+ <div className="flex flex-col items-start gap-10 md:flex-row md:items-end md:justify-between">
+ <div className="max-w-3xl">
+ <p className="text-caption text-cream/60">Closing note</p>
+ <h2 className="mt-6 text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:text-display-md lg:text-display-lg">
                   If this resonates,{" "}
-                  <span className="italic text-saffron">
+ <span className="text-saffron">
                     you belong here.
                   </span>
                 </h2>
@@ -280,12 +279,12 @@ export default function ManifestoPage() {
 
               <Link
                 href="/signup"
-                className="group inline-flex h-12 items-center gap-3 rounded-full bg-saffron px-8 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-[0.98]"
+ className="group inline-flex h-12 items-center gap-3 rounded-full bg-saffron px-8 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-[0.98]"
               >
                 Claim your handle
                 <span
                   aria-hidden
-                  className="transition-transform group-hover:translate-x-1"
+ className="transition-transform group-hover:translate-x-1"
                 >
                   &rarr;
                 </span>

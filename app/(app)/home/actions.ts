@@ -117,10 +117,9 @@ export async function createPostAction(
     city_tags: [],
   });
 
-  if (result.ok) {
-    revalidatePath("/home");
-  }
-
+  // No revalidatePath("/home"): the composer inserts the new post optimistically
+  // into the client feed and reconciles with the returned id/short_id. A full
+  // /home revalidation would re-run the ranker and clobber the optimistic list.
   return result;
 }
 
