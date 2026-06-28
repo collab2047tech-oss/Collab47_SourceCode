@@ -93,12 +93,3 @@ function friendlyReason(rule: string): string {
       return "Content blocked by policy.";
   }
 }
-
-/**
- * Soft toxicity score stub. Real call goes to Cloudflare AI Worker later.
- * Returns 0 to 1. Above 0.7 soft-demote in ranker. Above 0.9 quarantine.
- */
-export async function softToxicityScore(_text: string): Promise<number> {
-  // TODO: call Cloudflare AI Worker once Day 7+ infra is up.
-  return 0;
-}

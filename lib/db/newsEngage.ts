@@ -138,7 +138,9 @@ export async function setNewsSaved(
   if (next) {
     const { error } = await sb
       .from("news_saves")
-      .upsert({ user_id: user.id, news_id: newsId }, { onConflict: "user_id,news_id" });
+      // ignoreDuplicates: re-saving is a no-op insert (news_saves has no UPDATE
+      // policy, so an on-conflict UPDATE would RLS-fail). Saving twice is fine.
+      .upsert({ user_id: user.id, news_id: newsId }, { onConflict: "user_id,news_id", ignoreDuplicates: true });
     if (error) return { ok: false, error: error.message };
     await sb.from("news_events").insert({ user_id: user.id, news_id: newsId, kind: "save" });
   } else {

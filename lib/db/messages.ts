@@ -753,11 +753,8 @@ export async function sendMessage({
     return { ok: false, error: msgErr?.message ?? "Failed to send message" };
   }
 
-  // Update last_message_at on conversation
-  await sb
-    .from("conversations")
-    .update({ last_message_at: new Date().toISOString() })
-    .eq("id", conversationId);
+  // last_message_at is bumped automatically by the trg_bump_conversation_last_message
+  // trigger (migration 0039) - the old manual update here silently failed RLS.
 
   // Fire-and-forget notification to every recipient.
   void (async () => {
