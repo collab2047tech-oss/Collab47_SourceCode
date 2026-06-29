@@ -147,17 +147,28 @@ export function ApplicationsPanel({
 
               {app.links.length > 0 && (
                 <div className="mt-3 flex flex-col gap-1.5">
-                  {app.links.map((link) => (
-                    <a
-                      key={link}
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="max-w-full truncate text-xs text-saffron underline underline-offset-2 hover:text-saffron-dk"
-                    >
-                      {link}
-                    </a>
-                  ))}
+                  {app.links.map((link) =>
+                    /^https?:\/\//i.test(link) ? (
+                      <a
+                        key={link}
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="max-w-full truncate text-xs text-saffron underline underline-offset-2 hover:text-saffron-dk"
+                      >
+                        {link}
+                      </a>
+                    ) : (
+                      // Belt-and-suspenders: never render a non-http(s) link as a
+                      // clickable anchor (guards against stored javascript: XSS).
+                      <span
+                        key={link}
+                        className="max-w-full truncate text-xs text-ash"
+                      >
+                        {link}
+                      </span>
+                    )
+                  )}
                 </div>
               )}
 

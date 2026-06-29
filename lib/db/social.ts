@@ -2,6 +2,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
 import { semanticMatch } from "@/lib/ranker/taxonomy";
 import { fieldProximity } from "@/lib/ranker/features";
+import { overLimit, LIMITS, RATE_LIMITED } from "@/lib/security/ratelimit";
 
 export interface MiniProfile {
   id: string;
@@ -73,6 +74,9 @@ export async function followUser(targetUserId: string): Promise<Result> {
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+  if (await overLimit(sb, { table: "follows", userColumn: "follower_id", userId: user.id, ...LIMITS.follow })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
   const { error } = await sb.from("follows").insert({ follower_id: user.id, following_id: targetUserId });
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
 
@@ -109,6 +113,9 @@ export async function requestConnection(targetUserId: string): Promise<Result> {
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+  if (await overLimit(sb, { table: "connections", userColumn: "requested_by", userId: user.id, ...LIMITS.follow })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
   const [a, b] = canonical(user.id, targetUserId);
   const { error } = await sb
     .from("connections")

@@ -818,6 +818,21 @@ export async function acceptMessageRequest(
     .maybeSingle();
   if (!membership) return { ok: false, error: "Not part of this conversation" };
 
+  // Only the RECIPIENT may accept. Fetch the earliest pending request message:
+  // if the caller sent it, they are trying to self-accept their own cold DM into
+  // the recipient's main inbox - mirror declineMessageRequest and refuse.
+  const { data: firstMsg } = await sb
+    .from("messages")
+    .select("sender_id")
+    .eq("conversation_id", conversationId)
+    .eq("is_request", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (firstMsg?.sender_id === user.id) {
+    return { ok: false, error: "You cannot accept your own request." };
+  }
+
   // Flip request->accepted via service role (RLS limits message updates to the
   // sender; accepting a request is done by the recipient).
   const admin = getAdminClient();

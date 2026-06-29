@@ -72,8 +72,9 @@ export default function PrivacyPage() {
  <p className="mt-4">
                 Your data is stored with Supabase (Postgres database, file
                 storage and authentication) hosted in the Mumbai
-                (ap-south-1) region in India. Transactional email is sent via
-                Resend. These providers process data only to deliver the service.
+                (ap-south-1) region in India. We do not yet send transactional
+                email; if we add it, we will name the provider here. These
+                providers process data only to deliver the service.
               </p>
             </div>
 

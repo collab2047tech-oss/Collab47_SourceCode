@@ -1,12 +1,15 @@
 name: Fetch news
 
-# Auto-fetches news into the database so nobody has to trigger it by hand.
-# Daily at 01:00 UTC (06:30 AM IST). Quotas are huge, so daily is safe; bump the
-# schedule if you want it more/less often. Can also be run manually below.
+# REDUNDANT / DISABLED SCHEDULE. The daily news fetch is now owned by the Vercel
+# cron in vercel.json (/api/cron/news at "0 1 * * *"). This Action used to run the
+# SAME endpoint at the SAME time, which double-fetched. The schedule below is
+# commented out to stop the overlap; only the Vercel cron runs it automatically.
+# Kept as a manual fallback: trigger via "Run workflow" (workflow_dispatch) if the
+# Vercel cron is ever down. Re-enable the schedule only if Vercel's cron is removed.
 
 on:
-  schedule:
-    - cron: "0 1 * * *"
+  # schedule:
+  #   - cron: "0 1 * * *"   # disabled: handled by vercel.json cron (see note above)
   workflow_dispatch: {}
 
 jobs:

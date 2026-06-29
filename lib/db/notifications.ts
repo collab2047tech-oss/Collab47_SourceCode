@@ -69,6 +69,31 @@ export async function createNotification(input: {
   try {
     const admin = getAdminClient();
     if (!admin) return;
+
+    // Coalesce: if an identical notification (same recipient, kind, and actor)
+    // was already created in the last 10 minutes, bump its timestamp instead of
+    // inserting a fresh row. Prevents react/unreact and follow/unfollow loops
+    // from flooding the victim's feed. The actor is stored in payload.who.
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { data: existing } = await admin
+      .from("notifications")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("kind", input.kind)
+      .eq("payload->>who", input.actorName)
+      .gt("created_at", tenMinutesAgo)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      // Already notified recently - bump to the top instead of duplicating.
+      await admin
+        .from("notifications")
+        .update({ created_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      return;
+    }
+
     await admin.from("notifications").insert({
       user_id: input.userId,
       kind: input.kind,

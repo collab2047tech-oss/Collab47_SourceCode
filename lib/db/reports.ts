@@ -32,7 +32,15 @@ export async function submitReport(args: SubmitArgs): Promise<{ ok: boolean; err
   else row.profile_id = args.targetId;
 
   const { error } = await sb.from("reports").insert(row);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // A second report by the same user on the same target hits the partial-unique
+    // index added in migration 0042 (reports_reporter_{post,profile,news}_uniq).
+    // Treat "already reported" as success - no scary error for the reporter.
+    if (error.code === "23505" || error.message.toLowerCase().includes("duplicate")) {
+      return { ok: true };
+    }
+    return { ok: false, error: error.message };
+  }
   return { ok: true };
 }
 

@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
 import { moderateContent } from "@/lib/moderation/moderate";
+import { overLimit, LIMITS, RATE_LIMITED } from "@/lib/security/ratelimit";
 
 interface OkResult { ok: true }
 interface ErrResult { ok: false; error: string }
@@ -79,6 +80,10 @@ export async function addComment(args: {
   if (!sb) return { ok: false, error: "Database not connected." };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+
+  if (await overLimit(sb, { table: "comments", userColumn: "author_id", userId: user.id, ...LIMITS.comment })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
 
   // reject depth > 1
   if (args.parentCommentId) {
@@ -198,6 +203,10 @@ export async function repostPost(args: {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
 
+  if (await overLimit(sb, { table: "posts", userColumn: "author_id", userId: user.id, ...LIMITS.post })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
+
   const { data: original } = await sb
     .from("posts")
     .select("hashtags, branch_tags, city_tags, author_id, short_id")
@@ -258,6 +267,9 @@ export async function bookmarkPost(postId: string): Promise<Result> {
   if (!sb) return { ok: true };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
+  if (await overLimit(sb, { table: "bookmarks", userColumn: "user_id", userId: user.id, ...LIMITS.bookmark })) {
+    return { ok: false, error: RATE_LIMITED };
+  }
   const { error } = await sb.from("bookmarks").insert({ post_id: postId, user_id: user.id });
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
 

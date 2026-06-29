@@ -24,13 +24,26 @@ export async function createProject(input: {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated." };
 
+  // Clamp free-text fields server-side to guard against storage bloat/abuse
+  // (mirrors the clampText pattern in lib/db/events.ts).
+  const title = input.title.trim().slice(0, 160);
+  const brief = input.brief.trim().slice(0, 4000);
+  const deliverable = input.deliverable.trim().slice(0, 2000);
+
+  // Validate the deadline is a parseable date.
+  const deadlineMs = Date.parse(input.deadline);
+  if (Number.isNaN(deadlineMs)) {
+    return { ok: false, error: "Please enter a valid deadline date." };
+  }
+  const deadline = new Date(deadlineMs).toISOString();
+
   const { data: project, error: insertErr } = await sb
     .from("projects")
     .insert({
-      title: input.title,
-      brief: input.brief,
-      deliverable: input.deliverable,
-      deadline: input.deadline,
+      title,
+      brief,
+      deliverable,
+      deadline,
       slot_count: input.slot_count,
       author_id: user.id,
       status: "open",
@@ -181,6 +194,22 @@ export async function applyToProject(input: {
     return { ok: false, error: "You can attach at most 3 links." };
   }
 
+  // Sanitize link strings: keep only valid http(s) URLs (mirrors the
+  // deliverable_url validation below), cap each to 500 chars, drop the rest.
+  // Prevents stored XSS (e.g. javascript:) when the author clicks a link.
+  const safeLinks = input.links.reduce<string[]>((acc, l) => {
+    if (typeof l !== "string") return acc;
+    const trimmed = l.trim().slice(0, 500);
+    if (!trimmed) return acc;
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol === "http:" || u.protocol === "https:") acc.push(u.toString());
+    } catch {
+      /* drop invalid URLs */
+    }
+    return acc;
+  }, []);
+
   // A user who is already on the team should not be able to apply again.
   const { data: existingMember } = await sb
     .from("project_members")
@@ -196,7 +225,7 @@ export async function applyToProject(input: {
     project_id: input.projectId,
     applicant_id: user.id,
     pitch: input.pitch,
-    links: input.links,
+    links: safeLinks,
     status: "pending",
   });
 

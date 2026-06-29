@@ -43,7 +43,6 @@ export function computeStrength(
     { key: "posts", label: "Publish 3 posts", done: counts.posts >= 3, href: "/home", weight: 3 },
     { key: "project", label: "Start or join a project", done: counts.projects >= 1, href: "/collabs/new", weight: 2 },
     { key: "connections", label: "Make 5 connections", done: counts.connections >= 5, href: "/network", weight: 2 },
-    { key: "verified", label: "Get verified", done: p.verified, href: "/settings", weight: 1 },
   ];
 
   const total = items.reduce((s, i) => s + i.weight, 0);

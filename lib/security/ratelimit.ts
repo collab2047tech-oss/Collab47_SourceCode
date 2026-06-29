@@ -30,6 +30,7 @@ export const LIMITS = {
   message: { windowSec: 60, max: 40 },     // 40 messages / min
   report: { windowSec: 3600, max: 20 },    // 20 reports / hour
   follow: { windowSec: 60, max: 40 },      // 40 follows / min
+  bookmark: { windowSec: 60, max: 60 },    // 60 bookmarks / min (light)
 } as const;
 
 export const RATE_LIMITED = "You are doing that too fast. Please wait a moment and try again.";
