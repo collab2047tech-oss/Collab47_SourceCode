@@ -3,6 +3,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
 import { isReserved } from "@/lib/data/reserved-handles";
+import { moderateContent } from "@/lib/moderation/moderate";
 import type { AccountType, Profile } from "@/lib/supabase/types";
 
 // ---------------------------------------------------------------------------
@@ -258,6 +259,25 @@ export async function updateProfile(payload: {
       updateFields.last_handle_change_at = now.toISOString();
     }
     // Unchanged handle: leave it untouched (no stamp, no write).
+  }
+
+  // Moderate the user-changeable free-text in a single pass before the write.
+  // Only fields actually being changed/present are included: name is gated to
+  // its changed value (set above), and bio/college/city flow through `rest`
+  // only when the caller sent them. URLs/dates/enums are never moderated.
+  const moderationText = [
+    updateFields.name,
+    updateFields.bio,
+    updateFields.college,
+    updateFields.city,
+  ]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+    .join(" ");
+  if (moderationText) {
+    const moderationResult = await moderateContent(moderationText);
+    if (!moderationResult.ok) {
+      return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+    }
   }
 
   const { error } = await sb

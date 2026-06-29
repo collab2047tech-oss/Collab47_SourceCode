@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAndStoreNews } from "@/lib/news/fetch";
+import { cronAuthorized } from "@/lib/security/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,9 +20,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Accept our header (GitHub Action) or Vercel's built-in cron bearer token.
-  const incoming = req.headers.get("x-cron-secret");
-  const authHeader = req.headers.get("authorization");
-  if (incoming !== cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronAuthorized(req, cronSecret)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -1,4 +1,5 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { moderateContent } from "@/lib/moderation/moderate";
 
 // ---------------------------------------------------------------------------
 // Structured profile resume: Experience / Education / Skills.
@@ -103,6 +104,15 @@ export async function upsertExperience(input: ExperienceInput & { id?: string })
     skills: Array.isArray(input.skills) ? [...new Set(input.skills.map((s) => clamp(s, 40).toLowerCase()).filter(Boolean))].slice(0, 12) : [],
     url: clamp(input.url, 300) || null,
   };
+  // Moderate the free-text (title + organization + description) in one pass
+  // before the write; URLs/dates/enums/skills are not moderated here.
+  const moderationText = [row.title, row.organization, row.description]
+    .filter((v): v is string => typeof v === "string" && v.length > 0)
+    .join(" ");
+  const moderationResult = await moderateContent(moderationText);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
   if (input.id) {
     const { error } = await sb.from("profile_experience").update(row).eq("id", input.id).eq("user_id", uid);
     return error ? { ok: false, error: error.message } : { ok: true, data: { id: input.id } };
@@ -137,6 +147,15 @@ export async function upsertEducation(input: EducationInput & { id?: string }): 
     grade: clamp(input.grade, 60) || null,
     description: clamp(input.description, 2000) || null,
   };
+  // Moderate the free-text (institution + degree + field + description) in one
+  // pass before the write; dates/grade are not moderated.
+  const moderationText = [row.institution, row.degree, row.field_of_study, row.description]
+    .filter((v): v is string => typeof v === "string" && v.length > 0)
+    .join(" ");
+  const moderationResult = await moderateContent(moderationText);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
   if (input.id) {
     const { error } = await sb.from("profile_education").update(row).eq("id", input.id).eq("user_id", uid);
     return error ? { ok: false, error: error.message } : { ok: true, data: { id: input.id } };
@@ -158,6 +177,11 @@ export async function addSkill(name: string, category: SkillCategory): Promise<R
   if (!sb || !uid) return { ok: false, error: "Not signed in" };
   const clean = clamp(name, 50);
   if (!clean) return { ok: false, error: "Skill name is required" };
+  // Moderate the free-text skill name before the write (category is an enum).
+  const moderationResult = await moderateContent(clean);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
   const { data, error } = await sb
     .from("profile_skills")
     .insert({ user_id: uid, name: clean, category })

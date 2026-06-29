@@ -2,6 +2,7 @@
 
 import { upsertOnboardingProfile } from "@/lib/db/profiles";
 import { isReserved } from "@/lib/data/reserved-handles";
+import { moderateContent } from "@/lib/moderation/moderate";
 import type { AccountType } from "@/lib/supabase/types";
 import { redirect } from "next/navigation";
 
@@ -39,6 +40,19 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
   if (!handle.match(/^[a-z0-9_]{3,32}$/)) redirect("/onboarding?error=handle");
   if (isReserved(handle)) redirect("/onboarding?error=" + encodeURIComponent("That username is reserved."));
   if (interests.length < 3) redirect("/onboarding?error=" + encodeURIComponent("Please select at least 3 interests."));
+
+  // Moderate the user-entered free-text (name + college) in a single pass
+  // before persisting - profiles are world-readable. URLs/dates/enums are not
+  // moderated. On a block, redirect back with the reason like other failures.
+  const moderationText = [name, college]
+    .filter((v) => v.length > 0)
+    .join(" ");
+  if (moderationText) {
+    const moderationResult = await moderateContent(moderationText);
+    if (!moderationResult.ok) {
+      redirect("/onboarding?error=" + encodeURIComponent(moderationResult.reason ?? "Content blocked by policy."));
+    }
+  }
 
   // Map the branched fields to real columns per account type. No fabricated
   // values: anything not collected for a type is left undefined (stored null).

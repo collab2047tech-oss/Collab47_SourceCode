@@ -15,7 +15,9 @@ interface SubmitArgs {
 
 export async function submitReport(args: SubmitArgs): Promise<{ ok: boolean; error?: string }> {
   const sb = await getSupabaseServer();
-  if (!sb) return { ok: true };
+  // Fail closed: if there is no client we cannot persist the report, so surface
+  // an error rather than silently dropping it as a false success.
+  if (!sb) return { ok: false, error: "Reporting is unavailable right now. Please try again." };
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not signed in" };
 

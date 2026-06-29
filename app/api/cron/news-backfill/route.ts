@@ -15,6 +15,7 @@ import { summariseArticle, groqConfigured } from "@/lib/news/summarise";
 import { tagArticle } from "@/lib/news/tagger";
 import { branchToTopics } from "@/lib/news/topics";
 import type { NewsSummaryStatus } from "@/lib/supabase/types";
+import { cronAuthorized } from "@/lib/security/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -37,9 +38,7 @@ export async function GET(req: NextRequest) {
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
-  const incoming = req.headers.get("x-cron-secret");
-  const authHeader = req.headers.get("authorization");
-  if (incoming !== cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronAuthorized(req, cronSecret)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

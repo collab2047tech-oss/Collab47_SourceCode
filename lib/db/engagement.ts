@@ -239,7 +239,13 @@ export async function repostPost(args: {
     })
     .select("id, short_id")
     .single();
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // Double-submit: one repost per user per original (unique index, 0045).
+    if (error.code === "23505" || error.message.includes("duplicate")) {
+      return { ok: false, error: "You already reposted this." };
+    }
+    return { ok: false, error: error.message };
+  }
 
   // repost_count is maintained by a DB trigger. Notify the original author.
   const originalAuthor = original.author_id as string;

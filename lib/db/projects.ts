@@ -2,6 +2,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
 import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
+import { moderateContent } from "@/lib/moderation/moderate";
 
 export interface MiniProfile {
   id: string;
@@ -36,6 +37,16 @@ export async function createProject(input: {
     return { ok: false, error: "Please enter a valid deadline date." };
   }
   const deadline = new Date(deadlineMs).toISOString();
+
+  // Moderate the world-readable free-text fields before insert (mirrors the
+  // single-pass gate in lib/db/events.ts createEvent).
+  const moderationText = [title, brief, deliverable]
+    .filter((v): v is string => Boolean(v))
+    .join(" ");
+  const moderationResult = await moderateContent(moderationText);
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
+  }
 
   const { data: project, error: insertErr } = await sb
     .from("projects")
@@ -219,6 +230,13 @@ export async function applyToProject(input: {
     .maybeSingle();
   if (existingMember) {
     return { ok: false, error: "You are already a member of this project." };
+  }
+
+  // Moderate the free-text pitch before insert - applications are visible to
+  // the project author (mirrors the single-pass gate in lib/db/events.ts).
+  const moderationResult = await moderateContent(input.pitch.trim());
+  if (!moderationResult.ok) {
+    return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
   }
 
   const { error } = await sb.from("project_applications").insert({

@@ -77,11 +77,18 @@ export async function followUser(targetUserId: string): Promise<Result> {
   if (await overLimit(sb, { table: "follows", userColumn: "follower_id", userId: user.id, ...LIMITS.follow })) {
     return { ok: false, error: RATE_LIMITED };
   }
-  const { error } = await sb.from("follows").insert({ follower_id: user.id, following_id: targetUserId });
+  // Upsert with ignoreDuplicates so a repeat follow is a silent no-op, and
+  // .select() so we can tell whether a row was GENUINELY created (returns the
+  // row) vs already existed (returns nothing) - we only notify on a new follow.
+  const { data: inserted, error } = await sb
+    .from("follows")
+    .upsert({ follower_id: user.id, following_id: targetUserId }, { ignoreDuplicates: true })
+    .select("follower_id");
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
+  const isNew = (inserted?.length ?? 0) > 0;
 
-  // Fire-and-forget notification to the followed user.
-  void (async () => {
+  // Fire-and-forget notification to the followed user - only when newly created.
+  if (isNew) void (async () => {
     try {
       const actor = await getActorDisplayInfo(user.id);
       if (!actor) return;
@@ -117,13 +124,20 @@ export async function requestConnection(targetUserId: string): Promise<Result> {
     return { ok: false, error: RATE_LIMITED };
   }
   const [a, b] = canonical(user.id, targetUserId);
-  const { error } = await sb
+  // Upsert with ignoreDuplicates + .select() so we only notify when this insert
+  // genuinely created the connection row (an existing request returns no row).
+  const { data: inserted, error } = await sb
     .from("connections")
-    .insert({ user_a_id: a, user_b_id: b, status: "pending", requested_by: user.id });
+    .upsert(
+      { user_a_id: a, user_b_id: b, status: "pending", requested_by: user.id },
+      { ignoreDuplicates: true }
+    )
+    .select("user_a_id");
   if (error && !error.message.includes("duplicate")) return { ok: false, error: error.message };
+  const isNew = (inserted?.length ?? 0) > 0;
 
-  // Notify the recipient of the pending connection request.
-  void (async () => {
+  // Notify the recipient of the pending connection request - only when new.
+  if (isNew) void (async () => {
     try {
       const actor = await getActorDisplayInfo(user.id);
       if (!actor) return;

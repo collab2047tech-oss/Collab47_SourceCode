@@ -754,6 +754,18 @@ export async function sendMessage({
     .single();
 
   if (msgErr || !msg) {
+    // Retry/double-submit idempotency: same (sender_id, client_id) already
+    // landed (unique index, 0045). Return the existing message as success so the
+    // optimistic bubble reconciles instead of duplicating.
+    if (clientId && (msgErr?.code === "23505" || msgErr?.message?.includes("duplicate"))) {
+      const { data: existing } = await sb
+        .from("messages")
+        .select("id")
+        .eq("sender_id", user.id)
+        .eq("client_id", clientId)
+        .maybeSingle();
+      if (existing) return { ok: true, messageId: existing.id as string, isRequest, clientId };
+    }
     return { ok: false, error: msgErr?.message ?? "Failed to send message" };
   }
 
