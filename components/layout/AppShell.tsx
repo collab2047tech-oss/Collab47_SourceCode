@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/primitives/Avatar";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useMessagesStore } from "@/components/messages/MessagesProvider";
 import {
   Home,
   Compass,
@@ -58,7 +60,7 @@ export function AppShell({
   messagesUnread = 0,
 }: {
   children: React.ReactNode;
-  me: { name: string; handle: string; avatar_url: string | null } | null;
+  me: { id: string; name: string; handle: string; avatar_url: string | null } | null;
   unreadCount?: number;
   /** Unread DM count, shown on the Messages nav item. */
   messagesUnread?: number;
@@ -67,19 +69,21 @@ export function AppShell({
   const [moreOpen, setMoreOpen] = useState(false);
   const displayName = me?.name ?? "You";
   const displayHandle = me?.handle ?? "";
-  const badge = unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : null;
 
   const isActive = (href: string) => path === href || path?.startsWith(href + "/");
 
-  // The DM badge clears the moment the user is on any /messages route, matching
-  // the optimistic mark-read in the thread. The count is sourced from real
-  // conversation data (getMessageUnreadCount).
+  // The DM badge is LIVE: it reads the app-wide MessagesProvider unreadCount so it
+  // ticks on every page (not just /messages). The server prop is the first-paint
+  // fallback before the client store hydrates. The badge still clears the moment
+  // the user is on any /messages route, matching the optimistic mark-read.
+  const store = useMessagesStore();
+  const liveMessagesUnread = store?.unreadCount ?? messagesUnread;
   const onMessages = isActive("/messages");
   const dmBadge =
-    !onMessages && messagesUnread > 0
-      ? messagesUnread > 9
+    !onMessages && liveMessagesUnread > 0
+      ? liveMessagesUnread > 9
         ? "9+"
-        : String(messagesUnread)
+        : String(liveMessagesUnread)
       : null;
 
   // Close the "More" sheet on navigation.
@@ -168,18 +172,17 @@ export function AppShell({
             C47.
           </Link>
           <GlobalSearch className="min-w-0 flex-1 md:max-w-md" />
-          <Link
-            href="/notifications"
-            aria-label="Notifications"
-            className="relative shrink-0 rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone active:scale-95"
-          >
-            <Bell className="size-4 text-ink" />
-            {badge ? (
-              <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-saffron px-1 text-[10px] font-semibold text-cream">
-                {badge}
-              </span>
-            ) : null}
-          </Link>
+          {me ? (
+            <NotificationBell initialCount={unreadCount} userId={me.id} href="/notifications" />
+          ) : (
+            <Link
+              href="/notifications"
+              aria-label="Notifications"
+              className="relative shrink-0 rounded-full border border-bone bg-paper p-2.5 transition-colors hover:bg-bone active:scale-95"
+            >
+              <Bell className="size-4 text-ink" />
+            </Link>
+          )}
           {/* Mobile profile shortcut (sidebar is hidden below md) */}
           <Link href="/profile" aria-label="Your profile" className="shrink-0 md:hidden">
             <Avatar

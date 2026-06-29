@@ -1,6 +1,7 @@
 "use server";
 
 import { upsertOnboardingProfile } from "@/lib/db/profiles";
+import { isReserved } from "@/lib/data/reserved-handles";
 import type { AccountType } from "@/lib/supabase/types";
 import { redirect } from "next/navigation";
 
@@ -36,6 +37,7 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
   if (!account_type) redirect("/onboarding?error=" + encodeURIComponent("Please choose how you are joining."));
   if (!name) redirect("/onboarding?error=name");
   if (!handle.match(/^[a-z0-9_]{3,32}$/)) redirect("/onboarding?error=handle");
+  if (isReserved(handle)) redirect("/onboarding?error=" + encodeURIComponent("That username is reserved."));
   if (interests.length < 3) redirect("/onboarding?error=" + encodeURIComponent("Please select at least 3 interests."));
 
   // Map the branched fields to real columns per account type. No fabricated

@@ -2,6 +2,7 @@ import { cache } from "react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
+import { isReserved } from "@/lib/data/reserved-handles";
 import type { AccountType, Profile } from "@/lib/supabase/types";
 
 // ---------------------------------------------------------------------------
@@ -47,10 +48,29 @@ function changeLimitMessage(field: "name" | "username", nextAt: Date): string {
   return `You can change your ${field} again in ${daysLeft} ${dayWord} (next change available on ${formatChangeDate(nextAt)}).`;
 }
 
+/**
+ * True when a Supabase/Postgres error is a unique-constraint violation. The
+ * canonical signal is SQLSTATE 23505; we also sniff the message as a fallback
+ * since the shape varies across client/PostgREST versions.
+ */
+function isUniqueViolation(error: { code?: string; message?: string }): boolean {
+  if (error.code === "23505") return true;
+  const msg = (error.message ?? "").toLowerCase();
+  return msg.includes("duplicate") || msg.includes("unique");
+}
+
 export async function getProfileByHandle(handle: string): Promise<Profile | null> {
   const sb = await getSupabaseServer();
   if (!sb) return null;
-  const { data } = await sb.from("profiles").select("*").eq("handle", handle).maybeSingle();
+  // Exclude self-deleted and suspended accounts so /u/[handle] never renders a
+  // live profile for a banned or removed user (the page 404s on null).
+  const { data } = await sb
+    .from("profiles")
+    .select("*")
+    .eq("handle", handle)
+    .is("deleted_at", null)
+    .is("suspended_at", null)
+    .maybeSingle();
   return (data as Profile) ?? null;
 }
 
@@ -88,6 +108,11 @@ export async function upsertOnboardingProfile(payload: {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
 
+  // Reserved usernames are never claimable (impersonation / route collisions).
+  if (isReserved(payload.handle)) {
+    return { ok: false, error: "That username is reserved." };
+  }
+
   // Handle must be unique; surface a friendly error if taken by someone else.
   const { data: clash } = await sb
     .from("profiles")
@@ -115,7 +140,11 @@ export async function upsertOnboardingProfile(payload: {
   };
 
   const { error } = await sb.from("profiles").upsert(row);
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // Lost the race to a concurrent claim on the same handle.
+    if (isUniqueViolation(error)) return { ok: false, error: "That username is taken." };
+    return { ok: false, error: error.message };
+  }
   return { ok: true };
 }
 
@@ -210,6 +239,9 @@ export async function updateProfile(payload: {
       if (!/^[a-z0-9_]{3,32}$/.test(handle)) {
         return { ok: false, error: "Handle must be 3-32 lowercase letters, digits, or underscores." };
       }
+      if (isReserved(handle)) {
+        return { ok: false, error: "That username is reserved." };
+      }
       const { data: clash } = await sb
         .from("profiles")
         .select("id")
@@ -233,7 +265,13 @@ export async function updateProfile(payload: {
     .update(updateFields)
     .eq("id", user.id);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    // A racing handle claim slips past the pre-check and surfaces as a raw
+    // Postgres unique_violation. Translate it into a friendly message instead
+    // of leaking the constraint error.
+    if (isUniqueViolation(error)) return { ok: false, error: "That username is taken." };
+    return { ok: false, error: error.message };
+  }
   return { ok: true };
 }
 

@@ -55,7 +55,8 @@ export async function attachReposts<T extends PostWithAuthor>(
   const { data: originals } = await sb
     .from("posts")
     .select(`*, ${AUTHOR_EMBED}`)
-    .in("id", originalIds);
+    .in("id", originalIds)
+    .or("expires_at.is.null,expires_at.gt.now()");
 
   const byId = new Map<string, RepostedOriginal>();
   for (const o of (originals ?? []) as RepostedOriginal[]) byId.set(o.id, o);

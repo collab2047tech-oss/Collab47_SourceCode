@@ -5,10 +5,11 @@ import { Input } from "@/components/primitives/Input";
 import { Button } from "@/components/primitives/Button";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { GOOGLE_AUTH_ENABLED, PHONE_AUTH_ENABLED } from "@/app/(auth)/authProviders";
-import { checkSignupEmail } from "@/app/(auth)/email-check";
+import { isValidEmailFormat } from "@/lib/security/email-validate";
+import { signUpAction } from "@/app/(auth)/signup/actions";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -18,6 +19,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
   // Prefill email when arriving from the landing CTA (/signup?email=...).
   useEffect(() => {
@@ -25,36 +27,28 @@ export default function SignupPage() {
     if (qp) setEmail(qp);
   }, []);
 
-  async function signUpEmail(e: React.FormEvent) {
+  function signUpEmail(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
-    const sb = getSupabaseBrowser();
-    if (!sb) {
-      setError("Sign up is not configured yet on this build.");
-      setLoading(false);
-      return;
-    }
+    // Fast client-side hints only - the AUTHORITATIVE gate (format + disposable
+    // + MX + signUp) lives in signUpAction on the server and cannot be skipped.
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
-      setLoading(false);
       return;
     }
-    // Real-email sanity check (format + disposable + MX, fail-open). No
-    // confirmation email is sent; a genuine address is never blocked.
-    const emailCheck = await checkSignupEmail(email.trim());
-    if (!emailCheck.ok) {
-      setError(emailCheck.reason ?? "Please use a valid email.");
-      setLoading(false);
+    if (!isValidEmailFormat(email.trim())) {
+      setError("That email does not look valid. Check for typos.");
       return;
     }
-    const { error } = await sb.auth.signUp({ email: email.trim(), password });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-    location.href = "/onboarding";
+    startTransition(async () => {
+      const result = await signUpAction({ email: email.trim(), password });
+      if (!result.ok) {
+        setError(result.error ?? "Could not create your account. Try again.");
+        return;
+      }
+      // signUpAction set the session cookie server-side; go to onboarding.
+      location.href = "/onboarding";
+    });
   }
 
   async function signInGoogle() {
@@ -142,7 +136,7 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
- <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading}>
+ <Button type="submit" size="lg" className="mt-4 w-full justify-center" disabled={loading || pending}>
  Create account <ArrowRight className="size-4" />
             </Button>
           </form>

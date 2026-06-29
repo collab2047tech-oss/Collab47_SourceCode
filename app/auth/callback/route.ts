@@ -9,6 +9,19 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get("code");
   let next = searchParams.get("next") ?? "/home";
 
+  // Open-redirect hardening: only allow same-site absolute paths. Must start with
+  // exactly one "/" (reject "//host" and "/\" which browsers treat as off-site),
+  // and carry no scheme or backslash. Otherwise fall back to "/home".
+  if (
+    !next.startsWith("/") ||
+    next.startsWith("//") ||
+    next.startsWith("/\\") ||
+    next.includes("\\") ||
+    next.includes("://")
+  ) {
+    next = "/home";
+  }
+
   if (code) {
     const supabase = await getSupabaseServer();
     if (supabase) {

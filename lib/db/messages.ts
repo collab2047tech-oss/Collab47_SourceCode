@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import type { Message } from "@/lib/supabase/types";
@@ -66,9 +67,12 @@ export interface SendMessageResult {
   clientId?: string;
 }
 
-export async function getMyConversations(
+// Cached per request: the app shell layout seeds the DM provider with this on
+// every navigation, and the /messages route reads it too - cache() dedupes them
+// to one fetch per render (keyed by bucket).
+export const getMyConversations = cache(async (
   bucket: "main" | "requests" | "all"
-): Promise<ConversationPreview[]> {
+): Promise<ConversationPreview[]> => {
   const sb = await getSupabaseServer();
   if (!sb) return [];
 
@@ -170,7 +174,7 @@ export async function getMyConversations(
   }
 
   return results;
-}
+});
 
 export async function getConversationMessages(
   conversationId: string,

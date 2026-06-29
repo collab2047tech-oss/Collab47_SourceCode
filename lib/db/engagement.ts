@@ -209,10 +209,18 @@ export async function repostPost(args: {
 
   const { data: original } = await sb
     .from("posts")
-    .select("hashtags, branch_tags, city_tags, author_id, short_id")
+    .select("hashtags, branch_tags, city_tags, author_id, short_id, deleted_at, expires_at")
     .eq("id", args.originalPostId)
     .maybeSingle();
   if (!original) return { ok: false, error: "Original post not found" };
+
+  // Reject reposts of originals that are no longer live (soft-deleted or expired).
+  const originalDeleted = (original.deleted_at as string | null) !== null;
+  const originalExpired =
+    original.expires_at !== null && new Date(original.expires_at as string) < new Date();
+  if (originalDeleted || originalExpired) {
+    return { ok: false, error: "This post is no longer available." };
+  }
 
   const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const body = (args.addedBody ?? "").slice(0, 2000);
