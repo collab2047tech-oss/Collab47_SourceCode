@@ -47,6 +47,11 @@ export default async function ModerationQueuePage() {
           <p className="mt-3 text-body text-ash">
             Three or more flags trigger auto-hide. Review within 24 hours.
           </p>
+          <p className="mt-4">
+            <Link href="/feedback" className="text-sm text-saffron underline underline-offset-4">
+              Go to feedback inbox
+            </Link>
+          </p>
         </div>
       </Reveal>
 

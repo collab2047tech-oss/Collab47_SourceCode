@@ -8,6 +8,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { GlobalSearch } from "@/components/search/GlobalSearch";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useMessagesStore } from "@/components/messages/MessagesProvider";
+import { FeedbackWidget } from "@/components/composite/FeedbackWidget";
 import {
   Home,
   Compass,
@@ -237,6 +238,9 @@ export function AppShell({
           </div>
         </>
       ) : null}
+
+      {/* In-app feedback / bug report widget (floats bottom-right on every page) */}
+      <FeedbackWidget />
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around border-t border-bone bg-cream/95 px-1 py-1.5 backdrop-blur-md md:hidden">
