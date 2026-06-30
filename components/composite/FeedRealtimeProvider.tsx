@@ -84,6 +84,44 @@ export function FeedRealtimeProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
+  // POLLING FALLBACK. WebSocket Realtime can fail to deliver in some prod/
+  // network conditions (proxies, blocked WS, auth-token timing). To GUARANTEE
+  // live-ish counts regardless, every few seconds we refetch the authoritative
+  // counts for the posts currently on screen and push them to their cards. This
+  // is cheap (one bounded query) and runs only while posts are registered. The
+  // realtime channel above still delivers instant updates when it works; this
+  // just backstops it so likes/comments/reposts/saves never appear frozen.
+  useEffect(() => {
+    const sb = getSupabaseBrowser();
+    if (!sb) return;
+    let cancelled = false;
+    const tick = async () => {
+      const ids = [...registry.current.keys()];
+      if (ids.length === 0) return;
+      const { data } = await sb
+        .from("posts")
+        .select("id, like_count, comment_count, repost_count, bookmark_count")
+        .in("id", ids.slice(0, 200));
+      if (cancelled) return;
+      for (const r of (data ?? []) as Array<{ id: string } & Partial<PostCounts>>) {
+        const set = registry.current.get(r.id);
+        if (!set || set.size === 0) continue;
+        const counts: PostCounts = {
+          like_count: r.like_count ?? 0,
+          comment_count: r.comment_count ?? 0,
+          repost_count: r.repost_count ?? 0,
+          bookmark_count: r.bookmark_count ?? 0,
+        };
+        for (const cb of set) cb(counts);
+      }
+    };
+    const interval = setInterval(tick, 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <FeedRealtimeContext.Provider value={{ register }}>
       {children}
