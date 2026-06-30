@@ -1,0 +1,14 @@
+-- 0046_fix_likes_grant.sql
+-- CRITICAL regression fix. Migration 0040 did `grant update (reaction) on likes`
+-- to stop post_id/user_id repointing. But the like/react path uses supabase-js
+-- .upsert(), which emits `INSERT ... ON CONFLICT DO UPDATE SET post_id, user_id,
+-- reaction`. Postgres checks UPDATE privilege on EVERY column named in that SET
+-- at plan time (even when no conflict occurs), so the column-restricted grant
+-- rejected ALL likes with 42501 "permission denied for table likes" - users
+-- could unlike (DELETE) but never like or change a reaction.
+--
+-- Restore full UPDATE. The minor repoint concern is already bounded by RLS
+-- (likes_update_own WITH CHECK user_id = auth.uid()), and the counters are
+-- trigger-maintained; a stricter column guard can be reintroduced later as a
+-- BEFORE UPDATE trigger (which does not have this plan-time grant problem).
+grant update on public.likes to authenticated;

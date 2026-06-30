@@ -622,89 +622,31 @@ export function PostCard({
 
           {/* Action bar */}
           <div className="mt-2.5 -ml-2 flex items-center justify-between sm:justify-start sm:gap-1">
-            {/* Reaction control */}
-            <div
-              ref={reactionRef}
-              className="relative"
-              onMouseEnter={openReactionPopover}
-              onMouseLeave={cancelReactionPopover}
+            {/* Like - one clean tap (LinkedIn/Instagram style). No hover popover
+                that hijacked the tap on touch devices; just an instant, animated
+                like/unlike. */}
+            <button
+              type="button"
+              onClick={toggleLike}
+              disabled={isPending}
+              aria-pressed={liked}
+              aria-label={liked ? "Unlike" : "Like"}
+              className={cn(
+                "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
+                "transition-all duration-150 hover:bg-bone active:scale-90",
+                "disabled:cursor-not-allowed disabled:opacity-40",
+                liked ? "text-saffron" : "text-ash hover:text-ink"
+              )}
             >
-              {/* Reaction popover - left-anchored but clamped so it never spills
-                  past the viewport edge on phones. */}
-              {reactionPopoverOpen ? (
-                <div
-                  className="absolute bottom-full left-0 z-50 mb-1.5 flex max-w-[calc(100vw-2rem)] items-center gap-0.5 overflow-x-auto rounded-full border border-bone bg-paper px-2 py-1.5 shadow-xl shadow-ink/10 sm:gap-1 sm:overflow-visible"
-                  onMouseEnter={() => {
-                    cancelReactionPopover();
-                    setReactionPopoverOpen(true);
-                  }}
-                  onMouseLeave={() => setReactionPopoverOpen(false)}
-                >
-                  {REACTIONS.map((r) => (
-                    <button
-                      key={r.kind}
-                      type="button"
-                      onClick={() => pickReaction(r.kind)}
-                      aria-label={r.label}
-                      title={r.label}
-                      className={cn(
-                        "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110 sm:size-8",
-                        r.color,
-                        reaction === r.kind && "scale-110 bg-bone"
-                      )}
-                    >
-                      {r.icon}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* Main reaction button */}
-              {(() => {
-                const meta = getReactionMeta(liked ? reaction : undefined);
-                return (
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={toggleLike}
-                      disabled={isPending}
-                      aria-label={liked ? `Remove ${meta.label}` : "Like"}
-                      className={cn(
-                        "flex min-h-10 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3",
-                        "text-ash transition-all duration-150",
-                        "hover:bg-bone hover:text-ink active:scale-95",
-                        "disabled:cursor-not-allowed disabled:opacity-40",
-                        liked && meta.color
-                      )}
-                    >
-                      {liked ? (
-                        <span className={cn("size-4 transition-all scale-110", meta.color)}>
-                          {meta.icon}
-                        </span>
-                      ) : (
-                        <ThumbsUp className="size-4 transition-all stroke-current" />
-                      )}
-                      {likes > 0 ? (
-                        <span className="tabular-nums text-xs">{likes}</span>
-                      ) : null}
-                    </button>
-                    {/* Caret: click opens the reaction picker instantly (touch-friendly) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        cancelReactionPopover();
-                        setReactionPopoverOpen((o) => !o);
-                      }}
-                      disabled={isPending}
-                      aria-label="Choose a reaction"
-                      className="flex min-h-10 items-center rounded-full px-1.5 text-ash transition-colors hover:text-ink disabled:opacity-40"
-                    >
-                      <span className="block size-0 border-x-[3px] border-t-4 border-x-transparent border-t-current" />
-                    </button>
-                  </div>
-                );
-              })()}
-            </div>
+              <ThumbsUp
+                className={cn(
+                  "size-4 transition-transform duration-200",
+                  liked ? "scale-110 fill-saffron stroke-saffron" : "stroke-current"
+                )}
+                strokeWidth={liked ? 2 : 1.75}
+              />
+              {likes > 0 ? <span className="tabular-nums text-xs">{likes}</span> : null}
+            </button>
 
             {/* Comment - links to full post thread */}
             <Link
