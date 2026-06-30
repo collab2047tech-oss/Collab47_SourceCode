@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import {
@@ -185,6 +186,15 @@ export function PostCard({
       setSaves(c.bookmark_count);
     });
   }, [post.id]);
+
+  const router = useRouter();
+  // Click the post body to open it (LinkedIn-style). Skipped when the user is
+  // selecting text, or when the click came from an interactive child (handled by
+  // those children's own stopPropagation / links).
+  function openPost() {
+    if (typeof window !== "undefined" && window.getSelection()?.toString()) return;
+    router.push(`/p/${post.short_id}`);
+  }
 
   const isOwner = Boolean(currentUserId) && currentUserId === post.author_id;
   const isPinned = post.is_pinned ?? false;
@@ -552,8 +562,9 @@ export function PostCard({
           {post.body ? (
             <div className="mt-2.5">
               <p
+                onClick={openPost}
                 className={cn(
-                  "text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word",
+                  "cursor-pointer text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word",
                   !expanded && "line-clamp-6"
                 )}
               >
@@ -562,7 +573,10 @@ export function PostCard({
               {!expanded && post.body.length > 320 ? (
                 <button
                   type="button"
-                  onClick={() => setExpanded(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpanded(true);
+                  }}
                   className="mt-0.5 text-sm font-medium text-saffron transition-colors hover:text-saffron-dk"
                 >
                   see more
