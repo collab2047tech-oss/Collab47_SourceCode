@@ -248,41 +248,46 @@ async function getForYouFeedPage(opts: { excludeIds?: string[]; limit?: number; 
     for (const r of rows ?? []) if (!excludeSet.has(r.id)) byId.set(r.id, r);
   };
 
-  // Over-fetch when paginating so excluded ids don't starve the next page.
-  const recallBoost = excludeIds.length > 0 ? 1 : 0;
+  // The recall window must GROW with scroll depth (how many ids are already on
+  // screen), otherwise a fixed newest-N window starves after one page and the
+  // feed dead-ends even though hundreds of older posts exist. depth scales every
+  // recall query so older posts keep entering as the viewer scrolls (capped).
+  const depth = excludeIds.length;
+  const grow = (base: number, cap: number) => Math.min(cap, base + depth + Math.floor(depth / 2));
 
   if (onlyFollows && followIds.length > 0) {
     const { data } = await liveFilter(sb.from("posts").select(SELECT))
       .in("author_id", followIds)
       .order("created_at", { ascending: false })
-      .limit(80 + recallBoost * 60);
+      .limit(grow(120, 600));
     addAll(data as PostWithAuthor[] | null);
   } else {
     // Semantic recall: expand the viewer's interests to RELATED tags via the
     // taxonomy (so "AI/ML" also recalls #llm / #deeplearning), capped for the query.
     const expanded = expandTagList([...interests, ...(branch ? [branch] : [])]).slice(0, 60);
     const queries: PromiseLike<unknown>[] = [
-      liveFilter(sb.from("posts").select(SELECT)).order("created_at", { ascending: false }).limit(60 + recallBoost * 60),
+      // Global recency backbone - the main source for viewers who follow nobody.
+      liveFilter(sb.from("posts").select(SELECT)).order("created_at", { ascending: false }).limit(grow(120, 600)),
     ];
     if (expanded.length > 0) {
       queries.push(
-        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", expanded).order("created_at", { ascending: false }).limit(50 + recallBoost * 40)
+        liveFilter(sb.from("posts").select(SELECT)).overlaps("hashtags", expanded).order("created_at", { ascending: false }).limit(grow(80, 300))
       );
       if (branch) {
         queries.push(
-          liveFilter(sb.from("posts").select(SELECT)).overlaps("branch_tags", [branch]).order("created_at", { ascending: false }).limit(40)
+          liveFilter(sb.from("posts").select(SELECT)).overlaps("branch_tags", [branch]).order("created_at", { ascending: false }).limit(grow(60, 200))
         );
       }
     }
     if (followIds.length > 0) {
       queries.push(
-        liveFilter(sb.from("posts").select(SELECT)).in("author_id", followIds).order("created_at", { ascending: false }).limit(40)
+        liveFilter(sb.from("posts").select(SELECT)).in("author_id", followIds).order("created_at", { ascending: false }).limit(grow(60, 200))
       );
     }
     // Cohort recall: recent posts from people in your college/branch ("like me").
     if (cohortAuthorIds.length > 0) {
       queries.push(
-        liveFilter(sb.from("posts").select(SELECT)).in("author_id", cohortAuthorIds.slice(0, 150)).order("created_at", { ascending: false }).limit(40)
+        liveFilter(sb.from("posts").select(SELECT)).in("author_id", cohortAuthorIds.slice(0, 150)).order("created_at", { ascending: false }).limit(grow(60, 200))
       );
     }
     const results = (await Promise.all(queries)) as Array<{ data: PostWithAuthor[] | null }>;
