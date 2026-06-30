@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { FeedRealtimeProvider } from "@/components/composite/FeedRealtimeProvider";
 import {
   MessagesProvider,
   type RailConversation,
@@ -67,9 +66,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       currentUserId={profile.id}
     >
       <AppShell me={me} unreadCount={unreadCount} messagesUnread={messagesUnread}>
-        {/* One realtime channel for the whole app shell -> live post counts
-            (likes/comments/reposts/saves) tick across users without a refresh. */}
-        <FeedRealtimeProvider>{children}</FeedRealtimeProvider>
+        {/* Live post counts are handled by the global subscribePostCounts()
+            manager (lib/realtime/postCounts) - no provider needed, works on every
+            page including /p and /u. */}
+        {children}
       </AppShell>
     </MessagesProvider>
   );

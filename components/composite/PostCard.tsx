@@ -25,7 +25,7 @@ import { useState, useRef, useEffect, useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { PostMedia } from "./post/PostMedia";
 import { ReactionSummary } from "./post/ReactionSummary";
-import { useFeedRealtime } from "./FeedRealtimeProvider";
+import { subscribePostCounts } from "@/lib/realtime/postCounts";
 import { absoluteTime } from "@/lib/ui/toCardPost";
 import { ReportModal } from "./ReportModal";
 import { submitReportAction } from "@/app/(app)/home/report-actions";
@@ -173,16 +173,18 @@ export function PostCard({
   const touchLocal = () => {
     localActionAt.current = Date.now();
   };
-  const { register } = useFeedRealtime();
+  // LIVE counts via the global singleton manager (realtime + 6s poll). The short
+  // gate after a local action prevents an in-flight echo from briefly snapping
+  // the optimistic number back; OTHER users' updates apply right after.
   useEffect(() => {
-    return register(post.id, (c) => {
-      if (Date.now() - localActionAt.current < 1500) return; // skip self/echo bounce
+    return subscribePostCounts(post.id, (c) => {
+      if (Date.now() - localActionAt.current < 1500) return;
       setLikes(c.like_count);
       setComments(c.comment_count);
       setReposts(c.repost_count);
       setSaves(c.bookmark_count);
     });
-  }, [post.id, register]);
+  }, [post.id]);
 
   const isOwner = Boolean(currentUserId) && currentUserId === post.author_id;
   const isPinned = post.is_pinned ?? false;
