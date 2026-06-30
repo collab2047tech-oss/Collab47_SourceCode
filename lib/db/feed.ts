@@ -398,8 +398,11 @@ async function getForYouFeedPage(opts: { excludeIds?: string[]; limit?: number; 
   }
 
   const posts = await attachReposts(sb, served);
-  // More pages likely exist while we keep filling a full page from a deep pool.
-  const nextCursor = served.length >= limit && pool.length > served.length ? String(excludeIds.length + served.length) : null;
+  // Keep paginating as long as this page yielded posts AND the recall pool held
+  // more than we served (i.e. older/unseen posts remain). NOT gated on a full
+  // page of exactly `limit` - diversity can serve a few less and that must not
+  // dead-end the infinite scroll.
+  const nextCursor = served.length > 0 && pool.length > served.length ? String(excludeIds.length + served.length) : null;
   return { posts, nextCursor };
 }
 

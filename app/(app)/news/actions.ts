@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getOlderNews } from "@/lib/news/fetch";
+import type { NewsItem } from "@/lib/supabase/types";
 import {
   reactToNews,
   addNewsComment,
@@ -10,6 +12,14 @@ import {
   type NewsReactionKind,
   type NewsComment,
 } from "@/lib/db/newsEngage";
+
+/** Load the next distinct batch of older news for the infinite reader. */
+export async function loadMoreNewsAction(
+  before: string | null,
+  excludeIds: string[]
+): Promise<NewsItem[]> {
+  return getOlderNews(before, (excludeIds ?? []).slice(-120), 30);
+}
 
 export async function reactToNewsAction(
   newsId: string,

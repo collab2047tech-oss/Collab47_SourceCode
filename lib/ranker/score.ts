@@ -115,20 +115,25 @@ export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   const picked: ScoredPost[] = [];
   const coveredTags = new Set<string>();
 
+  // Pass 1: prefer tag diversity (skip a post whose primary tag is already
+  // covered, until 4 distinct tags are covered, then take purely by score).
   for (const p of sorted) {
-    if (picked.length >= k - 1) break;
+    if (picked.length >= k) break;
     const primary = p.hashtags[0]?.toLowerCase();
-    const addsCoverage = primary && !coveredTags.has(primary);
-    if (addsCoverage || coveredTags.size >= 4) {
+    if (!primary || !coveredTags.has(primary) || coveredTags.size >= 4) {
       picked.push(p);
       if (primary) coveredTags.add(primary);
     }
   }
-  for (const p of sorted) {
-    if (picked.length >= k - 1) break;
-    if (!picked.includes(p)) picked.push(p);
+  // Pass 2: fill any leftover slots with the highest-scored not-yet-picked, so
+  // we ALWAYS return min(k, scored.length). A short page (< k) must never
+  // dead-end the infinite scroll.
+  if (picked.length < k) {
+    const have = new Set(picked);
+    for (const p of sorted) {
+      if (picked.length >= k) break;
+      if (!have.has(p)) picked.push(p);
+    }
   }
-  const remaining = sorted.filter((p) => !picked.includes(p));
-  if (remaining.length > 0) picked.push(remaining[Math.floor(remaining.length / 2)]);
   return picked.slice(0, k);
 }

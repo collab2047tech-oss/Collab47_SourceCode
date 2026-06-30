@@ -42,19 +42,43 @@ export function HomeFeed({
   const reduce = useReducedMotion();
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Infinite scroll: prefetch 800px before the user reaches the bottom.
+  // Latest props read by the observer (so it can be created ONCE per tab and
+  // never go stale - recreating it on every render caused re-arm races that
+  // stalled the infinite scroll after a page or two).
+  const loadRef = useRef(onLoadMore);
+  const hasMoreRef = useRef(hasMore);
+  const loadingRef = useRef(loading);
+  loadRef.current = onLoadMore;
+  hasMoreRef.current = hasMore;
+  loadingRef.current = loading;
+
+  // Infinite scroll observer: created once per tab, fires on every scroll that
+  // brings the sentinel within 1200px of the viewport.
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || !hasMore) return;
+    if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) onLoadMore();
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) loadRef.current();
       },
-      { rootMargin: "800px" }
+      { rootMargin: "1200px" }
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasMore, loading, onLoadMore, tab]);
+  }, [tab]);
+
+  // Post-load "kick": a still-intersecting sentinel does NOT emit a new
+  // IntersectionObserver event, so after each page settles we re-check whether
+  // the sentinel is still near the viewport and, if so, keep loading until the
+  // screen is filled. This is what makes it feel continuous (LinkedIn/YouTube).
+  useEffect(() => {
+    if (loading || !hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight + 1200) onLoadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, hasMore, posts.length, tab]);
 
   return (
     <>

@@ -380,3 +380,27 @@ export async function getNewsItem(id: string): Promise<NewsItem | null> {
   const { data } = await client.from("news_items").select("*").eq("id", id).maybeSingle();
   return (data as NewsItem) ?? null;
 }
+
+/**
+ * Keyset pagination for the news reader: the NEXT distinct batch of older items
+ * (published_at < `before`), excluding ids already on screen. Lets the reader
+ * load EVERY article that exists - no 300-item cap, no re-cycling - until the
+ * archive is exhausted. Chronological (newest-first) below the ranked first page.
+ */
+export async function getOlderNews(
+  before: string | null,
+  excludeIds: string[],
+  limit = 30
+): Promise<NewsItem[]> {
+  const client = getServiceClient();
+  if (!client) return [];
+  let q = client
+    .from("news_items")
+    .select("*")
+    .order("published_at", { ascending: false })
+    .limit(limit + excludeIds.length);
+  if (before) q = q.lt("published_at", before);
+  const { data } = await q;
+  const ex = new Set(excludeIds);
+  return ((data as NewsItem[] | null) ?? []).filter((n) => !ex.has(n.id)).slice(0, limit);
+}

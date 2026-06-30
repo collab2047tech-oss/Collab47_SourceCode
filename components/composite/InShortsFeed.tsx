@@ -12,6 +12,7 @@ import {
   type InterestProfile,
 } from "@/lib/newsPersonalize";
 import { NewsActions } from "@/components/composite/NewsActions";
+import { loadMoreNewsAction } from "@/app/(app)/news/actions";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -41,6 +42,11 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
   const cycleRef = useRef(0);
   const indexRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Keyset pagination state for loading EVERY distinct article (no cap).
+  const cursorRef = useRef<string | null>(null);   // oldest published_at loaded
+  const idsRef = useRef<Set<string>>(new Set());    // every id on screen (dedupe)
+  const loadingMoreRef = useRef(false);
+  const exhaustedRef = useRef(false);               // archive fully shown
 
   // The server already field-matched `items`; the local loop re-shuffles WITHIN
   // that relevant set (relevance first, instant personalisation on top).
@@ -55,6 +61,10 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
     profileRef.current = p;
     cycleRef.current = 0;
     indexRef.current = 0;
+    loadingMoreRef.current = false;
+    exhaustedRef.current = false;
+    idsRef.current = new Set(items.map((it) => it.id));
+    cursorRef.current = items.length > 0 ? items[items.length - 1].published_at : null;
     // First cycle keeps the server's ranked order verbatim (no local re-shuffle)
     // so the most-relevant matched story is the first card you see.
     setOrder(items.map((it) => ({ item: it, key: `${it.id}-c0` })));
@@ -65,13 +75,31 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
     const el = scrollRef.current;
     if (!el || order.length === 0) return;
     indexRef.current = Math.round(el.scrollTop / el.clientHeight);
-    // Infinite loop: when near the end of the current cycle, append the next
-    // personalised cycle. We only ever APPEND - never reorder what's already on
-    // screen - so the visible card can't jump or vanish.
-    if (indexRef.current >= order.length - 2) {
+    if (indexRef.current < order.length - 3 || loadingMoreRef.current) return;
+
+    // Archive exhausted -> gently re-cycle the personalised set so the reader
+    // never dead-ends (last resort only, after EVERY distinct article shown).
+    if (exhaustedRef.current) {
       cycleRef.current += 1;
       setOrder((prev) => [...prev, ...makeCycle(profileRef.current, cycleRef.current)]);
+      return;
     }
+
+    // Otherwise fetch the NEXT distinct batch of older articles (no cap).
+    loadingMoreRef.current = true;
+    loadMoreNewsAction(cursorRef.current, [...idsRef.current])
+      .then((more) => {
+        const fresh = more.filter((m) => !idsRef.current.has(m.id));
+        if (fresh.length === 0) {
+          exhaustedRef.current = true;
+        } else {
+          for (const m of fresh) idsRef.current.add(m.id);
+          cursorRef.current = fresh[fresh.length - 1].published_at;
+          setOrder((prev) => [...prev, ...fresh.map((it) => ({ item: it, key: `${it.id}-m` }))]);
+        }
+      })
+      .catch(() => { exhaustedRef.current = true; })
+      .finally(() => { loadingMoreRef.current = false; });
   }
 
   /**
