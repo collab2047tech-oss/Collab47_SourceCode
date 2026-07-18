@@ -108,30 +108,30 @@ function renderDigest(name: string, c: DigestContent, unsubUrl: string): string 
     const names = c.followerNames.map(escapeHtml).slice(0, 3).join(", ");
     const extra = c.newFollowers > 3 ? ` and ${c.newFollowers - 3} more` : "";
     parts.push(
-      `<p style="margin:0 0 14px"><strong style="color:#0A0F1C">${c.newFollowers} new follower${c.newFollowers === 1 ? "" : "s"}</strong>${names ? ` - ${names}${extra}` : ""}.</p>`,
+      `<p style="margin:0 0 14px"><strong style="color:#12100E">${c.newFollowers} new follower${c.newFollowers === 1 ? "" : "s"}</strong>${names ? ` - ${names}${extra}` : ""}.</p>`,
     );
   }
   if (c.pendingRequests > 0) {
     parts.push(
-      `<p style="margin:0 0 14px"><strong style="color:#0A0F1C">${c.pendingRequests} connection request${c.pendingRequests === 1 ? "" : "s"}</strong> waiting for you.</p>`,
+      `<p style="margin:0 0 14px"><strong style="color:#12100E">${c.pendingRequests} connection request${c.pendingRequests === 1 ? "" : "s"}</strong> waiting for you.</p>`,
     );
   }
   if (c.topPosts.length > 0) {
     const items = c.topPosts
       .map(
         (p) =>
-          `<li style="margin-bottom:10px"><a href="${p.url}" style="color:#2C5BFF;text-decoration:none;font-weight:600">${escapeHtml(p.author)}</a>: ${escapeHtml(p.snippet)}${p.snippet.length >= 120 ? "..." : ""}</li>`,
+          `<li style="margin-bottom:10px"><a href="${p.url}" style="color:#B95402;text-decoration:none;font-weight:600">${escapeHtml(p.author)}</a>: ${escapeHtml(p.snippet)}${p.snippet.length >= 120 ? "..." : ""}</li>`,
       )
       .join("");
     parts.push(
-      `<p style="margin:0 0 6px;color:#0A0F1C;font-weight:600">Worth a look from your network</p><ul style="margin:0 0 14px;padding-left:18px;color:#42506B">${items}</ul>`,
+      `<p style="margin:0 0 6px;color:#12100E;font-weight:600">Worth a look from your network</p><ul style="margin:0 0 14px;padding-left:18px;color:#42506B">${items}</ul>`,
     );
   }
   if (c.community.length > 0) {
     const people = c.community
       .map(
         (p) =>
-          `<a href="${BASE}/u/${p.handle}" style="color:#2C5BFF;text-decoration:none;font-weight:600">${escapeHtml(p.name)}</a>`,
+          `<a href="${BASE}/u/${p.handle}" style="color:#B95402;text-decoration:none;font-weight:600">${escapeHtml(p.name)}</a>`,
       )
       .join(", ");
     parts.push(`<p style="margin:0 0 4px;color:#8A93A6;font-size:13px">People in your community: ${people}</p>`);

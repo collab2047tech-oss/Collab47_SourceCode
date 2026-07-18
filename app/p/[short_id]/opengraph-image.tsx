@@ -50,7 +50,7 @@ export default async function Image({ params }: { params: Promise<{ short_id: st
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#F5F7FB",
+          background: "#FBF8F4",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
@@ -65,7 +65,7 @@ export default async function Image({ params }: { params: Promise<{ short_id: st
                 width: 84,
                 height: 84,
                 borderRadius: 84,
-                background: "#2C5BFF",
+                background: "#B95402",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
@@ -78,18 +78,18 @@ export default async function Image({ params }: { params: Promise<{ short_id: st
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", marginLeft: 24 }}>
-            <div style={{ display: "flex", fontSize: 36, fontWeight: 700, color: "#0A0F1C" }}>{author}</div>
+            <div style={{ display: "flex", fontSize: 36, fontWeight: 700, color: "#12100E" }}>{author}</div>
             {handle ? <div style={{ display: "flex", fontSize: 26, color: "#8A93A6" }}>{handle}</div> : null}
           </div>
         </div>
 
-        <div style={{ display: "flex", fontSize: 48, lineHeight: 1.3, color: "#0A0F1C", fontWeight: 500 }}>
+        <div style={{ display: "flex", fontSize: 48, lineHeight: 1.3, color: "#12100E", fontWeight: 500 }}>
           {excerpt}
           {excerpt.length >= 180 ? "..." : ""}
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", fontSize: 30, fontWeight: 800, color: "#0A0F1C" }}>
-          Collab<span style={{ color: "#2C5BFF" }}>47</span>
+        <div style={{ display: "flex", alignItems: "center", fontSize: 30, fontWeight: 800, color: "#12100E" }}>
+          Collab<span style={{ color: "#B95402" }}>47</span>
         </div>
       </div>
     ),

@@ -18,7 +18,7 @@ export function Hero() {
         </Reveal>
 
         {/* Headline - clamp down hard on phones so it never overflows at 360px */}
- <h1 className="max-w-[21ch] text-[2.6rem] leading-[1.05] tracking-tight font-serif text-ink sm:text-display-lg md:text-display-xl">
+ <h1 className="max-w-[21ch] text-[2.6rem] leading-[1.12] tracking-tight font-serif text-ink pb-[0.08em] sm:text-display-lg md:text-display-xl">
           <SplitWords text="Where talent, innovation" />
           <br />
           <SplitWords text="and opportunity" delay={0.15} />{" "}

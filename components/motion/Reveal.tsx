@@ -19,7 +19,13 @@ export function Reveal({
   once = true,
 }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once, margin: "-80px" });
+  // margin is bottom-only on purpose. A uniform "-80px" shrinks the detection
+  // box on ALL sides, including the top, so an element scrolled to the top of
+  // the viewport by a #hash jump falls in the dead zone, never registers as in
+  // view, and stays at opacity:0 - the "How it works / Who it's for links land
+  // on a blank section" bug. Shrinking only the bottom keeps the early-trigger
+  // feel while guaranteeing anything already on screen is visible.
+  const inView = useInView(ref, { once, margin: "0px 0px -80px 0px" });
   const reduce = useReducedMotion();
 
   // motion/react animates via inline transforms (not CSS transitions), so the
@@ -71,7 +77,13 @@ export function Stagger({
   once = true,
 }: StaggerProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once, margin: "-80px" });
+  // margin is bottom-only on purpose. A uniform "-80px" shrinks the detection
+  // box on ALL sides, including the top, so an element scrolled to the top of
+  // the viewport by a #hash jump falls in the dead zone, never registers as in
+  // view, and stays at opacity:0 - the "How it works / Who it's for links land
+  // on a blank section" bug. Shrinking only the bottom keeps the early-trigger
+  // feel while guaranteeing anything already on screen is visible.
+  const inView = useInView(ref, { once, margin: "0px 0px -80px 0px" });
   const reduce = useReducedMotion();
   const items = Array.isArray(children) ? children : [children];
 

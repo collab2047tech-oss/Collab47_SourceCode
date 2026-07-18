@@ -27,7 +27,7 @@ export async function sendFeedbackAlert(f: {
   const html = emailShell({
     title: `New ${escapeHtml(f.kind)} report`,
     intro: `Someone just submitted a ${escapeHtml(f.kind)} on Collab47.`,
-    bodyHtml: `<p style="margin:0 0 8px"><strong style="color:#0A0F1C">${escapeHtml(f.subject)}</strong></p>
+    bodyHtml: `<p style="margin:0 0 8px"><strong style="color:#12100E">${escapeHtml(f.subject)}</strong></p>
       <p style="margin:0 0 14px;white-space:pre-line">${escapeHtml(f.body)}</p>${meta}`,
     cta: { text: "Open triage", href: "https://collab47.com/feedback" },
   });
@@ -112,7 +112,7 @@ export async function sendWelcomeEmail(
     title: `You are in, ${first}.`,
     intro:
       "I am Shaurya, one of the people building Collab47. The short reason it exists: too much good work in India stays hidden. The student never meets the lab, the founder never meets the researcher. We are fixing that.",
-    bodyHtml: `<p style="margin:0 0 10px;color:#0A0F1C;font-weight:600">Three ways to start as a ${escapeHtml(role.label)}:</p>
+    bodyHtml: `<p style="margin:0 0 10px;color:#12100E;font-weight:600">Three ways to start as a ${escapeHtml(role.label)}:</p>
       <ul style="margin:0 0 18px;padding-left:18px;color:#42506B">${moves}</ul>
       <p style="margin:0">Post something today, even something small. The network only gets good when people like you actually show up.</p>
       <p style="margin:16px 0 0;color:#42506B">See you inside,<br>Shaurya</p>`,

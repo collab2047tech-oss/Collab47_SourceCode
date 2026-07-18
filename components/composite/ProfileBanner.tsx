@@ -44,7 +44,7 @@ export function ProfileBanner({
   return (
     <div
       className={cn(
-        "relative w-full overflow-hidden bg-[#0B1220]",
+        "relative w-full overflow-hidden bg-[#03265E]",
         className
       )}
     >

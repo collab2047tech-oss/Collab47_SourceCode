@@ -28,7 +28,7 @@ export function ProfileStrength({ isOwner, score, items, todo }: ProfileStrength
   if (!isOwner) return null;
 
   const done = items.length - todo.length;
-  const accent = score >= 80 ? "#1B7A4B" : score >= 50 ? "#2C5BFF" : "#F5A623";
+  const accent = score >= 80 ? "#1B7A4B" : score >= 50 ? "#B95402" : "#F5A623";
 
   return (
     <div className="mt-6 overflow-hidden rounded-xl border border-bone bg-paper">
@@ -91,7 +91,7 @@ export function ProfileStrength({ isOwner, score, items, todo }: ProfileStrength
                     <span className="flex-1 group-hover:text-saffron-dk">{item.label}</span>
                     <span
                       className="text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100"
-                      style={{ color: "#2C5BFF" }}
+                      style={{ color: "#B95402" }}
                     >
                       Fix
                     </span>

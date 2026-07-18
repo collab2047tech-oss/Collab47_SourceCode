@@ -297,12 +297,12 @@ export function ProfileEditForm({
                     }}
                     aria-pressed={selected}
                     className="group relative block overflow-hidden rounded-lg text-left"
-                    style={{ boxShadow: selected ? "0 0 0 2px #2C5BFF" : "0 0 0 1px #DDE3EE" }}
+                    style={{ boxShadow: selected ? "0 0 0 2px #B95402" : "0 0 0 1px #E7E0D6" }}
                   >
                     <ProfileBanner bannerPreset={b.id} className="h-16 sm:h-20" />
                     {selected ? (
                       <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-paper shadow">
-                        <Check className="size-3" strokeWidth={3} style={{ color: "#2C5BFF" }} />
+                        <Check className="size-3" strokeWidth={3} style={{ color: "#B95402" }} />
                       </span>
                     ) : null}
                     <span className="absolute bottom-1 left-1.5 rounded bg-ink/55 px-1.5 py-0.5 text-[10px] font-medium text-cream backdrop-blur-sm">

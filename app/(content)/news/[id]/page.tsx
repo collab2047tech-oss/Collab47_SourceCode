@@ -92,7 +92,7 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
             </div>
           </Reveal>
         ) : (
-          <div className="flex h-40 items-end rounded-xl bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)] p-5">
+          <div className="flex h-40 items-end rounded-xl bg-[linear-gradient(135deg,#12100E_0%,#A34802_100%)] p-5">
             <span className="text-xs font-medium uppercase tracking-widest text-cream">{item.source}</span>
           </div>
         )}

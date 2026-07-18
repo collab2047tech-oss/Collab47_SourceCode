@@ -12,7 +12,6 @@ const NAV = [
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#who", label: "Who it's for" },
   { href: "/about", label: "About" },
-  { href: "/manifesto", label: "Manifesto" },
 ];
 
 export function Nav() {

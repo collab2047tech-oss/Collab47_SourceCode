@@ -7,7 +7,6 @@ const COLUMNS: { heading: string; links: { label: string; href: string; external
     links: [
       { label: "Home", href: "/" },
       { label: "About", href: "/about" },
-      { label: "Manifesto", href: "/manifesto" },
       { label: "Sign up", href: "/signup" },
     ],
   },

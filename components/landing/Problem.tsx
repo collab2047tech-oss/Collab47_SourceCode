@@ -27,7 +27,7 @@ const items = [
 
 export function Problem() {
   return (
- <section id="who" className="section scroll-mt-20 bg-cream">
+ <section id="who" className="section scroll-mt-24 bg-cream">
  <div className="container-edit">
         <Reveal>
  <p className="text-caption mb-6">The Problem</p>

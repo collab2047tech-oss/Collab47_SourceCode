@@ -3,7 +3,7 @@
  *
  * Every preset is generated from pure CSS gradients and/or an inline SVG layer
  * (no stock photos, no network requests). Brand-aligned to the Collab47 tokens:
- *   cobalt #2C5BFF, ink #0A0F1C, saffron #F5A623, plus supporting blends.
+ *   cobalt #B95402, ink #12100E, saffron #F5A623, plus supporting blends.
  *
  * A profile's banner is ONE of:
  *   - a preset id stored in `profiles.banner_preset`, OR
@@ -142,7 +142,7 @@ const horizon = () =>
   svgWrap(
     `<g>
        <circle cx='600' cy='250' r='90' fill='#F5A623' fill-opacity='0.85'/>
-       <rect x='0' y='250' width='1200' height='110' fill='#0A0F1C' fill-opacity='0.35'/>
+       <rect x='0' y='250' width='1200' height='110' fill='#12100E' fill-opacity='0.35'/>
        <line x1='0' y1='250' x2='1200' y2='250' stroke='#F5A623' stroke-width='1.5' stroke-opacity='0.5'/>
      </g>`
   );
@@ -154,7 +154,7 @@ const skyline = () => {
   const heights = [70, 120, 90, 160, 110, 200, 130, 180, 100, 150, 90, 140, 80, 170, 110, 130];
   for (const h of heights) {
     const w = 60 + (h % 40);
-    bldgs += `<rect x='${x}' y='${360 - h}' width='${w - 8}' height='${h}' fill='#0A0F1C' fill-opacity='0.5'/>`;
+    bldgs += `<rect x='${x}' y='${360 - h}' width='${w - 8}' height='${h}' fill='#12100E' fill-opacity='0.5'/>`;
     x += w;
   }
   return svgWrap(`<g>${bldgs}</g>`);
@@ -175,8 +175,8 @@ const aurora = () =>
   svgWrap(
     `<g filter='url(#au)'>
        <defs><filter id='au'><feGaussianBlur stdDeviation='22'/></filter></defs>
-       <path d='M0 120 Q300 40 600 120 T1200 120 L1200 220 Q900 160 600 220 T0 220 Z' fill='#2C5BFF' fill-opacity='0.55'/>
-       <path d='M0 200 Q300 280 600 200 T1200 200 L1200 280 Q900 230 600 280 T0 280 Z' fill='#5a7dff' fill-opacity='0.4'/>
+       <path d='M0 120 Q300 40 600 120 T1200 120 L1200 220 Q900 160 600 220 T0 220 Z' fill='#B95402' fill-opacity='0.55'/>
+       <path d='M0 200 Q300 280 600 200 T1200 200 L1200 280 Q900 230 600 280 T0 280 Z' fill='#D76202' fill-opacity='0.4'/>
      </g>`
   );
 
@@ -191,35 +191,35 @@ export const BANNER_PRESETS: BannerPreset[] = [
     family: "gradient",
     label: "Cobalt Aurora",
     background:
-      "linear-gradient(135deg, #0B1220 0%, #1a2744 38%, #2C5BFF 78%, #5a7dff 100%)",
+      "linear-gradient(135deg, #03265E 0%, #1a2744 38%, #B95402 78%, #D76202 100%)",
   },
   {
     id: "midnight-mesh",
     family: "gradient",
     label: "Midnight Mesh",
     background:
-      "radial-gradient(ellipse at 80% 18%, #2C5BFF55 0%, transparent 60%), linear-gradient(135deg, #0B1220 0%, #1a2744 45%, #0A0F1C 100%)",
+      "radial-gradient(ellipse at 80% 18%, #B9540255 0%, transparent 60%), linear-gradient(135deg, #03265E 0%, #1a2744 45%, #12100E 100%)",
   },
   {
     id: "dawn-cobalt",
     family: "gradient",
     label: "Dawn Cobalt",
     background:
-      "linear-gradient(120deg, #2C5BFF 0%, #5a7dff 40%, #F5A623 100%)",
+      "linear-gradient(120deg, #B95402 0%, #D76202 40%, #F5A623 100%)",
   },
   {
     id: "ink-fade",
     family: "gradient",
     label: "Ink Fade",
     background:
-      "linear-gradient(180deg, #0A0F1C 0%, #131b30 60%, #1a2744 100%)",
+      "linear-gradient(180deg, #12100E 0%, #131b30 60%, #1a2744 100%)",
   },
   {
     id: "paper-cobalt-soft",
     family: "gradient",
     label: "Soft Cobalt",
     background:
-      "linear-gradient(135deg, #2C5BFF 0%, #4f74ff 50%, #1E40D6 100%)",
+      "linear-gradient(135deg, #B95402 0%, #4f74ff 50%, #A34802 100%)",
   },
 
   // --- Doodles (4) ---------------------------------------------------------
@@ -227,28 +227,28 @@ export const BANNER_PRESETS: BannerPreset[] = [
     id: "doodle-plus",
     family: "doodle",
     label: "Plus Field",
-    background: "linear-gradient(135deg, #0B1220 0%, #1a2744 100%)",
-    svg: plusField("#5a7dff", 0.7),
+    background: "linear-gradient(135deg, #03265E 0%, #1a2744 100%)",
+    svg: plusField("#D76202", 0.7),
   },
   {
     id: "doodle-circuit",
     family: "doodle",
     label: "Circuit",
-    background: "linear-gradient(135deg, #0A0F1C 0%, #16223f 100%)",
-    svg: circuit("#2C5BFF"),
+    background: "linear-gradient(135deg, #12100E 0%, #16223f 100%)",
+    svg: circuit("#B95402"),
   },
   {
     id: "doodle-nodes",
     family: "doodle",
     label: "Network",
     background: "linear-gradient(135deg, #101a33 0%, #1f2e52 100%)",
-    svg: nodes("#5a7dff"),
+    svg: nodes("#D76202"),
   },
   {
     id: "doodle-constellation",
     family: "doodle",
     label: "Constellation",
-    background: "linear-gradient(160deg, #0A0F1C 0%, #131b30 70%, #1a2744 100%)",
+    background: "linear-gradient(160deg, #12100E 0%, #131b30 70%, #1a2744 100%)",
     svg: constellation("#F5A623"),
   },
 
@@ -258,35 +258,35 @@ export const BANNER_PRESETS: BannerPreset[] = [
     family: "abstract",
     label: "Conic Mesh",
     background:
-      "conic-gradient(from 200deg at 70% 40%, #2C5BFF, #0B1220, #5a7dff, #1a2744, #2C5BFF)",
+      "conic-gradient(from 200deg at 70% 40%, #B95402, #03265E, #D76202, #1a2744, #B95402)",
   },
   {
     id: "abstract-blueprint",
     family: "abstract",
     label: "Blueprint",
     background: "linear-gradient(135deg, #0e1830 0%, #16223f 100%)",
-    svg: blueprintGrid("#5a7dff"),
+    svg: blueprintGrid("#D76202"),
   },
   {
     id: "abstract-blobs",
     family: "abstract",
     label: "Soft Blobs",
-    background: "linear-gradient(135deg, #0B1220 0%, #131b30 100%)",
-    svg: blobs("#2C5BFF", "#F5A623"),
+    background: "linear-gradient(135deg, #03265E 0%, #131b30 100%)",
+    svg: blobs("#B95402", "#F5A623"),
   },
   {
     id: "abstract-halftone",
     family: "abstract",
     label: "Halftone",
-    background: "linear-gradient(120deg, #1a2744 0%, #2C5BFF 120%)",
+    background: "linear-gradient(120deg, #1a2744 0%, #B95402 120%)",
     svg: halftone("#FFFFFF"),
   },
   {
     id: "abstract-bands",
     family: "abstract",
     label: "Diagonal Bands",
-    background: "linear-gradient(135deg, #0B1220 0%, #1f2e52 100%)",
-    svg: diagonalBands("#2C5BFF", "#F5A623"),
+    background: "linear-gradient(135deg, #03265E 0%, #1f2e52 100%)",
+    svg: diagonalBands("#B95402", "#F5A623"),
   },
 
   // --- Scenic (4) - all pure CSS/SVG, no photos ---------------------------
@@ -303,7 +303,7 @@ export const BANNER_PRESETS: BannerPreset[] = [
     family: "scenic",
     label: "Skyline",
     background:
-      "linear-gradient(180deg, #2C5BFF 0%, #5a7dff 40%, #1a2744 100%)",
+      "linear-gradient(180deg, #B95402 0%, #D76202 40%, #1a2744 100%)",
     svg: skyline(),
   },
   {
@@ -311,14 +311,14 @@ export const BANNER_PRESETS: BannerPreset[] = [
     family: "scenic",
     label: "Tide",
     background:
-      "linear-gradient(180deg, #0B1220 0%, #16357a 55%, #2C5BFF 100%)",
+      "linear-gradient(180deg, #03265E 0%, #16357a 55%, #B95402 100%)",
     svg: waves(),
   },
   {
     id: "scenic-aurora",
     family: "scenic",
     label: "Northern Lights",
-    background: "linear-gradient(180deg, #0A0F1C 0%, #101a33 100%)",
+    background: "linear-gradient(180deg, #12100E 0%, #101a33 100%)",
     svg: aurora(),
   },
 ];

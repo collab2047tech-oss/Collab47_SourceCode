@@ -76,8 +76,8 @@ function HighlightBubble({ post }: { post: PostWithAuthor }) {
         className="rounded-full p-0.75 transition-transform duration-200 group-hover:scale-105"
         style={{
           background: post.is_pinned
-            ? "linear-gradient(135deg, #2C5BFF 0%, #5a7dff 60%, #2C5BFF 100%)"
-            : "linear-gradient(135deg, #F5A623 0%, #2C5BFF 50%, #5a7dff 100%)",
+            ? "linear-gradient(135deg, #B95402 0%, #D76202 60%, #B95402 100%)"
+            : "linear-gradient(135deg, #F5A623 0%, #B95402 50%, #D76202 100%)",
         }}
       >
         <div className="rounded-full border-2 border-cream">
@@ -93,8 +93,8 @@ function HighlightBubble({ post }: { post: PostWithAuthor }) {
               className="flex size-16 items-center justify-center rounded-full font-serif text-lg text-cream"
               style={{
                 background: post.is_pinned
-                  ? "linear-gradient(135deg, #1E40D6 0%, #2C5BFF 100%)"
-                  : "linear-gradient(135deg, #0B1220 0%, #1a2744 100%)",
+                  ? "linear-gradient(135deg, #A34802 0%, #B95402 100%)"
+                  : "linear-gradient(135deg, #03265E 0%, #1a2744 100%)",
               }}
             >
               {snippet}
@@ -260,7 +260,7 @@ function PostCard({ post }: { post: PostWithAuthor }) {
       <div className="px-5 py-4">
         {/* Pin badge */}
         {post.is_pinned ? (
-          <div className="mb-2 flex items-center gap-1.5 text-xs" style={{ color: "#2C5BFF" }}>
+          <div className="mb-2 flex items-center gap-1.5 text-xs" style={{ color: "#B95402" }}>
             <Pin className="size-3.5" strokeWidth={1.75} />
             <span>Pinned post</span>
           </div>
@@ -384,7 +384,7 @@ function EmptyState({
         className="flex size-12 items-center justify-center rounded-full"
         style={{ background: "rgba(44,91,255,0.07)" }}
       >
-        <span style={{ color: "#2C5BFF" }}>{icon}</span>
+        <span style={{ color: "#B95402" }}>{icon}</span>
       </div>
       <p className="max-w-xs text-sm leading-relaxed text-ash">{message}</p>
       {cta ? <div className="mt-1">{cta}</div> : null}
@@ -477,7 +477,7 @@ export function ProfileTabs({
               {tab === t.id ? (
                 <span
                   className="absolute bottom-0 left-0 right-0 h-0.5 rounded-t-full bg-saffron"
-                  style={{ background: "#2C5BFF" }}
+                  style={{ background: "#B95402" }}
                 />
               ) : null}
             </button>
@@ -523,7 +523,7 @@ export function ProfileTabs({
                   <Link
                     href="/collabs/new"
                     className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
-                    style={{ background: "#2C5BFF" }}
+                    style={{ background: "#B95402" }}
                   >
                     Post a brief
                   </Link>
@@ -605,8 +605,8 @@ export function ProfileTabs({
                         className="flex h-24 items-center justify-center"
                         style={{
                           background: p.is_pinned
-                            ? "linear-gradient(135deg,#1E40D6,#2C5BFF)"
-                            : "linear-gradient(135deg,#0B1220,#1a2744)",
+                            ? "linear-gradient(135deg,#A34802,#B95402)"
+                            : "linear-gradient(135deg,#03265E,#1a2744)",
                         }}
                       >
                         <Star className="size-8 text-cream/30" strokeWidth={1} />
@@ -664,7 +664,7 @@ export function ProfileTabs({
                       <Link
                         href="/profile/edit"
                         className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-cream transition-opacity hover:opacity-90"
-                        style={{ background: "#2C5BFF" }}
+                        style={{ background: "#B95402" }}
                       >
                         Complete profile
                       </Link>
@@ -713,7 +713,7 @@ export function ProfileTabs({
                     <div className="flex flex-wrap gap-2">
                       {interests.map((i) => (
                         <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-bone px-3.5 py-1.5 text-sm text-ink">
-                          <span className="size-1.5 rounded-full" style={{ background: "#2C5BFF" }} />
+                          <span className="size-1.5 rounded-full" style={{ background: "#B95402" }} />
                           {i}
                         </span>
                       ))}

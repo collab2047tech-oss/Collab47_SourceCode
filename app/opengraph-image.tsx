@@ -15,7 +15,7 @@ export default async function OpengraphImage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#F5F7FB",
+          background: "#FBF8F4",
           padding: "80px",
           fontFamily: "system-ui, -apple-system, sans-serif",
         }}
@@ -26,7 +26,7 @@ export default async function OpengraphImage() {
             display: "flex",
             width: 96,
             height: 8,
-            background: "#2C5BFF",
+            background: "#B95402",
             borderRadius: 999,
           }}
         />
@@ -39,11 +39,11 @@ export default async function OpengraphImage() {
               fontSize: 128,
               fontWeight: 700,
               letterSpacing: "-0.03em",
-              color: "#0A0F1C",
+              color: "#12100E",
             }}
           >
             Collab
-            <span style={{ color: "#2C5BFF" }}>47</span>
+            <span style={{ color: "#B95402" }}>47</span>
           </div>
           <div
             style={{
@@ -51,7 +51,7 @@ export default async function OpengraphImage() {
               marginTop: 24,
               fontSize: 40,
               fontWeight: 500,
-              color: "#5A6A86",
+              color: "#6B6559",
               maxWidth: 900,
               lineHeight: 1.3,
             }}
@@ -66,7 +66,7 @@ export default async function OpengraphImage() {
             display: "flex",
             fontSize: 28,
             fontWeight: 600,
-            color: "#0A0F1C",
+            color: "#12100E",
           }}
         >
           collab47.com

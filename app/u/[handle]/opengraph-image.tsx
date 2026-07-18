@@ -49,13 +49,13 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#F5F7FB",
+          background: "#FBF8F4",
           padding: "72px",
           fontFamily: "sans-serif",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", fontSize: 34, fontWeight: 800, color: "#0A0F1C" }}>
-          Collab<span style={{ color: "#2C5BFF" }}>47</span>
+        <div style={{ display: "flex", alignItems: "center", fontSize: 34, fontWeight: 800, color: "#12100E" }}>
+          Collab<span style={{ color: "#B95402" }}>47</span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center" }}>
@@ -65,7 +65,7 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
               src={avatar}
               width={168}
               height={168}
-              style={{ width: 168, height: 168, borderRadius: 168, objectFit: "cover", border: "4px solid #2C5BFF" }}
+              style={{ width: 168, height: 168, borderRadius: 168, objectFit: "cover", border: "4px solid #B95402" }}
               alt=""
             />
           ) : (
@@ -74,7 +74,7 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
                 width: 168,
                 height: 168,
                 borderRadius: 168,
-                background: "#2C5BFF",
+                background: "#B95402",
                 color: "#fff",
                 display: "flex",
                 alignItems: "center",
@@ -87,9 +87,9 @@ export default async function Image({ params }: { params: Promise<{ handle: stri
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", marginLeft: 40 }}>
-            <div style={{ display: "flex", alignItems: "center", fontSize: 66, fontWeight: 800, color: "#0A0F1C" }}>
+            <div style={{ display: "flex", alignItems: "center", fontSize: 66, fontWeight: 800, color: "#12100E" }}>
               {name}
-              {verified ? <span style={{ color: "#2C5BFF", marginLeft: 16, fontSize: 48 }}>✓</span> : null}
+              {verified ? <span style={{ color: "#B95402", marginLeft: 16, fontSize: 48 }}>✓</span> : null}
             </div>
             <div style={{ display: "flex", fontSize: 34, color: "#42506B", marginTop: 12 }}>{sub}</div>
           </div>

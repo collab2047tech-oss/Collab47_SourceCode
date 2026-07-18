@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Pin the workspace root. A stray package-lock.json in the user's home dir made
+  // Turbopack infer ~/ as the root, so it looked for the app there and every route
+  // 404'd. Explicit root removes the ambiguity permanently.
+  turbopack: {
+    root: __dirname,
+  },
   // Hide the Next.js dev indicator badge (bottom-left).
   devIndicators: false,
   images: {

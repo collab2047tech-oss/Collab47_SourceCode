@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 // Colors mirror app/globals.css design tokens:
-//   background = --color-cream (#F5F7FB), theme = --color-saffron (#2C5BFF).
+//   background = --color-cream (#FBF8F4), theme = --color-saffron (#B95402).
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Collab47",
@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "India's unified academia-industry collaboration ecosystem.",
     start_url: "/",
     display: "standalone",
-    background_color: "#F5F7FB",
-    theme_color: "#2C5BFF",
+    background_color: "#FBF8F4",
+    theme_color: "#B95402",
     icons: [
       {
         src: "/icon",

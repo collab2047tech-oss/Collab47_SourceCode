@@ -212,7 +212,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               {/* Avatar overlaps banner; clean white ring (no purple gradient). */}
               <div className="-mt-14 shrink-0 self-start sm:-mt-16 md:-mt-20">
-                <Avatar name={profile.name} src={profile.avatar_url ?? undefined} size="2xl" className="ring-4 ring-paper shadow-[0_0_0_1px_#DDE3EE]" />
+                <Avatar name={profile.name} src={profile.avatar_url ?? undefined} size="2xl" className="ring-4 ring-paper shadow-[0_0_0_1px_#E7E0D6]" />
               </div>
 
               <div className="rounded-2xl border border-bone bg-paper px-5 py-5 shadow-sm">
@@ -223,7 +223,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
                   {profile.verified ? (
                     <span
                       className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                      style={{ background: "rgba(44,91,255,0.10)", color: "#2C5BFF" }}
+                      style={{ background: "rgba(44,91,255,0.10)", color: "#B95402" }}
                     >
                       <CheckCircle2 className="size-3.5" strokeWidth={2.5} />
                       Verified

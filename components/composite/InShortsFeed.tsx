@@ -160,7 +160,7 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
                       </span>
                     </div>
                   ) : (
-                    <div className="flex h-28 w-full shrink-0 items-end justify-between bg-[linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)] p-5">
+                    <div className="flex h-28 w-full shrink-0 items-end justify-between bg-[linear-gradient(135deg,#12100E_0%,#A34802_100%)] p-5">
                       <span className="text-xs font-medium uppercase tracking-widest text-cream">
                         {item.source}
                       </span>

@@ -39,7 +39,7 @@ const features = [
 
 export function Product() {
   return (
- <section id="how-it-works" className="section bg-paper">
+ <section id="how-it-works" className="section scroll-mt-24 bg-paper">
  <div className="container-edit">
         <Reveal>
  <p className="text-caption mb-6">The Product</p>

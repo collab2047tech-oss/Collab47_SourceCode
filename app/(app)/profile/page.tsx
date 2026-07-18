@@ -126,7 +126,7 @@ export default async function ProfilePage() {
               {/* Avatar overlaps the banner (image, not text -> always legible).
                   Clean white ring (no purple gradient) - crisp on any banner. */}
               <div className="-mt-14 shrink-0 self-start sm:-mt-16 md:-mt-20">
-                <Avatar name={p.name} src={p.avatar_url ?? undefined} size="2xl" className="ring-4 ring-paper shadow-[0_0_0_1px_#DDE3EE]" />
+                <Avatar name={p.name} src={p.avatar_url ?? undefined} size="2xl" className="ring-4 ring-paper shadow-[0_0_0_1px_#E7E0D6]" />
               </div>
 
               {/* Identity CARD on solid paper -> name contrast guaranteed on any banner. */}
@@ -141,7 +141,7 @@ export default async function ProfilePage() {
                   {p.verified ? (
                     <span
                       className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                      style={{ background: "rgba(44,91,255,0.10)", color: "#2C5BFF" }}
+                      style={{ background: "rgba(44,91,255,0.10)", color: "#B95402" }}
                     >
                       <CheckCircle2 className="size-3.5" strokeWidth={2.5} />
                       Verified

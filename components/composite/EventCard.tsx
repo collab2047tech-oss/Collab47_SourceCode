@@ -93,10 +93,10 @@ export function EventCard({ event, index = 0 }: { event: EventRow; index?: numbe
   // Stable gradient for the no-image header (varies by kind + index so the grid
   // isn't a wall of identical headers). Mirrors InShortsFeed's no-image header.
   const gradients = [
-    "linear-gradient(135deg,#0A0F1C_0%,#1E40D6_100%)",
-    "linear-gradient(135deg,#1E40D6_0%,#2C5BFF_100%)",
-    "linear-gradient(135deg,#0B1220_0%,#047857_100%)",
-    "linear-gradient(135deg,#0A0F1C_0%,#5A6A86_100%)",
+    "linear-gradient(135deg,#12100E_0%,#A34802_100%)",
+    "linear-gradient(135deg,#A34802_0%,#B95402_100%)",
+    "linear-gradient(135deg,#03265E_0%,#047857_100%)",
+    "linear-gradient(135deg,#12100E_0%,#6B6559_100%)",
   ];
   const gradient = gradients[index % gradients.length];
 

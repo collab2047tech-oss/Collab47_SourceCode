@@ -7,25 +7,35 @@
 
 @theme {
   /*
-   * Colors: cool premium palette. Token NAMES kept for code compat,
-   * VALUES repainted to cobalt/navy. "saffron" = cobalt accent now.
-   * "cream" = cool off-white. "ink" = near-black navy.
+   * Colors: warm editorial palette derived from the real Collab47 logo
+   * (orange / green / navy). Token NAMES are kept because ~1300 usages point
+   * at them; only the VALUES change, so the whole app re-skins from here.
+   *
+   * Contrast is verified, not guessed (all ratios vs #FFFFFF paper):
+   *   ink 18.98:1 . ash 5.78:1 . saffron 4.85:1 . moss 7.26:1
+   *   ember 6.47:1 . navy 14.56:1   -> every text token clears WCAG AA.
+   *
+   * IMPORTANT: --color-brand (#D76202) is the logo orange and measures only
+   * 3.73:1 on white. It is for the logo and large graphics ONLY. Never use it
+   * for body text, links or button fills; use --color-saffron for those.
    */
-  --color-ink: #0A0F1C;
-  --color-cream: #F5F7FB;
-  --color-paper: #FFFFFF;
-  --color-saffron: #2C5BFF;
-  --color-saffron-dk: #1E40D6;
-  --color-ash: #5A6A86;
-  --color-bone: #DDE3EE;
-  --color-moss: #047857;
-  --color-ember: #DC2626;
-  --color-navy: #0B1220;
-  --color-gold: #F5A623;
+  --color-ink: #12100E;        /* warm near-black, primary text */
+  --color-cream: #FBF8F4;      /* warm off-white page surface */
+  --color-paper: #FFFFFF;      /* cards / raised surfaces */
+  --color-brand: #D76202;      /* logo orange - large graphics ONLY */
+  --color-saffron: #B95402;    /* action orange - text, links, buttons */
+  --color-saffron-dk: #A34802; /* hover / pressed */
+  --color-ash: #6B6559;        /* warm secondary text */
+  --color-bone: #E7E0D6;       /* warm borders / dividers */
+  --color-moss: #106434;       /* brand green - success, accents */
+  --color-ember: #B91C1C;      /* error - shifted off orange to stay distinct */
+  --color-navy: #03265E;       /* brand navy - depth, headers */
+  --color-gold: #B45309;       /* warm highlight */
 
-  /* Type families - simple, clean, highly readable (no cursive/high-contrast).
-     "serif" token kept for code compat but is now a clean display sans (Sora). */
-  --font-serif: var(--font-sora), "Sora", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* Type families. --font-serif is now a REAL editorial serif (Fraunces), not a
+     sans wearing the serif token. Headlines set in it, body in Inter: high
+     contrast between the two is what carries the editorial feel. */
+  --font-serif: var(--font-fraunces), "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--font-jetbrains), "JetBrains Mono", "SF Mono", Menlo, monospace;
   --font-indic: var(--font-noto-devanagari), "Noto Sans Devanagari", var(--font-sans);
@@ -35,13 +45,13 @@
      Display sizes trimmed in rem so the absolute headline size stays similar
      while body + small UI text grows (fixes the "too small" feel). */
   --text-display-xl: 6.5rem;        /* ~117px @18 */
-  --text-display-xl--line-height: 1.0;
+  --text-display-xl--line-height: 1.08;
   --text-display-xl--letter-spacing: -0.025em;
   --text-display-lg: 4.75rem;       /* ~86px @18 */
-  --text-display-lg--line-height: 1.02;
+  --text-display-lg--line-height: 1.08;
   --text-display-lg--letter-spacing: -0.025em;
   --text-display-md: 3.5rem;        /* ~63px @18 */
-  --text-display-md--line-height: 1.05;
+  --text-display-md--line-height: 1.1;
   --text-display-md--letter-spacing: -0.02em;
   --text-h1: 2.25rem;               /* ~40px @18 */
   --text-h1--line-height: 1.15;
@@ -72,6 +82,17 @@
   /* Animation */
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* Tailwind v4 tree-shakes @theme variables it does not detect in use. The
+   .font-serif / .text-display-* rules below reference --font-serif from plain
+   CSS, which the tree-shaker does not count as usage, so the variable was being
+   dropped and every headline fell back to Inter. Declaring the font vars in a
+   real :root block guarantees they are always emitted. */
+:root {
+  --font-serif: var(--font-fraunces), "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", "SF Mono", Menlo, monospace;
 }
 
 /* ============================================================
@@ -118,6 +139,14 @@ body {
 .font-sans { font-family: var(--font-sans); }
 .font-mono { font-family: var(--font-mono); }
 .font-indic { font-family: var(--font-indic); }
+
+.text-display-xl,
+.text-display-lg,
+.text-display-md {
+  /* pb reserves space so descenders (g, y, p) are never clipped by a tight
+     line box or an ancestor with overflow hidden. */
+  padding-bottom: 0.08em;
+}
 
 .text-display-xl {
   font-family: var(--font-serif);
