@@ -44,11 +44,16 @@ export default async function ContentLayout({ children }: { children: React.Reac
   const profile = await getMyProfile();
 
   // Logged-out, not-yet-onboarded, or closed account -> public shell (indexable).
+  // data-news-shell="public" publishes the fixed-inset contract (globals.css)
+  // the InShortsFeed reads, so the full-screen reader fits this shell exactly
+  // (no sidebar/bottom-nav gutter) instead of assuming the member AppShell.
   if (!profile || profile.deleted_at || profile.suspended_at) {
     return (
       <>
         <PublicTopNav />
-        <main className="mx-auto w-full max-w-2xl px-4 pt-6">{children}</main>
+        <main data-news-shell="public" className="mx-auto w-full max-w-2xl px-4 pt-6">
+          {children}
+        </main>
       </>
     );
   }
@@ -76,7 +81,12 @@ export default async function ContentLayout({ children }: { children: React.Reac
       currentUserId={profile.id}
     >
       <AppShell me={me} unreadCount={unreadCount} messagesUnread={messagesUnread}>
-        {children}
+        {/* display:contents wrapper: adds no box (AppShell's <main> layout is
+            untouched) but publishes the member fixed-inset contract to the
+            InShortsFeed descendant via inherited CSS custom properties. */}
+        <div data-news-shell="member" className="contents">
+          {children}
+        </div>
       </AppShell>
     </MessagesProvider>
   );

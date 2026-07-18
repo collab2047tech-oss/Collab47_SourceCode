@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { NewsItem } from "@/lib/supabase/types";
-import { ChevronUp, ExternalLink, Newspaper } from "lucide-react";
+import { ChevronUp, ExternalLink, Newspaper, CheckCircle2, RotateCw, AlertTriangle } from "lucide-react";
 import {
   loadProfile,
   saveProfile,
@@ -35,8 +35,12 @@ interface Slot {
   key: string;
 }
 
+/** End-of-stream status surfaced honestly (no more silent recycle / swallow). */
+type FeedStatus = "idle" | "loading" | "error" | "caughtup";
+
 export function InShortsFeed({ items, savedIds = [] }: Props) {
   const [order, setOrder] = useState<Slot[]>(() => items.map((it) => ({ item: it, key: it.id })));
+  const [status, setStatus] = useState<FeedStatus>("idle");
   const savedSet = useRef<Set<string>>(new Set(savedIds));
   const profileRef = useRef<InterestProfile>({ weights: {} });
   const cycleRef = useRef(0);
@@ -65,41 +69,55 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
     exhaustedRef.current = false;
     idsRef.current = new Set(items.map((it) => it.id));
     cursorRef.current = items.length > 0 ? items[items.length - 1].published_at : null;
+    setStatus("idle");
     // First cycle keeps the server's ranked order verbatim (no local re-shuffle)
     // so the most-relevant matched story is the first card you see.
     setOrder(items.map((it) => ({ item: it, key: `${it.id}-c0` })));
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [items]);
 
-  function onScroll() {
-    const el = scrollRef.current;
-    if (!el || order.length === 0) return;
-    indexRef.current = Math.round(el.scrollTop / el.clientHeight);
-    if (indexRef.current < order.length - 3 || loadingMoreRef.current) return;
-
-    // Archive exhausted -> gently re-cycle the personalised set so the reader
-    // never dead-ends (last resort only, after EVERY distinct article shown).
-    if (exhaustedRef.current) {
-      cycleRef.current += 1;
-      setOrder((prev) => [...prev, ...makeCycle(profileRef.current, cycleRef.current)]);
-      return;
-    }
-
-    // Otherwise fetch the NEXT distinct batch of older articles (no cap).
+  // Fetch the NEXT distinct batch of older articles (no cap). Surfaces its own
+  // loading / caught-up / error status instead of swallowing failures.
+  const loadMore = useCallback(() => {
+    if (loadingMoreRef.current || exhaustedRef.current) return;
     loadingMoreRef.current = true;
+    setStatus("loading");
     loadMoreNewsAction(cursorRef.current, [...idsRef.current])
       .then((more) => {
         const fresh = more.filter((m) => !idsRef.current.has(m.id));
         if (fresh.length === 0) {
           exhaustedRef.current = true;
+          setStatus("caughtup"); // every distinct article shown - honest terminal
         } else {
           for (const m of fresh) idsRef.current.add(m.id);
           cursorRef.current = fresh[fresh.length - 1].published_at;
           setOrder((prev) => [...prev, ...fresh.map((it) => ({ item: it, key: `${it.id}-m` }))]);
+          setStatus("idle");
         }
       })
-      .catch(() => { exhaustedRef.current = true; })
+      // Do NOT mark exhausted on failure - keep it retryable rather than
+      // pretending the archive ended (the old code silently dead-ended here).
+      .catch(() => setStatus("error"))
       .finally(() => { loadingMoreRef.current = false; });
+  }, []);
+
+  // Re-cycle the personalised set ONLY on an explicit user choice, so the reader
+  // never dead-ends yet also never silently repeats content behind their back.
+  const recycle = useCallback(() => {
+    cycleRef.current += 1;
+    setOrder((prev) => [...prev, ...makeCycle(profileRef.current, cycleRef.current)]);
+    exhaustedRef.current = false;
+    setStatus("idle");
+  }, [makeCycle]);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el || order.length === 0) return;
+    indexRef.current = Math.round(el.scrollTop / el.clientHeight);
+    // Prefetch when within 3 cards of the end, unless already busy or terminal.
+    if (indexRef.current < order.length - 3) return;
+    if (loadingMoreRef.current || exhaustedRef.current || status === "error") return;
+    loadMore();
   }
 
   /**
@@ -115,7 +133,18 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-16 top-16 z-30 flex flex-col bg-cream md:bottom-0 md:left-60">
+    <div
+      // Offsets derive from the SHELL the (content) layout actually renders
+      // (data-news-shell -> CSS vars in globals.css), so this is correct in BOTH
+      // the member AppShell and the anonymous PublicTopNav shell. The fallbacks
+      // reproduce the member-mobile chrome if the contract is ever absent.
+      style={{
+        top: "var(--news-inset-top, 4rem)",
+        bottom: "var(--news-inset-bottom, 4rem)",
+        left: "var(--news-inset-left, 0px)",
+      }}
+      className="fixed right-0 z-30 flex flex-col bg-cream"
+    >
       {order.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           <div className="flex size-16 items-center justify-center rounded-full border border-bone bg-paper text-ash">
@@ -160,7 +189,7 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
                       </span>
                     </div>
                   ) : (
-                    <div className="flex h-28 w-full shrink-0 items-end justify-between bg-[linear-gradient(135deg,#12100E_0%,#A34802_100%)] p-5">
+                    <div className="brand-gradient flex h-28 w-full shrink-0 items-end justify-between p-5">
                       <span className="text-xs font-medium uppercase tracking-widest text-cream">
                         {item.source}
                       </span>
@@ -243,6 +272,61 @@ export function InShortsFeed({ items, savedIds = [] }: Props) {
               </article>
             );
           })}
+
+          {/* Terminal status card - a full-screen snap slot so the end-of-stream
+              moment reads as a deliberate card, not a silent stop or a hidden
+              re-cycle. Only one shows at a time. */}
+          {status !== "idle" ? (
+            <div
+              className="flex h-full snap-start snap-always flex-col items-center justify-center px-8 text-center"
+              role="status"
+              aria-live="polite"
+            >
+              {status === "loading" ? (
+                <>
+                  <span
+                    aria-hidden
+                    className="size-8 animate-spin rounded-full border-2 border-bone border-t-saffron"
+                  />
+                  <p className="mt-4 text-body-sm text-ink/70">Loading more stories…</p>
+                </>
+              ) : status === "caughtup" ? (
+                <>
+                  <div className="flex size-14 items-center justify-center rounded-full border border-bone bg-paper text-moss">
+                    <CheckCircle2 className="size-7" />
+                  </div>
+                  <p className="mt-5 font-serif text-h3 text-ink">You&rsquo;re all caught up.</p>
+                  <p className="mt-2 max-w-xs text-body-sm text-ink/70">
+                    That&rsquo;s every story in the archive. Fresh news arrives hourly.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={recycle}
+                    className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-cream transition-all hover:bg-saffron active:scale-95"
+                  >
+                    <RotateCw className="size-4" /> Show earlier stories again
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="flex size-14 items-center justify-center rounded-full border border-bone bg-paper text-ember">
+                    <AlertTriangle className="size-7" />
+                  </div>
+                  <p className="mt-5 font-serif text-h3 text-ink">Couldn&rsquo;t load more.</p>
+                  <p className="mt-2 max-w-xs text-body-sm text-ink/70">
+                    Something went wrong reaching the news archive.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => loadMore()}
+                    className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-cream transition-all hover:bg-saffron active:scale-95"
+                  >
+                    <RotateCw className="size-4" /> Retry
+                  </button>
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
     </div>

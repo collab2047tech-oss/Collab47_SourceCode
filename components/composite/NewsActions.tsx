@@ -60,12 +60,15 @@ export function NewsActions({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  // ── Save (optimistic) ──────────────────────────────────────────────────
+  // ── Save (optimistic, with rollback) ───────────────────────────────────
+  // Roll the flag back if the write fails so the UI never shows "Saved" over a
+  // DB that holds nothing (the old fire-and-forget could lie on failure).
   function handleSave() {
     const next = !saved;
     setSaved(next); // instant
     startTransition(async () => {
-      await setNewsSavedAction(newsId, next);
+      const res = await setNewsSavedAction(newsId, next);
+      if (!res.ok) setSaved(!next);
     });
   }
 

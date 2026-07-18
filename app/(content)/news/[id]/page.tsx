@@ -49,6 +49,25 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+/**
+ * Honest provenance for the summary block. The pipeline tags every stored item
+ * (lib/news/fetch) with how its brief was produced; we surface that verbatim
+ * instead of implying an editor wrote it. Never marketing ("AI-powered") - just
+ * what actually happened to the text.
+ */
+function briefMeta(status: "ai" | "headline" | "raw" | "none"): { label: string; note: string | null } {
+  switch (status) {
+    case "ai":
+      return { label: "The brief", note: "Auto-summarised from the full article" };
+    case "headline":
+      return { label: "The brief", note: "Expanded from the headline - no full text was published" };
+    case "raw":
+      return { label: "From the publisher", note: "The source's own excerpt, unedited" };
+    default:
+      return { label: "The brief", note: null };
+  }
+}
+
 export default async function NewsReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [item, comments, saved, me] = await Promise.all([
@@ -92,29 +111,50 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
             </div>
           </Reveal>
         ) : (
-          <div className="flex h-40 items-end rounded-xl bg-[linear-gradient(135deg,#12100E_0%,#A34802_100%)] p-5">
+          <div className="brand-gradient flex h-40 items-end rounded-xl p-5">
             <span className="text-xs font-medium uppercase tracking-widest text-cream">{item.source}</span>
           </div>
         )}
 
+        {/* Source attribution + timestamp - always visible, whether or not the
+            story has a lead image. */}
         <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption">
-          <span className="font-medium uppercase tracking-widest text-ink/80">{item.source}</span>
-          <span className="text-ink/40">&#183;</span>
-          <span className="text-ink/60">{timeAgo(item.published_at)}</span>
+          <span className="font-semibold uppercase tracking-widest text-saffron-dk">{item.source}</span>
+          <span className="text-ink/30" aria-hidden>&#183;</span>
+          <span className="normal-case tracking-normal text-ink/60">{timeAgo(item.published_at)}</span>
         </div>
 
-        <h1 className="mt-3 font-serif text-h1 leading-tight text-ink">{item.title}</h1>
+        <h1 className="mt-3 max-w-[20ch] font-serif text-h1 font-medium leading-[1.14] text-ink sm:text-[2.6rem]">
+          {item.title}
+        </h1>
 
-        {/* The brief - the AI/curated summary. Never fall back to the raw
-            publisher blurb (excerpt); show a neutral prompt when absent. */}
+        {/* The brief. Its label + provenance note stay honest to how the text
+            was produced (summary_status); never fall back to a raw blurb dressed
+            up as an editor's summary; show a neutral prompt when absent. */}
         {item.summary ? (
-          <div className="mt-6 rounded-xl border border-bone bg-paper p-5">
-            <p className="text-caption font-semibold uppercase tracking-widest text-saffron">The brief</p>
-            <p className="mt-2 whitespace-pre-line text-body-lg leading-relaxed text-ink/90">
-              {item.summary}
-            </p>
-          </div>
-        ) : null}
+          (() => {
+            const meta = briefMeta(item.summary_status);
+            return (
+              <div className="mt-7 rounded-xl border border-bone bg-paper p-6">
+                <p className="text-caption font-semibold uppercase tracking-widest text-saffron">
+                  {meta.label}
+                </p>
+                <p className="mt-3 max-w-[65ch] whitespace-pre-line text-body-lg leading-relaxed text-ink/90">
+                  {item.summary}
+                </p>
+                {meta.note ? (
+                  <p className="mt-4 border-t border-bone pt-3 text-caption normal-case tracking-normal text-ash">
+                    {meta.note}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()
+        ) : (
+          <p className="mt-7 max-w-[65ch] text-body italic leading-relaxed text-ink/55">
+            No summary was available for this story. Open the full article below to read it at the source.
+          </p>
+        )}
 
         {/* News action bar: Save (primary) + More/Less + Share + overflow Report. */}
         <div className="mt-6 border-t border-bone pt-5">

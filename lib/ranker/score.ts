@@ -54,13 +54,28 @@ export interface ScoreContext {
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /**
- * scorePost: deterministic ranking over the shared feature vector (lib/ranker/
- * features). Two interchangeable heads, same features:
+ * scorePost: the single "For You" score function. Deterministic ranking over the
+ * shared feature vector (lib/ranker/features). Two interchangeable heads, SAME
+ * features, and identical serving-time re-ranks - so the blend is one formula:
+ *
  *   - NEURAL head (ctx.model): score = P(engage) from the trained net. 100% real,
  *     learned offline from real interactions; forward pass is plain JS, $0 to serve.
- *   - MCDM head (default / cold-start): hand-tuned Tchebycheff scalarisation,
- *     which beats an under-trained net until enough real data exists.
- * Diversity + already-seen penalties are applied identically to both heads.
+ *   - MCDM head (default / cold-start): hand-tuned Tchebycheff scalarisation over
+ *     four blended criteria (weights = DEFAULT_WEIGHTS unless learned weights
+ *     exist), which beats an under-trained net until enough real data exists:
+ *
+ *       match       = interest/hashtag semantic match (v0) + branch (v1) + BM25
+ *                     (v2) + item-CF (v3) + revealed-behaviour affinity (v4)
+ *       recency     = exp decay on age, ~16.6h half-life (e^-age/24)  (v5)
+ *       engagement  = Bayesian engagement RATE eng/(impr+10) (v6) + 6h velocity (v7)
+ *       authorTrust = follow-affinity boost: verified (v8) + personalised PageRank
+ *                     ppr [followed=1.0, 2nd-degree=0.5] (v9) + field proximity (v10)
+ *
+ * Serving-time re-ranks (applied to BOTH heads so the two can never drift):
+ *   - tag-diversity penalty  (this post's primary tag already used higher up)
+ *   - already-seen penalty   (strongly demote posts the viewer has seen)
+ * Author-diversity ("no one author monopolising the page") is enforced at
+ * SELECTION time in diversifyTopK, where the ordering is true score order.
  */
 export function scorePost(post: PostWithAuthor, ctx: ScoreContext): ScoredPost {
   const reason: string[] = [];
@@ -107,32 +122,55 @@ export function scorePost(post: PostWithAuthor, ctx: ScoreContext): ScoredPost {
 }
 
 /**
- * diversifyTopK: greedy max-coverage over distinct hashtags + a reserved
- * exploration slot - the serendipity that keeps the feed from tunnelling.
+ * diversifyTopK: greedy max-coverage that keeps the page from tunnelling on one
+ * topic OR one author. Enforces two diversity guards over the score-sorted list:
+ *   - TAG variety: prefer distinct primary hashtags until 4 are covered.
+ *   - AUTHOR variety ("no monopolising"): a single author may fill at most
+ *     ~1/4 of the page (min 2), so a prolific poster can't dominate the feed.
+ * A final safety pass relaxes the caps only if they would starve the page below
+ * k, so a thin pool never dead-ends the infinite scroll.
  */
 export function diversifyTopK(scored: ScoredPost[], k = 12): ScoredPost[] {
   const sorted = [...scored].sort((a, b) => b.score - a.score);
   const picked: ScoredPost[] = [];
   const coveredTags = new Set<string>();
+  const authorCount = new Map<string, number>();
+  const maxPerAuthor = Math.max(2, Math.ceil(k / 4));
+  const authorOk = (a: string) => (authorCount.get(a) ?? 0) < maxPerAuthor;
+  const take = (p: ScoredPost) => {
+    picked.push(p);
+    const primary = p.hashtags[0]?.toLowerCase();
+    if (primary) coveredTags.add(primary);
+    authorCount.set(p.author_id, (authorCount.get(p.author_id) ?? 0) + 1);
+  };
 
-  // Pass 1: prefer tag diversity (skip a post whose primary tag is already
-  // covered, until 4 distinct tags are covered, then take purely by score).
+  // Pass 1: prefer BOTH tag variety and author variety (honour the author cap).
   for (const p of sorted) {
     if (picked.length >= k) break;
+    if (!authorOk(p.author_id)) continue;
     const primary = p.hashtags[0]?.toLowerCase();
-    if (!primary || !coveredTags.has(primary) || coveredTags.size >= 4) {
-      picked.push(p);
-      if (primary) coveredTags.add(primary);
-    }
+    if (!primary || !coveredTags.has(primary) || coveredTags.size >= 4) take(p);
   }
-  // Pass 2: fill any leftover slots with the highest-scored not-yet-picked, so
-  // we ALWAYS return min(k, scored.length). A short page (< k) must never
-  // dead-end the infinite scroll.
+  // Pass 2: fill leftover slots by score, still honouring the author cap.
   if (picked.length < k) {
     const have = new Set(picked);
     for (const p of sorted) {
       if (picked.length >= k) break;
-      if (!have.has(p)) picked.push(p);
+      if (have.has(p) || !authorOk(p.author_id)) continue;
+      take(p);
+      have.add(p);
+    }
+  }
+  // Pass 3 (safety): if the author cap starved the page, relax it so we ALWAYS
+  // return min(k, scored.length) and never dead-end the infinite scroll.
+  if (picked.length < k) {
+    const have = new Set(picked);
+    for (const p of sorted) {
+      if (picked.length >= k) break;
+      if (!have.has(p)) {
+        picked.push(p);
+        have.add(p);
+      }
     }
   }
   return picked.slice(0, k);
