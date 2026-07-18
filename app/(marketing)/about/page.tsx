@@ -41,7 +41,7 @@ export default function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
- <h1 className="mt-8 max-w-5xl text-[2.5rem] leading-[1.04] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-lg md:text-display-xl">
+ <h1 className="mt-8 max-w-5xl text-[2.5rem] leading-[1.16] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-lg md:text-display-xl">
               <SplitWords text="The missing link" />
               <br />
               <SplitWords
@@ -131,7 +131,7 @@ export default function AboutPage() {
           </Reveal>
 
           <Reveal delay={0.1}>
- <h2 className="mt-8 max-w-4xl text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:mt-10 sm:text-display-md lg:text-display-lg">
+ <h2 className="mt-8 max-w-4xl text-[2.25rem] leading-[1.16] tracking-tight font-serif sm:mt-10 sm:text-display-md lg:text-display-lg">
  Four rules we will not <span className="text-saffron">break</span>.
             </h2>
           </Reveal>

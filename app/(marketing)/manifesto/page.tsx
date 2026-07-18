@@ -22,7 +22,7 @@ export default function ManifestoPage() {
           </Reveal>
 
           <Reveal delay={0.08}>
- <h1 className="mt-6 max-w-5xl text-[2.5rem] leading-[1.05] tracking-tight font-serif sm:mt-8 sm:text-display-lg md:text-display-xl">
+ <h1 className="mt-6 max-w-5xl text-[2.5rem] leading-[1.16] tracking-tight font-serif sm:mt-8 sm:text-display-lg md:text-display-xl">
               Built where the next 40 million Indians{" "}
  <span className="text-saffron">actually are.</span>
             </h1>
@@ -109,7 +109,7 @@ export default function ManifestoPage() {
             <Reveal delay={0.05}>
  <figure className="my-12 rule-top sm:my-16">
                 <blockquote
- className="text-[1.85rem] leading-[1.12] tracking-tight font-serif text-saffron sm:text-display-md"
+ className="text-[1.85rem] leading-[1.16] tracking-tight font-serif text-saffron sm:text-display-md"
                   style={{ maxWidth: "22ch" }}
                 >
                   The cost of being invisible at eighteen is not an
@@ -178,7 +178,7 @@ export default function ManifestoPage() {
             <Reveal delay={0.05}>
  <figure className="my-12 rule-top sm:my-16">
                 <blockquote
- className="text-[1.85rem] leading-[1.12] tracking-tight font-serif text-saffron sm:text-display-md"
+ className="text-[1.85rem] leading-[1.16] tracking-tight font-serif text-saffron sm:text-display-md"
                   style={{ maxWidth: "24ch" }}
                 >
                   We surface merit, not pedigree. The rest is footnote.
@@ -275,7 +275,7 @@ export default function ManifestoPage() {
  <div className="flex flex-col items-start gap-10 md:flex-row md:items-end md:justify-between">
  <div className="max-w-3xl">
  <p className="text-caption text-cream/60">Closing note</p>
- <h2 className="mt-6 text-[2.25rem] leading-[1.08] tracking-tight font-serif sm:text-display-md lg:text-display-lg">
+ <h2 className="mt-6 text-[2.25rem] leading-[1.16] tracking-tight font-serif sm:text-display-md lg:text-display-lg">
                   If this resonates,{" "}
  <span className="text-saffron">
                     you belong here.

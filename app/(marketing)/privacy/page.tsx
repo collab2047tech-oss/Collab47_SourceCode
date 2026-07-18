@@ -18,7 +18,7 @@ export default function PrivacyPage() {
  <section className="section pt-32 sm:pt-40 md:pt-48">
  <div className="container-edit max-w-3xl">
  <p className="text-caption rule-top inline-block">Legal</p>
- <h1 className="mt-8 text-[2.5rem] leading-[1.08] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md">
+ <h1 className="mt-8 text-[2.5rem] leading-[1.16] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md">
             Privacy Policy
           </h1>
  <p className="mt-6 text-body text-ash">Last updated {updated}.</p>

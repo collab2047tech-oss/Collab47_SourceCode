@@ -43,7 +43,7 @@ export function Product() {
  <div className="container-edit">
         <Reveal>
  <p className="text-caption mb-6">The Product</p>
- <h2 className="text-[2.1rem] leading-[1.12] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
+ <h2 className="text-[2.1rem] leading-[1.16] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
             One platform.{" "}
  <span className="text-saffron">Infinite collaborations.</span>
           </h2>

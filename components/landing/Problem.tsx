@@ -31,7 +31,7 @@ export function Problem() {
  <div className="container-edit">
         <Reveal>
  <p className="text-caption mb-6">The Problem</p>
- <h2 className="text-[2.1rem] leading-[1.12] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
+ <h2 className="text-[2.1rem] leading-[1.16] tracking-tight font-serif max-w-4xl text-ink sm:text-display-md">
             Academia and industry are built to need each other.{" "}
  <span className="text-ash">In India, they barely meet.</span>
           </h2>
@@ -46,10 +46,10 @@ export function Problem() {
           {items.map((it, i) => (
  <Reveal key={it.n} delay={i * 0.06} className="bg-cream">
  <div className="group flex h-full flex-col gap-5 p-7 transition-colors hover:bg-paper sm:gap-6 sm:p-8 md:p-12">
- <span className="font-serif text-4xl text-saffron transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-5xl">
+ <span className="font-serif text-4xl leading-[1.16] text-saffron transition-transform duration-300 group-hover:-translate-y-0.5 sm:text-5xl">
                   {it.n}
                 </span>
- <h3 className="font-serif text-2xl text-ink sm:text-3xl">
+ <h3 className="font-serif text-2xl leading-[1.2] text-ink sm:text-3xl">
                   {it.h}
                 </h3>
  <p className="max-w-md text-body text-ash">{it.p}</p>

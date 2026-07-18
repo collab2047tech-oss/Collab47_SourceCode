@@ -13,7 +13,7 @@ export function Quote() {
  <blockquote className="relative mt-8 max-w-5xl pb-2 font-serif text-[2rem] leading-[1.25] tracking-tight text-cream sm:mt-10 sm:text-4xl sm:leading-[1.22] md:text-6xl md:leading-[1.18]">
             <span
               aria-hidden
- className="pointer-events-none absolute -left-1 -top-8 select-none font-serif text-7xl leading-none text-saffron/30 sm:-top-10 sm:text-8xl"
+ className="pointer-events-none absolute -left-1 -top-8 select-none font-serif text-7xl leading-[1.16] text-saffron/30 sm:-top-10 sm:text-8xl"
             >
               &ldquo;
             </span>

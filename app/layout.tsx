@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, JetBrains_Mono, Noto_Sans_Devanagari } from "next/font/google";
+import { Newsreader, Inter, JetBrains_Mono, Noto_Sans_Devanagari } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -9,14 +9,16 @@ import { LenisProvider } from "@/components/motion/LenisProvider";
 // used - identical look, but no render-blocking third-party fetch and fallback
 // metrics that remove the font-swap layout shift. Exposed as CSS variables that
 // globals.css maps onto --font-serif/--font-sans/--font-mono/--font-indic.
-// Fraunces is a variable display serif with real optical sizing. It gives the
-// headlines an editorial voice that a geometric sans cannot, which is what makes
-// the page read as a brand rather than a template.
-const fraunces = Fraunces({
+// Newsreader: editorial serif designed for screen. Chosen over Fraunces on
+// measured metrics - Fraunces needs 1.24em of line box (ascent 0.98 + descent
+// 0.26) so any tight display leading clips its descenders. Newsreader needs
+// 1.15em, which leaves room for a tight editorial setting that still never
+// clips a "g" or "y".
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-newsreader",
   display: "swap",
-  axes: ["SOFT", "WONK", "opsz"],
+  style: ["normal", "italic"],
 });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
@@ -68,7 +70,7 @@ export default function RootLayout({
   return (
     <html
       lang="en-IN"
-      className={`${fraunces.variable} ${inter.variable} ${jetbrainsMono.variable} ${notoDevanagari.variable}`}
+      className={`${newsreader.variable} ${inter.variable} ${jetbrainsMono.variable} ${notoDevanagari.variable}`}
     >
       <body>
         <LenisProvider>{children}</LenisProvider>
