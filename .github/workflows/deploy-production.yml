@@ -1,0 +1,47 @@
+name: Deploy to production
+
+# Auto-deploys collab47.com on every push to main.
+#
+# ONE-TIME SETUP: add a single repository secret named VERCEL_TOKEN.
+#   1. https://vercel.com/account/tokens -> Create Token
+#      IMPORTANT: set Scope to the "collab47" TEAM, not "Personal Account".
+#      A personal-scoped token gets 403 on this project.
+#   2. https://github.com/collab2047tech-oss/Collab47_SourceCode/settings/secrets/actions
+#      -> New repository secret -> name: VERCEL_TOKEN -> paste the token.
+#
+# The org/project ids below are identifiers, not credentials, so they live here
+# rather than in secrets to keep the setup to a single step.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_IR9p62lOf3iv74vm4jMHwJ95
+      VERCEL_PROJECT_ID: prj_AO9weLP21z8WcIKZ67dNt6METf8H
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull production environment
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
