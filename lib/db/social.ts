@@ -524,10 +524,29 @@ export async function getSuggestedPeople(limit = 12): Promise<SuggestedPerson[]>
  * Pending) instead of always showing "Follow". Used by pages that render people
  * who may already be followed or connected (e.g. search / explore results).
  */
+/**
+ * Direction of the connection edge as seen BY THE VIEWER:
+ *  - "none":             no connection row exists
+ *  - "outgoing_pending": the viewer sent a request that is still pending
+ *  - "incoming_pending": the OTHER person sent the viewer a request - the viewer
+ *                        can Accept or Ignore it (they must never "cancel" it)
+ *  - "connected":        an accepted, mutual connection
+ *
+ * Collapsing incoming + outgoing into one `pending` boolean is exactly what let
+ * an INCOMING invite render as the viewer's own cancelable "Pending" and get
+ * hard-deleted on click. Direction is derived from `connections.requested_by`.
+ */
+export type ConnectionDirection =
+  | "none"
+  | "outgoing_pending"
+  | "incoming_pending"
+  | "connected";
+
 export interface RelationshipState {
   isFollowing: boolean;
   isConnected: boolean;
-  pending: boolean;
+  /** Directional connection state - never collapses the two pending directions. */
+  direction: ConnectionDirection;
 }
 
 export async function getRelationshipStates(
@@ -546,25 +565,33 @@ export async function getRelationshipStates(
     sb.from("follows").select("following_id").eq("follower_id", user.id).in("following_id", targets),
     sb
       .from("connections")
-      .select("user_a_id, user_b_id, status")
+      // requested_by is REQUIRED to tell an incoming request from an outgoing one.
+      .select("user_a_id, user_b_id, status, requested_by")
       .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`)
       .in("status", ["accepted", "pending"]),
   ]);
 
   const followingSet = new Set((follows ?? []).map((f) => f.following_id as string));
-  const connectedSet = new Set<string>();
-  const pendingSet = new Set<string>();
+  const directionById = new Map<string, ConnectionDirection>();
   for (const c of conns ?? []) {
     const otherId = c.user_a_id === user.id ? (c.user_b_id as string) : (c.user_a_id as string);
-    if (c.status === "accepted") connectedSet.add(otherId);
-    else pendingSet.add(otherId);
+    if (c.status === "accepted") {
+      directionById.set(otherId, "connected");
+    } else if (c.requested_by === user.id) {
+      directionById.set(otherId, "outgoing_pending");
+    } else {
+      // Requested by the other party (or a legacy null requested_by) -> incoming,
+      // so it is offered as Accept/Ignore and can never be silently destroyed.
+      directionById.set(otherId, "incoming_pending");
+    }
   }
 
   for (const id of targets) {
+    const direction = directionById.get(id) ?? "none";
     out[id] = {
       isFollowing: followingSet.has(id),
-      isConnected: connectedSet.has(id),
-      pending: pendingSet.has(id),
+      isConnected: direction === "connected",
+      direction,
     };
   }
   return out;

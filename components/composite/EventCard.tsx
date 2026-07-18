@@ -19,7 +19,7 @@ const KIND_META: Record<EventKind, { label: string; badge: string }> = {
   competition:{ label: "Competition",badge: "bg-ember/10 text-ember" },
   workshop:   { label: "Workshop",   badge: "bg-moss/10 text-moss" },
   conference: { label: "Conference", badge: "bg-ink/8 text-ink" },
-  fest:       { label: "Fest",       badge: "bg-gold/15 text-[#9A6A00]" },
+  fest:       { label: "Fest",       badge: "bg-gold/15 text-gold" },
   talk:       { label: "Talk",       badge: "bg-saffron/10 text-saffron-dk" },
   other:      { label: "Event",      badge: "bg-bone text-ink" },
 };
@@ -79,6 +79,30 @@ function deadlineState(iso: string | null): {
   return { label: `Closes in ${days} days`, closed: false };
 }
 
+type EventStatus = "upcoming" | "live" | "past";
+
+/**
+ * REAL temporal status of the event - never approximated. "Live" is only claimed
+ * when we have BOTH a start AND an end and now falls between them; otherwise the
+ * card just says Upcoming (before start) or Past (after start). No fake "Live".
+ */
+function eventStatus(startIso: string | null, endIso: string | null): EventStatus | null {
+  if (!startIso) return null;
+  const start = new Date(startIso).getTime();
+  if (Number.isNaN(start)) return null;
+  const now = Date.now();
+  if (now < start) return "upcoming";
+  const end = endIso ? new Date(endIso).getTime() : null;
+  if (end !== null && !Number.isNaN(end) && now <= end) return "live";
+  return "past";
+}
+
+const STATUS_META: Record<EventStatus, { label: string; cls: string }> = {
+  upcoming: { label: "Upcoming", cls: "bg-moss/10 text-moss" },
+  live:     { label: "Live",     cls: "bg-ember/10 text-ember" },
+  past:     { label: "Past",     cls: "bg-bone text-ash" },
+};
+
 // ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
@@ -87,16 +111,17 @@ export function EventCard({ event, index = 0 }: { event: EventRow; index?: numbe
   const meta = kindMeta(event.kind);
   const start = formatStart(event.starts_at);
   const deadline = deadlineState(event.registration_deadline);
+  const status = eventStatus(event.starts_at, event.ends_at);
   const detailHref = `/events/${event.id}`;
   const hasReg = Boolean(event.registration_url);
 
   // Stable gradient for the no-image header (varies by kind + index so the grid
-  // isn't a wall of identical headers). Mirrors InShortsFeed's no-image header.
+  // isn't a wall of identical headers). Token-based (CSS vars) - no hardcoded hex.
   const gradients = [
-    "linear-gradient(135deg,#12100E_0%,#A34802_100%)",
-    "linear-gradient(135deg,#A34802_0%,#B95402_100%)",
-    "linear-gradient(135deg,#03265E_0%,#047857_100%)",
-    "linear-gradient(135deg,#12100E_0%,#6B6559_100%)",
+    "linear-gradient(135deg, var(--color-ink) 0%, var(--color-saffron-dk) 100%)",
+    "linear-gradient(135deg, var(--color-saffron-dk) 0%, var(--color-saffron) 100%)",
+    "linear-gradient(135deg, var(--color-navy) 0%, var(--color-moss) 100%)",
+    "linear-gradient(135deg, var(--color-ink) 0%, var(--color-ash) 100%)",
   ];
   const gradient = gradients[index % gradients.length];
 
@@ -123,7 +148,7 @@ export function EventCard({ event, index = 0 }: { event: EventRow; index?: numbe
         ) : (
           <div
             className="flex aspect-[16/9] w-full items-end justify-between p-4"
-            style={{ backgroundImage: gradient.replace(/_/g, " ") }}
+            style={{ backgroundImage: gradient }}
           >
             <span className="inline-flex items-center gap-1.5 text-cream/90">
               <CalendarDays className="size-4" />
@@ -136,12 +161,25 @@ export function EventCard({ event, index = 0 }: { event: EventRow; index?: numbe
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col p-5">
-        {/* Kind badge inline when there is a real image header (the header badge
-            sits on the photo); always show a deadline pill row below. */}
+        {/* Temporal status (real Upcoming / Live / Past) on the left, registration
+            deadline pill on the right. Kind is already shown on the header. When
+            there is no start time to derive status from, fall back to the kind. */}
         <div className="flex items-center justify-between gap-2">
-          <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide", meta.badge)}>
-            {meta.label}
-          </span>
+          {status ? (
+            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide", STATUS_META[status].cls)}>
+              {status === "live" ? (
+                <span className="relative flex size-1.5" aria-hidden="true">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-ember opacity-75 motion-reduce:animate-none" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-ember" />
+                </span>
+              ) : null}
+              {STATUS_META[status].label}
+            </span>
+          ) : (
+            <span className={cn("inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide", meta.badge)}>
+              {meta.label}
+            </span>
+          )}
           {deadline ? (
             <span
               className={cn(
@@ -186,7 +224,7 @@ export function EventCard({ event, index = 0 }: { event: EventRow; index?: numbe
             </span>
           ) : null}
           {event.prize ? (
-            <span className="flex items-center gap-1.5 text-[#9A6A00]">
+            <span className="flex items-center gap-1.5 text-gold">
               <Trophy className="size-3.5 shrink-0" />
               <span className="truncate">{event.prize}</span>
             </span>

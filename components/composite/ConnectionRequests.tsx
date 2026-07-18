@@ -21,6 +21,9 @@ export function ConnectionRequests({ requests }: Props) {
   const [, startTransition] = useTransition();
   // Per-row in-flight set so acting on one request never disables the others.
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  // Per-row error so a failed accept/ignore explains itself instead of the card
+  // silently re-appearing (read as a UI glitch).
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function setBusyFor(id: string, on: boolean) {
     setBusy((prev) => {
@@ -39,23 +42,40 @@ export function ConnectionRequests({ requests }: Props) {
     });
   }
 
+  function setErrorFor(id: string, message: string | null) {
+    setErrors((p) => {
+      const n = { ...p };
+      if (message) n[id] = message;
+      else delete n[id];
+      return n;
+    });
+  }
+
   function accept(person: MiniProfile) {
     // Optimistic: animate the card out instantly, confirm in the background.
+    setErrorFor(person.id, null);
     setResolved((p) => ({ ...p, [person.id]: "accepted" }));
     setBusyFor(person.id, true);
     startTransition(async () => {
       const res = await acceptConnectionAction(person.id);
-      if (!res.ok) clearResolved(person.id);
+      if (!res.ok) {
+        clearResolved(person.id); // rollback - restore the row
+        setErrorFor(person.id, res.error || "Could not accept. Try again.");
+      }
       setBusyFor(person.id, false);
     });
   }
 
   function reject(person: MiniProfile) {
+    setErrorFor(person.id, null);
     setResolved((p) => ({ ...p, [person.id]: "rejected" }));
     setBusyFor(person.id, true);
     startTransition(async () => {
       const res = await cancelConnectionAction(person.id);
-      if (!res.ok) clearResolved(person.id);
+      if (!res.ok) {
+        clearResolved(person.id); // rollback - restore the row
+        setErrorFor(person.id, res.error || "Could not ignore. Try again.");
+      }
       setBusyFor(person.id, false);
     });
   }
@@ -93,6 +113,11 @@ export function ConnectionRequests({ requests }: Props) {
                     {[person.branch, person.college].filter(Boolean).join(" . ")}
                   </p>
                 )}
+                {errors[person.id] ? (
+                  <p role="alert" className="mt-1 text-[11px] text-ember">
+                    {errors[person.id]}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="flex shrink-0 gap-2 lg:ml-auto">

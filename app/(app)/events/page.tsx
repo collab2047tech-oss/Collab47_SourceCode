@@ -85,6 +85,7 @@ export default async function EventsPage({
                 <Link
                   key={c.key}
                   href={buildHref({ kind: c.key })}
+                  aria-current={active ? "page" : undefined}
                   className={`rounded-full border px-4 py-1.5 text-sm transition-all active:scale-95 ${
                     active
                       ? "border-ink bg-ink text-cream"
@@ -105,6 +106,7 @@ export default async function EventsPage({
                 <Link
                   key={t.key}
                   href={buildHref({ filter: t.key })}
+                  aria-current={active ? "page" : undefined}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
                     active
                       ? "bg-saffron text-cream"

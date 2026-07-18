@@ -13,23 +13,28 @@ import {
   Clock,
   Link2,
   Sparkles,
+  Check,
+  X,
 } from "lucide-react";
-import type { MiniProfile } from "@/lib/db/social";
+import type { MiniProfile, ConnectionDirection } from "@/lib/db/social";
 import {
   followUserAction,
   unfollowUserAction,
   requestConnectionAction,
   cancelConnectionAction,
+  acceptConnectionAction,
 } from "@/app/(app)/network/actions";
 import { startConversationAction } from "@/app/(app)/messages/actions";
 
 export interface PersonCardState {
   isFollowing?: boolean;
-  isConnected?: boolean;
-  pending?: boolean;
+  /**
+   * Directional connection state. This is the fix for the invite-destroying bug:
+   * an INCOMING request renders Accept/Ignore, never a cancelable "Pending".
+   * Falls back to "none" when omitted.
+   */
+  direction?: ConnectionDirection;
 }
-
-type ConnState = "none" | "pending" | "connected";
 
 interface PersonCardProps {
   person: MiniProfile;
@@ -48,42 +53,84 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
   const [optimisticFollowing, setOptimisticFollowing] = useState(
     state.isFollowing ?? false
   );
-  const [conn, setConn] = useState<ConnState>(
-    state.isConnected ? "connected" : state.pending ? "pending" : "none"
+  const [direction, setDirection] = useState<ConnectionDirection>(
+    state.direction ?? "none"
   );
+  // Two-step confirm so clicking "Pending" NEVER instantly destroys an outgoing
+  // request - the second click withdraws it (LinkedIn-style).
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function handleFollow() {
     const next = !optimisticFollowing;
-    // Optimistic: flip instantly, sync in the background, roll back on failure.
+    setError(null);
     setOptimisticFollowing(next);
     startFollow(async () => {
       const res = next
         ? await followUserAction(person.id)
         : await unfollowUserAction(person.id);
-      if (!res.ok) setOptimisticFollowing(!next);
+      if (!res.ok) {
+        setOptimisticFollowing(!next); // rollback
+        setError(res.error || "Could not update. Try again.");
+      }
     });
   }
 
   function handleConnect() {
-    if (conn === "connected") return;
-    if (conn === "pending") {
-      // Cancel an outgoing request - optimistic revert.
-      setConn("none");
-      startConn(async () => {
-        const res = await cancelConnectionAction(person.id);
-        if (!res.ok) setConn("pending");
-      });
-      return;
-    }
-    // none -> pending
-    setConn("pending");
+    // none -> outgoing_pending
+    setError(null);
+    setDirection("outgoing_pending");
     startConn(async () => {
       const res = await requestConnectionAction(person.id);
-      if (!res.ok) setConn("none");
+      if (!res.ok) {
+        setDirection("none"); // rollback
+        setError(res.error || "Could not send request. Try again.");
+      }
+    });
+  }
+
+  function handleWithdraw() {
+    // Second click on an outgoing "Pending" - genuinely withdraw it.
+    setConfirmWithdraw(false);
+    setError(null);
+    setDirection("none");
+    startConn(async () => {
+      const res = await cancelConnectionAction(person.id);
+      if (!res.ok) {
+        setDirection("outgoing_pending"); // rollback
+        setError(res.error || "Could not withdraw. Try again.");
+      }
+    });
+  }
+
+  function handleAccept() {
+    // Accept an INCOMING request. This is the operation the old code destroyed.
+    setError(null);
+    setDirection("connected");
+    startConn(async () => {
+      const res = await acceptConnectionAction(person.id);
+      if (!res.ok) {
+        setDirection("incoming_pending"); // rollback
+        setError(res.error || "Could not accept. Try again.");
+      }
+    });
+  }
+
+  function handleIgnore() {
+    // Ignore an INCOMING request - deletes THEIR request to you (correct here).
+    setError(null);
+    setDirection("none");
+    startConn(async () => {
+      const res = await cancelConnectionAction(person.id);
+      if (!res.ok) {
+        setDirection("incoming_pending"); // rollback
+        setError(res.error || "Could not ignore. Try again.");
+      }
     });
   }
 
   function handleMessage() {
+    setError(null);
     startMsgTransition(async () => {
       const res = await startConversationAction(person.id);
       if (res.ok && res.conversationId) {
@@ -94,10 +141,10 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
     });
   }
 
-  const followBtn = (size: "sm", iconCls: string) => (
+  const followBtn = (iconCls: string) => (
     <Button
       variant={optimisticFollowing ? "secondary" : "primary"}
-      size={size}
+      size="sm"
       className="min-w-0 flex-1"
       onClick={handleFollow}
       disabled={followPending}
@@ -115,32 +162,63 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
     </Button>
   );
 
-  const connectBtn = (size: "sm", iconCls: string) => {
-    if (conn === "connected") {
+  const messageBtn = (iconCls: string, grow = false) => (
+    <Button
+      variant="secondary"
+      size="sm"
+      className={grow ? "min-w-0 flex-1" : "shrink-0"}
+      onClick={handleMessage}
+      disabled={msgPending}
+      aria-label="Message"
+    >
+      <MessageSquare className={iconCls} />
+      {grow ? <span className="truncate">Message</span> : null}
+    </Button>
+  );
+
+  // The connection slot renders the correct LinkedIn state for each direction.
+  const connectSlot = (iconCls: string) => {
+    if (direction === "connected") {
       return (
-        <Button variant="secondary" size={size} className="min-w-0 flex-1" disabled>
+        <Button variant="secondary" size="sm" className="min-w-0 flex-1" disabled>
           <UserCheck className={iconCls} /> <span className="truncate">Connected</span>
         </Button>
       );
     }
-    if (conn === "pending") {
+    if (direction === "outgoing_pending") {
+      if (confirmWithdraw) {
+        return (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="min-w-0 flex-1 border-ember/50! text-ember! hover:bg-ember! hover:text-cream!"
+            onClick={handleWithdraw}
+            onBlur={() => setConfirmWithdraw(false)}
+            disabled={connPending}
+            aria-label={`Withdraw connection request to ${person.name}`}
+          >
+            <X className={iconCls} /> <span className="truncate">Withdraw?</span>
+          </Button>
+        );
+      }
       return (
         <Button
           variant="secondary"
-          size={size}
+          size="sm"
           className="min-w-0 flex-1"
-          onClick={handleConnect}
+          onClick={() => setConfirmWithdraw(true)}
           disabled={connPending}
-          aria-label="Cancel connection request"
+          aria-label={`Connection request to ${person.name} is pending. Click to withdraw`}
         >
           <Clock className={iconCls} /> <span className="truncate">Pending</span>
         </Button>
       );
     }
+    // none
     return (
       <Button
         variant="secondary"
-        size={size}
+        size="sm"
         className="min-w-0 flex-1"
         onClick={handleConnect}
         disabled={connPending}
@@ -150,6 +228,32 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
     );
   };
 
+  // Incoming invitation gets its own Accept / Ignore pair - responding to the
+  // invite is the primary job of the card in this state.
+  const incomingActions = (iconCls: string) => (
+    <>
+      <Button
+        size="sm"
+        className="min-w-0 flex-1"
+        onClick={handleAccept}
+        disabled={connPending}
+        aria-label={`Accept ${person.name}'s connection request`}
+      >
+        <Check className={iconCls} /> <span className="truncate">Accept</span>
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="min-w-0 flex-1"
+        onClick={handleIgnore}
+        disabled={connPending}
+        aria-label={`Ignore ${person.name}'s connection request`}
+      >
+        <X className={iconCls} /> <span className="truncate">Ignore</span>
+      </Button>
+    </>
+  );
+
   const reasonChip = reason ? (
     <span className="mt-2 inline-flex max-w-full items-center gap-1 rounded-full bg-saffron/10 px-2 py-0.5 text-[11px] font-medium text-saffron-dk">
       <Sparkles className="size-3 shrink-0" />
@@ -157,7 +261,21 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
     </span>
   ) : null;
 
+  const errorLine = error ? (
+    <p role="alert" className="mt-2 text-[11px] text-ember">
+      {error}
+    </p>
+  ) : null;
+
+  const meta =
+    (person.branch || person.college) && (
+      <p className="truncate text-xs text-ash">
+        {[person.branch, person.college].filter(Boolean).join(" . ")}
+      </p>
+    );
+
   if (variant === "row") {
+    const iconCls = "size-3.5 shrink-0";
     return (
       <div className="flex flex-col gap-3 rounded-lg border border-bone bg-paper px-4 py-3 transition-all hover:-translate-y-0.5 hover:border-saffron hover:shadow-sm sm:flex-row sm:items-center">
         <div className="flex min-w-0 items-center gap-3">
@@ -168,36 +286,31 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
             <Link href={`/u/${person.handle}`} className="block min-w-0">
               <p className="truncate text-sm font-semibold text-ink">{person.name}</p>
               <p className="truncate text-xs text-ash">@{person.handle}</p>
-              {(person.branch || person.college) && (
-                <p className="truncate text-xs text-ash">
-                  {[person.branch, person.college].filter(Boolean).join(" . ")}
-                </p>
-              )}
+              {meta}
             </Link>
             {reasonChip}
+            {errorLine}
           </div>
         </div>
         <div className="flex shrink-0 gap-2 sm:ml-auto">
-          {/* Message collapses to an icon-only button on narrow widths so all
-              three actions fit, LinkedIn-style. */}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="shrink-0"
-            onClick={handleMessage}
-            disabled={msgPending}
-            aria-label="Message"
-          >
-            <MessageSquare className="size-3.5 shrink-0" />
-          </Button>
-          {followBtn("sm", "size-3.5 shrink-0")}
-          {connectBtn("sm", "size-3.5 shrink-0")}
+          {direction === "incoming_pending" ? (
+            incomingActions(iconCls)
+          ) : direction === "connected" ? (
+            <>{messageBtn(iconCls, true)}{connectSlot(iconCls)}</>
+          ) : (
+            <>
+              {messageBtn(iconCls)}
+              {followBtn(iconCls)}
+              {connectSlot(iconCls)}
+            </>
+          )}
         </div>
       </div>
     );
   }
 
   // grid variant
+  const iconCls = "size-4 shrink-0";
   return (
     <article
       className={cn(
@@ -224,19 +337,19 @@ export function PersonCard({ person, state = {}, variant = "grid", reason }: Per
         </div>
       </div>
       <div className="mt-4 flex gap-2 pt-1 sm:mt-auto">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shrink-0"
-          onClick={handleMessage}
-          disabled={msgPending}
-          aria-label="Message"
-        >
-          <MessageSquare className="size-4 shrink-0" />
-        </Button>
-        {followBtn("sm", "size-4 shrink-0")}
-        {connectBtn("sm", "size-4 shrink-0")}
+        {direction === "incoming_pending" ? (
+          incomingActions(iconCls)
+        ) : direction === "connected" ? (
+          <>{messageBtn(iconCls, true)}{connectSlot(iconCls)}</>
+        ) : (
+          <>
+            {messageBtn(iconCls)}
+            {followBtn(iconCls)}
+            {connectSlot(iconCls)}
+          </>
+        )}
       </div>
+      {errorLine}
     </article>
   );
 }

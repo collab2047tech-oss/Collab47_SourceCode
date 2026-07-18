@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { declineRequestAction } from "@/app/(app)/messages/actions";
 import {
@@ -23,8 +23,10 @@ export function DeclineRequestButton({
   const router = useRouter();
   const store = useMessagesStore();
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleDecline() {
+    setError(null);
     // Snapshot the row so we can restore it if the server decline fails.
     const snapshot: RailConversation | undefined = store?.requests.find(
       (c) => c.id === conversationId
@@ -36,22 +38,31 @@ export function DeclineRequestButton({
       if (r.ok) {
         if (redirectTo) router.push(redirectTo);
       } else if (snapshot) {
-        store?.restoreConversation(snapshot);
+        store?.restoreConversation(snapshot); // rollback
+        setError("Could not decline. Try again.");
       }
     });
   }
 
   return (
-    <button
-      onClick={handleDecline}
-      disabled={isPending}
-      className={cn(
-        "flex items-center gap-1.5 rounded-md border border-bone px-3 py-2 text-xs font-medium text-ink transition-all hover:bg-bone active:scale-95",
-        "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
-      )}
-    >
-      <X className="size-3" />
-      {isPending ? "Declining..." : "Decline"}
-    </button>
+    <div className="flex flex-col gap-1">
+      <button
+        onClick={handleDecline}
+        disabled={isPending}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md border border-bone px-3 py-2 text-xs font-medium text-ink transition-all hover:bg-bone active:scale-95",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2",
+          "disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100"
+        )}
+      >
+        <X className="size-3" />
+        {isPending ? "Declining..." : "Decline"}
+      </button>
+      {error ? (
+        <p role="alert" className="text-[11px] text-ember">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

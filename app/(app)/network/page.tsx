@@ -7,47 +7,71 @@ import {
   getPendingConnections,
   getSuggestedPeople,
   getRelationshipStates,
+  type MiniProfile,
+  type PendingConnections,
+  type SuggestedPerson,
+  type RelationshipState,
 } from "@/lib/db/social";
 import { getMyProfile } from "@/lib/db/profiles";
 import { ShareButton } from "@/components/composite/ShareButton";
 import { ConnectionRequests } from "@/components/composite/ConnectionRequests";
 
 export default async function NetworkPage() {
-  const [connections, followers, following, pendingSplit, suggested, profile] =
-    await Promise.all([
-      getMyConnections("all"),
-      getMyConnections("followers"),
-      getMyConnections("following"),
-      getPendingConnections(),
-      getSuggestedPeople(8),
-      getMyProfile(),
-    ]);
+  // Degrade gracefully: one failing fetch must not blank the whole page to the
+  // route error boundary. Each section defaults to empty on its own failure.
+  const [
+    connectionsR,
+    followersR,
+    followingR,
+    pendingR,
+    suggestedR,
+    profileR,
+  ] = await Promise.allSettled([
+    getMyConnections("all"),
+    getMyConnections("followers"),
+    getMyConnections("following"),
+    getPendingConnections(),
+    getSuggestedPeople(8),
+    getMyProfile(),
+  ]);
+
+  const settled = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
+    r.status === "fulfilled" ? r.value : fallback;
+
+  const connections = settled<MiniProfile[]>(connectionsR, []);
+  const followers = settled<MiniProfile[]>(followersR, []);
+  const following = settled<MiniProfile[]>(followingR, []);
+  const pendingSplit = settled<PendingConnections>(pendingR, {
+    incoming: [],
+    outgoing: [],
+  });
+  const suggested = settled<SuggestedPerson[]>(suggestedR, []);
+  const profile = settled<Awaited<ReturnType<typeof getMyProfile>>>(
+    profileR,
+    null
+  );
 
   const { incoming, outgoing } = pendingSplit;
 
-  // Real follow/connection state for everyone shown in the Followers/Following
-  // tabs AND the Suggested section, so every card's buttons read the correct
-  // state ("Following" / "Connected" / "Pending") instead of always "Follow".
+  // Real, DIRECTIONAL follow/connection state for everyone in the Manage tabs
+  // and the discovery grid, so every card's buttons read the correct state
+  // (Following / Connected / Pending / Accept) instead of always "Follow".
   const relIds = Array.from(
     new Set([...followers, ...following, ...suggested].map((p) => p.id))
   );
-  const relStates = await getRelationshipStates(relIds);
+  const relStates: Record<string, RelationshipState> =
+    relIds.length > 0
+      ? await getRelationshipStates(relIds).catch(() => ({}))
+      : {};
 
-  // Split the mixed suggestion pool into TWO honest clusters so the section
-  // label can never over-claim: people who are genuinely from the viewer's
-  // college (truthful "Same college" reason) vs everyone else. Previously the
-  // whole row was labelled by suggested[0]'s reason, so a single college match
-  // mislabelled branch-mates / 2nd-degree people from OTHER colleges as "from
-  // your college" - exactly the reported bug.
+  // Split suggestions into TWO honest clusters so the section label can never
+  // over-claim: genuine same-college matches vs everyone else. The "reason"
+  // chip on each card is real (from the ranker) - no fabricated mutual counts.
   const collegeMatches = profile?.college
     ? suggested.filter((p) => p.reason === "Same college")
     : [];
   const collegeMatchIds = new Set(collegeMatches.map((p) => p.id));
   const otherSuggestions = suggested.filter((p) => !collegeMatchIds.has(p.id));
-
-  // "Find from college" only points at a real college cluster; otherwise Explore.
-  const findFromCollegeHref =
-    collegeMatches.length > 0 ? "#college-cluster" : "/explore";
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -69,21 +93,24 @@ export default async function NetworkPage() {
                 shareText="Come build and collaborate with me on Collab47."
                 className="flex-1 justify-center sm:flex-none"
               />
-
-              {/* Find from college - jumps to the college-ranked Suggested
-                  section (real data) or Explore when there is nothing to show. */}
-              <Link
-                href={findFromCollegeHref}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-95 sm:flex-none"
-              >
-                Find from college
-              </Link>
+              {/* Only shown when there is a real same-college cluster to jump to;
+                  otherwise it would silently fall back and over-promise. */}
+              {collegeMatches.length > 0 ? (
+                <Link
+                  href="#college-cluster"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-saffron px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-95 sm:flex-none"
+                >
+                  Find from college
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>
       </Reveal>
 
-      {/* Incoming invitations - Accept / Reject */}
+      {/* Invitations FIRST (LinkedIn grammar) - only when non-empty, count in the
+          header, Accept/Ignore inline. This is the surface that must never let an
+          incoming invite be destroyed. */}
       {incoming.length > 0 ? (
         <Reveal delay={0.04}>
           <div className="mt-12">
@@ -95,7 +122,7 @@ export default async function NetworkPage() {
         </Reveal>
       ) : null}
 
-      {/* Tabs + Grid (client island) */}
+      {/* Manage my network - Connections / Followers / Following / Sent tabs. */}
       <Reveal delay={0.05}>
         <NetworkTabs
           connections={connections}
@@ -106,7 +133,7 @@ export default async function NetworkPage() {
         />
       </Reveal>
 
-      {/* Suggested - from your college (only true same-college matches) */}
+      {/* Discovery: from your college (only true same-college matches). */}
       {collegeMatches.length > 0 ? (
         <Reveal delay={0.1}>
           <div id="college-cluster" className="mt-20 scroll-mt-24">
@@ -116,23 +143,22 @@ export default async function NetworkPage() {
                 {collegeMatches.length}
               </span>
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {collegeMatches.map((person) => (
-                <div key={`c-${person.id}`} className="w-72 shrink-0">
-                  <PersonCard
-                    person={person}
-                    variant="grid"
-                    state={relStates[person.id] ?? {}}
-                    reason={person.reason}
-                  />
-                </div>
+                <PersonCard
+                  key={`c-${person.id}`}
+                  person={person}
+                  variant="grid"
+                  state={relStates[person.id] ?? {}}
+                  reason={person.reason}
+                />
               ))}
             </div>
           </div>
         </Reveal>
       ) : null}
 
-      {/* People you may know - everyone else (branch, 2nd-degree, shared field) */}
+      {/* Discovery: people you may know (branch / 2nd-degree / shared field). */}
       <Reveal delay={0.12}>
         <div id="suggested-cluster" className="mt-20 scroll-mt-24">
           <div className="mb-6 flex items-center gap-2 border-b border-bone pb-3">
@@ -148,16 +174,15 @@ export default async function NetworkPage() {
               No new suggestions right now. Check back as more people join.
             </p>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {otherSuggestions.map((person) => (
-                <div key={`s-${person.id}`} className="w-72 shrink-0">
-                  <PersonCard
-                    person={person}
-                    variant="grid"
-                    state={relStates[person.id] ?? {}}
-                    reason={person.reason}
-                  />
-                </div>
+                <PersonCard
+                  key={`s-${person.id}`}
+                  person={person}
+                  variant="grid"
+                  state={relStates[person.id] ?? {}}
+                  reason={person.reason}
+                />
               ))}
             </div>
           )}

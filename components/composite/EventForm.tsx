@@ -25,10 +25,14 @@ const MODES: { value: string; label: string }[] = [
   { value: "hybrid", label: "Hybrid" },
 ];
 
+// Shared focus ring so keyboard focus is clearly visible (fixes the
+// focus:outline-none anti-pattern). Mirrors the Switch primitive's focus ring.
+const focusRing =
+  "focus:outline-none focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 focus-visible:ring-offset-cream";
 const selectClass =
-  "h-12 w-full rounded-md border border-ink/15 bg-paper px-4 text-base text-ink transition-colors focus:border-ink focus:outline-none";
+  `h-12 w-full rounded-md border border-ink/15 bg-paper px-4 text-base text-ink transition-colors focus:border-ink ${focusRing}`;
 const dateClass =
-  "h-12 w-full rounded-md border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-ink focus:outline-none";
+  `h-12 w-full rounded-md border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-ink ${focusRing}`;
 const labelClass = "text-caption text-ink";
 
 export function EventForm() {
@@ -164,7 +168,7 @@ export function EventForm() {
           maxLength={4000}
           placeholder="What is this event about? Who is it for? What is the format, agenda, and what should attendees expect?"
           onChange={(e) => setDescLen(e.target.value.length)}
-          className="w-full resize-none rounded-md border border-ink/15 bg-paper px-4 py-3 text-base text-ink placeholder:text-ash transition-colors focus:border-ink focus:outline-none"
+          className={`w-full resize-none rounded-md border border-ink/15 bg-paper px-4 py-3 text-base text-ink placeholder:text-ash transition-colors focus:border-ink ${focusRing}`}
         />
       </div>
 
@@ -284,7 +288,7 @@ export function EventForm() {
         />
       </div>
 
-      {error ? <p className="text-sm text-ember">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-ember">{error}</p> : null}
 
       <div className="flex items-center gap-4 pt-2">
         <Button type="submit" size="lg" disabled={pending}>

@@ -49,11 +49,12 @@ export function NetworkTabs({
   };
 
   function stateFor(personId: string): PersonCardState {
-    if (tab === "pending") return { pending: true };
+    // "Pending sent" tab lists the viewer's OWN outgoing requests by definition.
+    if (tab === "pending") return { direction: "outgoing_pending" };
     // Connections tab lists accepted connections by definition.
-    if (tab === "connections") return { isConnected: true };
-    // Followers / Following: reflect the viewer's real relationship so buttons
-    // read "Connected" / "Following" instead of "Follow".
+    if (tab === "connections") return { direction: "connected" };
+    // Followers / Following: reflect the viewer's real, DIRECTIONAL relationship
+    // so an incoming request never renders as a cancelable "Pending".
     const rel = relStates[personId];
     if (!rel) {
       // Following tab: a listed person is followed by definition.
@@ -63,22 +64,28 @@ export function NetworkTabs({
     }
     return {
       isFollowing: rel.isFollowing,
-      isConnected: rel.isConnected,
-      pending: rel.pending,
+      direction: rel.direction,
     };
   }
 
   return (
     <>
+      {/* Manage my network - LinkedIn grammar: a labelled row of count tabs. */}
+      <p className="text-caption mt-16 mb-4">Manage my network</p>
+
       {/* Tab bar */}
-      <div className="mt-12 overflow-x-auto border-b border-bone no-scrollbar">
-        <div className="flex items-center gap-1">
+      <div className="overflow-x-auto border-b border-bone no-scrollbar">
+        <div role="tablist" aria-label="Manage my network" className="flex items-center gap-1">
           {tabs.map((t) => (
             <button
               key={t.id}
+              role="tab"
+              id={`network-tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls="network-tabpanel"
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex shrink-0 items-center gap-2 px-4 py-3 text-sm transition-colors sm:px-5",
+                "flex shrink-0 items-center gap-2 px-4 py-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-inset sm:px-5",
                 tab === t.id
                   ? "border-b-2 border-saffron text-ink"
                   : "text-ash hover:text-ink"
@@ -99,26 +106,28 @@ export function NetworkTabs({
       </div>
 
       {/* Grid */}
-      {activeData.length === 0 ? (
-        <p className="mt-10 rounded-lg border border-dashed border-bone bg-paper py-12 text-center text-sm text-ink/70">
-          {emptyCopy[tab]}
-        </p>
-      ) : (
-        <div
-          key={tab}
-          className="stagger mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {activeData.map((person, i) => (
-            <div key={person.id} className="h-full" style={{ "--stagger-i": i } as React.CSSProperties}>
-              <PersonCard
-                person={person}
-                variant="grid"
-                state={stateFor(person.id)}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      <div id="network-tabpanel" role="tabpanel" aria-labelledby={`network-tab-${tab}`}>
+        {activeData.length === 0 ? (
+          <p className="mt-10 rounded-lg border border-dashed border-bone bg-paper py-12 text-center text-sm text-ink/70">
+            {emptyCopy[tab]}
+          </p>
+        ) : (
+          <div
+            key={tab}
+            className="stagger mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {activeData.map((person, i) => (
+              <div key={person.id} className="h-full" style={{ "--stagger-i": i } as React.CSSProperties}>
+                <PersonCard
+                  person={person}
+                  variant="grid"
+                  state={stateFor(person.id)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 }
