@@ -112,10 +112,10 @@ export default function SignupPage() {
           </Link>
  <p className="text-caption mt-12">Sign up</p>
  <h1 className="mt-4 font-serif text-5xl text-ink">
- Start your <span className="text-saffron">portfolio.</span>
+ Show what you <span className="text-saffron">actually do.</span>
           </h1>
  <p className="mt-4 text-body text-ash">
-            Three taps. Under 60 seconds to your first feed.
+            For students, researchers, faculty, institutions and industry.
           </p>
 
  <form onSubmit={signUpEmail} className="mt-10 space-y-4">
