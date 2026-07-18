@@ -130,10 +130,9 @@ export default function ManifestoPage() {
                 feed is branch aware, so a third year ECE student in Jalandhar
                 sees the people, problems, and openings that are relevant to
                 her specifically, not the same generic advice loop that bores
-                everyone equally. Underneath sits a career impact engine that
-                scores opportunity by what it does for you over time, and an
-                anti bias layer that refuses to let pedigree be the only
-                signal in the room.
+                everyone equally. Underneath, we are building toward tools that
+                weigh an opportunity by what it does for you over time, and that
+                refuse to let pedigree be the only signal in the room.
               </p>
             </Reveal>
 
@@ -143,8 +142,8 @@ export default function ManifestoPage() {
                 style={{ maxWidth: "65ch" }}
               >
                 We are building this in India because India is the only place
-                this story can be told honestly. Forty million students will
-                pass through Indian higher education in the next four years.
+                this story can be told honestly. More than forty million
+                students are in Indian higher education today.
                 The cohort entering college in 2026 is, almost exactly, the
                 workforce of Viksit Bharat 2047. The country has decided what
                 it wants to be by then. Nobody has decided what infrastructure
@@ -161,9 +160,9 @@ export default function ManifestoPage() {
                 style={{ maxWidth: "65ch" }}
               >
                 The pedigree problem is the quiet violence at the centre of
-                Indian early career hiring. Roughly five percent of our
-                students sit inside the IIT, IIM, and NIT envelope. The other
-                ninety five percent are taught, in ways subtle and
+                Indian early career hiring. A small minority of our students
+                sit inside the IIT, IIM, and NIT envelope. Everyone else is
+                taught, in ways subtle and
                 unsubtle, that they are a fallback. Recruiters filter by
                 college because it is cheap to filter by college. Founders
                 hire from their batch because it is cheap to hire from their
@@ -198,8 +197,8 @@ export default function ManifestoPage() {
                 the loud. Real opportunities, vetted, from real companies and
                 real labs. When we do raise, it will be from people who
                 understand that a student network has to earn the trust of
-                students before it earns anything else. Until then, the
-                we pay for the servers.
+                students before it earns anything else. Until then, we pay for
+                the servers.
               </p>
             </Reveal>
 

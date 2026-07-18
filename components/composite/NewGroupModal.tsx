@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
@@ -25,16 +25,27 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // Load the connection pool once the modal opens.
-  useEffect(() => {
-    if (!open) return;
+  // Load the connection pool. A failed fetch now sets a DISTINCT error state so
+  // it no longer masquerades as "you have no connections" (which reads as a lie
+  // to a user who actually has connections).
+  const loadCandidates = useCallback(() => {
     setLoading(true);
+    setLoadError(false);
     getGroupCandidatesAction()
       .then((rows) => setCandidates(rows))
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [open]);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    loadCandidates();
+  }, [open, loadCandidates]);
 
   // Reset transient state each time the modal closes.
   useEffect(() => {
@@ -43,7 +54,46 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
     setName("");
     setSelected(new Set());
     setError(null);
+    setLoadError(false);
   }, [open]);
+
+  // Dialog behaviour: focus the first field on open, close on Escape, and trap
+  // Tab within the panel so keyboard focus cannot wander behind the modal.
+  useEffect(() => {
+    if (!open) return;
+    const focusTimer = setTimeout(() => nameInputRef.current?.focus(), 0);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute("disabled") && el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -93,11 +143,17 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="flex h-full w-full flex-col overflow-hidden border-bone bg-paper shadow-xl sm:h-auto sm:max-h-[80vh] sm:max-w-md sm:rounded-2xl sm:border">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-group-title"
+        className="flex h-full w-full flex-col overflow-hidden border-bone bg-paper shadow-xl sm:h-auto sm:max-h-[80vh] sm:max-w-md sm:rounded-2xl sm:border"
+      >
         <header className="flex items-center justify-between border-b border-bone px-5 py-4">
           <div className="flex items-center gap-2">
             <Users className="size-5 text-saffron" />
-            <h3 className="font-serif text-xl text-ink">New group</h3>
+            <h3 id="new-group-title" className="font-serif text-xl text-ink">New group</h3>
           </div>
           <button
             onClick={onClose}
@@ -110,9 +166,11 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
 
         <div className="border-b border-bone px-5 py-4">
           <input
+            ref={nameInputRef}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Group name"
+            aria-label="Group name"
             maxLength={80}
             className="w-full rounded-lg border border-bone bg-cream px-4 py-2.5 text-sm text-ink outline-none placeholder:text-ash focus:border-saffron"
           />
@@ -136,7 +194,22 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
           {loading && (
             <p className="px-5 py-10 text-center text-sm text-ash">Loading…</p>
           )}
-          {!loading && filtered.length === 0 && (
+          {!loading && loadError && (
+            <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+              <Users className="size-8 text-bone" />
+              <p className="text-sm text-ash">
+                Could not load your connections. Check your connection and try again.
+              </p>
+              <button
+                type="button"
+                onClick={loadCandidates}
+                className="rounded-full border border-bone px-4 py-2 text-xs font-medium text-ink transition-colors hover:bg-bone focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+          {!loading && !loadError && filtered.length === 0 && (
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
               <Users className="size-8 text-bone" />
               <p className="text-sm text-ash">
@@ -147,6 +220,7 @@ export function NewGroupModal({ open, onClose }: NewGroupModalProps) {
             </div>
           )}
           {!loading &&
+            !loadError &&
             filtered.map((c) => {
               const isSelected = selected.has(c.id);
               return (

@@ -162,7 +162,11 @@ export function ConversationRail({ activeId }: { activeId?: string }) {
           >
             Requests
             {requests.length > 0 && (
-              <span className="ml-1.5 inline-flex size-4 items-center justify-center rounded-full bg-saffron text-[10px] font-semibold text-cream">
+              <span
+                title={`${requests.length} message request${requests.length === 1 ? "" : "s"}`}
+                aria-label={`${requests.length} message request${requests.length === 1 ? "" : "s"}`}
+                className="ml-1.5 inline-flex size-4 items-center justify-center rounded-full bg-saffron text-[10px] font-semibold text-cream"
+              >
                 {requests.length > 9 ? "9+" : requests.length}
               </span>
             )}
@@ -176,6 +180,7 @@ export function ConversationRail({ activeId }: { activeId?: string }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
+            aria-label="Search conversations"
             className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ash"
           />
         </div>

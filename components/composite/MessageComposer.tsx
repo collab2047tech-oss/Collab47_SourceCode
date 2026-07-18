@@ -34,8 +34,14 @@ export function MessageComposer({
   canCompose = true,
   cannotComposeReason,
 }: MessageComposerProps) {
-  const { pushOptimistic, confirmOptimistic, failOptimistic, blockedByMenu } =
-    useThread();
+  const {
+    messages,
+    pushOptimistic,
+    confirmOptimistic,
+    failOptimistic,
+    retryOptimistic,
+    blockedByMenu,
+  } = useThread();
   const store = useMessagesStore();
   const [body, setBody] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -43,7 +49,13 @@ export function MessageComposer({
   const [hint, setHint] = useState<string | null>(null);
   const [errorNote, setErrorNote] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Live view of the thread's messages so a retry can rebuild the payload for a
+  // failed temp restored from storage (whose in-memory payload is gone).
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
   // Keep each pending send's payload so a failed bubble can be retried with the
@@ -72,8 +84,15 @@ export function MessageComposer({
     });
   }
 
-  function handleBodyChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // Grow the textarea with its content up to a cap, then scroll internally.
+  function autoGrow(el: HTMLTextAreaElement) {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }
+
+  function handleBodyChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setBody(e.target.value);
+    autoGrow(e.target);
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     typingTimerRef.current = setTimeout(broadcastTyping, TYPING_DEBOUNCE_MS);
   }
@@ -126,8 +145,13 @@ export function MessageComposer({
           const { data } = sb.storage.from("message-media").getPublicUrl(path);
           image_url = data.publicUrl;
         } catch {
-          failOptimistic(clientId, "Image upload failed.");
-          setErrorNote("Image upload failed. Tap the message to retry.");
+          // Image upload is transient (network / storage hiccup) - keep Retry.
+          failOptimistic(
+            clientId,
+            "Image upload failed. Check your connection and retry.",
+            false
+          );
+          setErrorNote("Image upload failed. Check your connection and retry.");
           return;
         }
       }
@@ -138,7 +162,22 @@ export function MessageComposer({
       fd.set("client_id", clientId);
       if (image_url) fd.set("image_url", image_url);
 
-      const result = await sendMessageAction(fd);
+      // The action call itself MUST be guarded: an unhandled rejection (network
+      // drop, server exception) would otherwise leave the bubble spinning on
+      // "Sending" forever - a silently lost message. On throw we flip it to a
+      // retryable failed bubble instead.
+      let result: Awaited<ReturnType<typeof sendMessageAction>>;
+      try {
+        result = await sendMessageAction(fd);
+      } catch {
+        failOptimistic(
+          clientId,
+          "Message not sent. Check your connection and retry.",
+          false
+        );
+        setErrorNote("Message not sent. Check your connection and retry.");
+        return;
+      }
 
       if (result?.ok) {
         pendingRef.current.delete(clientId);
@@ -154,10 +193,15 @@ export function MessageComposer({
           setTimeout(() => setHint(null), 4000);
         }
       } else {
-        failOptimistic(clientId, result?.blockedReason ?? result?.error);
-        if (result?.blockedReason) {
-          setErrorNote(`Cannot send: ${result.blockedReason}`);
-        }
+        // Surface the REAL reason for every failure and only offer Retry when it
+        // could actually help: permission blocks and moderation are permanent.
+        const reason =
+          result?.blockedReason ??
+          result?.error ??
+          "Message not sent. Please try again.";
+        const permanent = result?.permanent ?? Boolean(result?.blockedReason);
+        failOptimistic(clientId, reason, permanent);
+        setErrorNote(reason);
       }
     },
     [conversationId, confirmOptimistic, failOptimistic, store]
@@ -180,6 +224,7 @@ export function MessageComposer({
     pushOptimistic({ clientId, body: text, localImageUrl });
     pendingRef.current.set(clientId, { body: text, file, localImageUrl });
     setBody("");
+    if (inputRef.current) inputRef.current.style.height = "auto";
     removeImage();
     inputRef.current?.focus();
 
@@ -192,14 +237,29 @@ export function MessageComposer({
     function onRetry(e: Event) {
       const detail = (e as CustomEvent).detail as { clientId?: string };
       if (!detail?.clientId) return;
-      const payload = pendingRef.current.get(detail.clientId);
-      if (!payload) return;
+      let payload = pendingRef.current.get(detail.clientId);
+      if (!payload) {
+        // Failed temp restored from storage: its in-memory payload is gone, so
+        // rebuild a text payload from the thread. The original File cannot
+        // survive a reload, so an attached image is not re-uploaded.
+        const msg = messagesRef.current.find(
+          (m) => m.client_id === detail.clientId
+        );
+        if (!msg) return;
+        payload = {
+          body: msg.body ?? "",
+          file: null,
+          localImageUrl: msg.localImageUrl,
+        };
+      }
+      setErrorNote(null);
+      retryOptimistic(detail.clientId);
       void runSend(detail.clientId, payload);
     }
     window.addEventListener("c47:dm:retry", onRetry as EventListener);
     return () =>
       window.removeEventListener("c47:dm:retry", onRetry as EventListener);
-  }, [runSend]);
+  }, [runSend, retryOptimistic]);
 
   // Blocked from the menu (ChatMenu dispatches via ThreadProvider state).
   if (!canCompose || blockedByMenu) {
@@ -230,7 +290,8 @@ export function MessageComposer({
           <button
             type="button"
             onClick={removeImage}
-            className="absolute -right-2 -top-2 rounded-full bg-ink p-0.5 text-cream hover:bg-ash"
+            aria-label="Remove image"
+            className="absolute -right-2 -top-2 rounded-full bg-ink p-0.5 text-cream hover:bg-ash focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
           >
             <X className="size-3" />
           </button>
@@ -255,11 +316,11 @@ export function MessageComposer({
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="flex items-center gap-2 rounded-full border border-bone bg-cream py-1.5 pl-3 pr-1.5 sm:gap-3 sm:py-2 sm:pl-4 sm:pr-2">
+        <div className="flex items-end gap-2 rounded-3xl border border-bone bg-cream py-1.5 pl-2 pr-1.5 transition-colors focus-within:border-saffron sm:gap-3 sm:py-2 sm:pl-3 sm:pr-2">
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:text-ink active:scale-90"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full text-ash transition-colors hover:text-ink active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron"
             title="Attach image"
             aria-label="Attach image"
           >
@@ -272,12 +333,14 @@ export function MessageComposer({
             className="hidden"
             onChange={handleImageChange}
           />
-          <input
+          <textarea
             ref={inputRef}
             value={body}
             onChange={handleBodyChange}
             placeholder="Write a message"
-            className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ash"
+            rows={1}
+            aria-label="Write a message"
+            className="max-h-32 w-full min-w-0 resize-none self-center bg-transparent py-2 text-sm leading-snug text-ink outline-none placeholder:text-ash no-scrollbar"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -290,7 +353,7 @@ export function MessageComposer({
             disabled={!body.trim() && !imageFile}
             aria-label="Send message"
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron text-cream transition-all hover:bg-saffron-dk active:scale-90",
+              "flex size-10 shrink-0 items-center justify-center rounded-full bg-saffron text-cream transition-all hover:bg-saffron-dk active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-1",
               "disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
             )}
           >

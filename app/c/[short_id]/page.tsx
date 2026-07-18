@@ -97,6 +97,17 @@ export default async function ProjectPage({
     return "outline" as const;
   };
 
+  // Match the casing used on the Collabs list (/collabs) so the same status
+  // never reads as "Open" there and "open" here.
+  const statusLabel = (s: string) => {
+    if (s === "open") return "Open";
+    if (s === "team_formed") return "Team formed";
+    if (s === "in_progress") return "In progress";
+    if (s === "delivered") return "Delivered";
+    if (s === "closed") return "Closed";
+    return s.replace("_", " ");
+  };
+
   const isDelivered = !!project.delivered_at;
 
   return (
@@ -143,18 +154,16 @@ export default async function ProjectPage({
                 year: "numeric",
               })}
             </span>
-            <span className="flex items-center gap-2">
-              <Users className="size-4" />
-              {project.status === "open"
-                ? openSlots > 0
-                  ? `${openSlots} of ${project.slot_count} slots open`
-                  : "Team full"
-                : `${project.slot_count} slots`}
-            </span>
+            {project.status === "open" && (
+              <span className="flex items-center gap-2">
+                <Users className="size-4" />
+                {openSlots > 0 ? "Open to applicants" : "Team full"}
+              </span>
+            )}
             <span className="flex items-center gap-2">
               <Briefcase className="size-4" />
               <Tag variant={statusBadgeVariant(project.status)} className="text-xs">
-                {project.status.replace("_", " ")}
+                {statusLabel(project.status)}
               </Tag>
             </span>
           </div>

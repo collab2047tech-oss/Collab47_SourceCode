@@ -1,4 +1,50 @@
-# Collab47 - Master Overhaul Plan (v2 - post-teardown)
+# Collab47 - Master Overhaul Plan (v3 - Wave 1 dispatched)
+
+## v3 - Founder directives + mentor notes (test.txt), 19 Jul
+
+**Founder round:** sidebar unscrollable/clipped; LinkedIn-style identity card under the
+logo (banner, photo, name, headline, institute); home search entry poor; post must open
+as an in-place modal over a blurred feed with comments in a right rail (LinkedIn
+pattern); uniform color/type; Explore rebuild; News + feed personalisation improved at
+ZERO added cost; Network fixed; Collabs fixed; Events fixed; Messages to LinkedIn-DM
+grade. Analytics OK for now.
+
+**Mentor test.txt - new items understood and adopted:**
+- Confirm-password field on signup.
+- "College" label -> "Institute" across forms.
+- Collabs entry as two intents: post a project vs join a project ("provider or seeker"),
+  Upwork-style project page (folds into Phase 4).
+- **Remove the team-slot UI** (mentor). Resolves open Q5 better than clamping: hide
+  slot count from creation + display; keep the column, server defaults it. Kills the
+  8-vs-5 contradiction outright.
+- "Retired person" onboarding option -> needs an account-type addition (schema check
+  first) - wave 2, flagged Q6.
+- "App progressive rakhna hai" - improve in place, never regress. Matches ground rules.
+
+**Conflicts + feature requests surfaced to founder (not silently decided):**
+- Mentor: "remove Explore, redundant" vs founder: "rebuild Explore world-class".
+  FOUNDER WINS for wave 1 (rebuild); mentor's objection recorded as Q7.
+- Mentor: "Where is the job feature?!" - does not exist; needs schema + product
+  decision. Recorded as Q8, nothing built.
+
+## Wave 1 - five builders, file-disjoint (verified below)
+
+| Builder | Scope | Owns (exclusively) |
+|---|---|---|
+| B1 Shell + identity | Sidebar scroll fix, LinkedIn identity card, search entry | AppShell.tsx, GlobalSearch.tsx, SearchResults.tsx, new SidebarProfileCard |
+| B2 Post modal | Intercepted-route modal w/ right-rail comments, blast fix, lost-comment P0 | app/p/*, app/(app)/@modal/*, app/(app)/layout.tsx, CommentsSection, PostDetailActions, PostCard, globals.css (additive only) |
+| B3 Explore + News + ranking | Explore rebuild, news personalisation, feed ranker (zero cost) | explore/*, (content)/*, InShortsFeed, NewsActions, NewsRail, lib/news/*, feed-ranking lib |
+| B4 Network + Events | Direction-aware connect states (P0 invite-destroy fix), events polish | network/*, PersonCard, ConnectionRequests, Accept/Decline, SuggestedFollowRow, lib/db/social.ts, events/*, EventCard, EventForm |
+| B5 Messages + P0 strays | DM failure states, LinkedIn thread polish; privacy fix, stat fix, manifesto neutralise, admin 404, slot-UI removal | messages components + routes, privacy, Problem.tsx, manifesto, (admin)/queue, collabs/new |
+
+**Disjointness self-check (orchestrator):** no file appears in two scopes; B1 edits
+components/layout/AppShell.tsx while B2 edits app/(app)/layout.tsx (different files);
+only B2 may append to globals.css; nobody edits tokens; nobody commits (orchestrator
+commits per-slice after final build + Playwright pass); no schema changes anywhere in
+wave 1; no new dependencies; no new runtime costs.
+
+**Founder Q6-Q8 (new):** 6) add "Retired / Mentor" account type (schema)? 7) Explore:
+keep rebuilt or remove per mentor? 8) Jobs feature - build later?
 
 Written 19 July 2026, updated same day after the full-codebase teardown.
 Orchestrator: Fable. Builders: Opus subagents with tight specs.

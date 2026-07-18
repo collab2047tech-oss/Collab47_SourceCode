@@ -3,6 +3,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { Tag } from "@/components/primitives/Tag";
 import { Button } from "@/components/primitives/Button";
 import { getModerationQueue } from "@/lib/db/reports";
+import { getSupabaseServer } from "@/lib/supabase/server";
 import { resolveReportAction } from "@/app/(app)/home/report-actions";
 
 function relativeTime(iso: string): string {
@@ -19,6 +20,30 @@ export const dynamic = "force-dynamic";
 
 export default async function ModerationQueuePage() {
   const items = await getModerationQueue(50);
+
+  // The moderation_queue view only exposes the post UUID, but /p/[short_id]
+  // routes by short_id - linking the UUID 404s every post. Resolve short_ids
+  // server-side. Only viewable (non-deleted) posts resolve; an unresolved link
+  // is hidden rather than pointed at a page that would 404 anyway.
+  const postIds = Array.from(
+    new Set(items.map((it) => it.post_id).filter((id): id is string => !!id))
+  );
+  const shortIdByPostId = new Map<string, string>();
+  if (postIds.length > 0) {
+    const sb = await getSupabaseServer();
+    if (sb) {
+      const { data: postRows } = await sb
+        .from("posts")
+        .select("id, short_id")
+        .in("id", postIds);
+      for (const row of (postRows ?? []) as Array<{
+        id: string;
+        short_id: string | null;
+      }>) {
+        if (row.short_id) shortIdByPostId.set(row.id, row.short_id);
+      }
+    }
+  }
 
   async function dismiss(formData: FormData) {
     "use server";
@@ -89,8 +114,11 @@ export default async function ModerationQueuePage() {
                   <div className="mt-4 rounded-md border border-bone bg-cream p-3">
                     <p className="text-caption">Post by @{it.target_handle}</p>
                     <p className="mt-2 line-clamp-4 text-sm text-ink">{it.post_body}</p>
-                    {it.post_id ? (
-                      <Link href={`/p/${it.post_id}`} className="mt-2 inline-block text-xs text-saffron underline">
+                    {it.post_id && shortIdByPostId.get(it.post_id) ? (
+                      <Link
+                        href={`/p/${shortIdByPostId.get(it.post_id)}`}
+                        className="mt-2 inline-block text-xs text-saffron underline"
+                      >
                         Open post
                       </Link>
                     ) : null}

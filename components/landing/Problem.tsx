@@ -6,7 +6,7 @@ const items = [
   {
     n: "01",
     h: "Talent stays invisible.",
-    p: "A student in Lucknow ships something real and no one outside their campus ever sees it. 95% of India's talent sits outside the top fifty institutions - and outside the networks that get noticed.",
+    p: "A student in Lucknow ships something real and no one outside their campus ever sees it. Most of India's talent sits outside the handful of elite institutions - and outside the networks that get noticed.",
   },
   {
     n: "02",

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     "How Collab47 collects, uses and protects your data, and your rights under India's Digital Personal Data Protection Act, 2023.",
 };
 
-const updated = "20 June 2026";
+const updated = "19 July 2026";
 
 export default function PrivacyPage() {
   return (
@@ -71,10 +71,25 @@ export default function PrivacyPage() {
  <h2 className="font-serif text-3xl text-ink">Where it lives</h2>
  <p className="mt-4">
                 Your data is stored with Supabase (Postgres database, file
-                storage and authentication) hosted in the Mumbai
-                (ap-south-1) region in India. We do not yet send transactional
-                email; if we add it, we will name the provider here. These
-                providers process data only to deliver the service.
+                storage and authentication) hosted in the Mumbai (ap-south-1)
+                region in India.
+              </p>
+ <p className="mt-4">
+                We send email through Resend, our email processor: a welcome
+                note when you join, a weekly digest of relevant activity, and
+                operational alerts (for example, when you send us feedback). The
+                weekly digest carries a one-click unsubscribe link, and
+                unsubscribing stops it. We do not send marketing or promotional
+                email. Resend processes your address only to deliver these
+                messages.
+              </p>
+ <p className="mt-4">
+                If you turn them on, we can also send optional browser push
+                notifications (web push). These are off by default and you can
+                revoke them from your browser at any time.
+              </p>
+ <p className="mt-4">
+                These providers process your data only to deliver the service.
               </p>
             </div>
 

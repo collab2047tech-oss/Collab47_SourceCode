@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { Avatar } from "@/components/primitives/Avatar";
 import { cn } from "@/lib/cn";
-import { ArrowDown, Clock, Loader2, AlertCircle, ChevronUp } from "lucide-react";
+import { ArrowDown, Clock, Loader2, AlertCircle, ChevronUp, RotateCcw } from "lucide-react";
 import { useThread, type ThreadMessage } from "@/components/messages/ThreadProvider";
 
 interface MessageThreadProps {
@@ -19,6 +19,21 @@ function formatTime(iso: string): string {
     minute: "2-digit",
   });
 }
+
+/** Absolute date + time, used as the hover title on every bubble. */
+function fullTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Consecutive messages from the same sender within this window are visually
+// clustered: one avatar + one timestamp per cluster (LinkedIn/iMessage style).
+const CLUSTER_WINDOW_MS = 5 * 60 * 1000;
 
 function groupByDate(
   messages: ThreadMessage[]
@@ -173,37 +188,71 @@ export function MessageThread({
         {groups.map((group) => (
           <div key={group.label}>
             <p className="text-caption mb-4 mt-2 text-center">{group.label}</p>
-            <div className="space-y-2">
-              <AnimatePresence initial={false}>
-                {group.messages.map((msg) => {
-                  const isOwn = msg.sender_id === currentUserId;
-                  const imageSrc = msg.image_url ?? msg.localImageUrl ?? null;
-                  return (
-                    <motion.div
-                      key={msg.client_id ?? msg.id}
-                      layout={reduce ? false : "position"}
-                      initial={reduce ? false : { opacity: 0, y: 6, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: reduce ? 0 : 0.22,
-                        ease: [0.16, 1, 0.3, 1],
-                      }}
-                      className={cn(
-                        "flex items-end gap-2",
-                        isOwn ? "justify-end" : "justify-start"
-                      )}
-                    >
-                      {!isOwn && (
+            <AnimatePresence initial={false}>
+              {group.messages.map((msg, i) => {
+                const isOwn = msg.sender_id === currentUserId;
+                const imageSrc = msg.image_url ?? msg.localImageUrl ?? null;
+
+                // Cluster consecutive same-sender messages inside the window.
+                const prev = group.messages[i - 1];
+                const next = group.messages[i + 1];
+                const clusteredWithPrev =
+                  !!prev &&
+                  prev.sender_id === msg.sender_id &&
+                  new Date(msg.created_at).getTime() -
+                    new Date(prev.created_at).getTime() <
+                    CLUSTER_WINDOW_MS;
+                const clusteredWithNext =
+                  !!next &&
+                  next.sender_id === msg.sender_id &&
+                  new Date(next.created_at).getTime() -
+                    new Date(msg.created_at).getTime() <
+                    CLUSTER_WINDOW_MS;
+                const firstOfCluster = !clusteredWithPrev;
+                const lastOfCluster = !clusteredWithNext;
+                const isSeen = isOwn && msg.id === lastSeenOwnId;
+                // One timestamp per cluster; the rest reveal on hover (native
+                // title) so a burst of messages stays tight but readable.
+                const showMeta =
+                  msg.status === "sending" || lastOfCluster || isSeen;
+
+                return (
+                  <motion.div
+                    key={msg.client_id ?? msg.id}
+                    layout={reduce ? false : "position"}
+                    initial={reduce ? false : { opacity: 0, y: 6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: reduce ? 0 : 0.22,
+                      ease: [0.16, 1, 0.3, 1],
+                    }}
+                    className={cn(
+                      "group flex items-end gap-2",
+                      isOwn ? "justify-end" : "justify-start",
+                      i === 0 ? "" : firstOfCluster ? "mt-3" : "mt-0.5"
+                    )}
+                  >
+                    {!isOwn &&
+                      (lastOfCluster ? (
                         <Avatar
                           name={msg.sender?.name ?? "?"}
                           src={msg.sender?.avatar_url ?? undefined}
                           size="xs"
                           className="mb-1 shrink-0"
                         />
+                      ) : (
+                        <div className="size-6 shrink-0" aria-hidden />
+                      ))}
+                    <div
+                      className={cn(
+                        "flex min-w-0 max-w-[78%] flex-col gap-1 sm:max-w-md",
+                        isOwn ? "items-end" : "items-start"
                       )}
+                    >
                       <div
+                        title={fullTimestamp(msg.created_at)}
                         className={cn(
-                          "min-w-0 max-w-[78%] rounded-2xl px-4 py-2.5 text-sm sm:max-w-md",
+                          "min-w-0 rounded-2xl px-4 py-2.5 text-sm",
                           isOwn
                             ? "rounded-br-md bg-saffron text-cream"
                             : "rounded-bl-md border border-bone bg-paper text-ink",
@@ -226,37 +275,43 @@ export function MessageThread({
                         {msg.body && (
                           <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                         )}
-                        <p
-                          className={cn(
-                            "mt-1 flex items-center justify-end gap-1 text-[10px]",
-                            isOwn ? "text-cream/90" : "text-ash"
-                          )}
-                        >
-                          {msg.status === "sending" ? (
-                            <>
-                              <Clock className="size-3 animate-pulse" />
-                              <span>Sending</span>
-                            </>
-                          ) : (
-                            <>
-                              {formatTime(msg.created_at)}
-                              {isOwn && msg.id === lastSeenOwnId && (
-                                <span className="font-medium text-cream">
-                                  {" "}· Seen
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </p>
+                        {showMeta && (
+                          <p
+                            className={cn(
+                              "mt-1 flex items-center justify-end gap-1 text-[10px]",
+                              isOwn ? "text-cream/90" : "text-ash"
+                            )}
+                          >
+                            {msg.status === "sending" ? (
+                              <>
+                                <Clock className="size-3 animate-pulse" />
+                                <span>Sending</span>
+                              </>
+                            ) : (
+                              <>
+                                {formatTime(msg.created_at)}
+                                {isSeen && (
+                                  <span className="font-medium text-cream">
+                                    {" "}· Seen
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </p>
+                        )}
                       </div>
                       {isOwn && msg.status === "failed" && (
-                        <RetryFailed clientId={msg.client_id} />
+                        <FailedNote
+                          clientId={msg.client_id}
+                          reason={msg.failReason}
+                          permanent={msg.failPermanent}
+                        />
                       )}
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         ))}
 
@@ -293,23 +348,43 @@ export function MessageThread({
   );
 }
 
-/** Tap-to-retry affordance on a failed own message. The composer owns the
- * actual re-send (it has the upload + action wiring); we only signal intent. */
-function RetryFailed({ clientId }: { clientId: string | null }) {
+/**
+ * Failure surface on an own message: the real reason (rate-limit / moderation /
+ * block / network) plus a Retry - but ONLY when a retry could actually succeed.
+ * Permanent failures (permission block, moderation) show the reason with no
+ * Retry, since re-sending the identical payload can never work. The composer
+ * owns the actual re-send (upload + action wiring); we only signal intent. */
+function FailedNote({
+  clientId,
+  reason,
+  permanent,
+}: {
+  clientId: string | null;
+  reason?: string;
+  permanent?: boolean;
+}) {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (!clientId) return;
-        window.dispatchEvent(
-          new CustomEvent("c47:dm:retry", { detail: { clientId } })
-        );
-      }}
-      aria-label="Retry sending"
-      className="mb-1 flex items-center gap-1 rounded-full bg-cream px-2 py-1 text-[10px] font-semibold text-ember transition-colors hover:bg-bone"
-    >
-      <AlertCircle className="size-3" />
-      Not delivered · Retry
-    </button>
+    <div className="flex max-w-full flex-col items-end gap-1">
+      <p className="flex items-start justify-end gap-1 text-right text-[11px] leading-snug text-ember">
+        <AlertCircle className="mt-px size-3 shrink-0" />
+        <span className="break-words">{reason ?? "Not delivered."}</span>
+      </p>
+      {!permanent && (
+        <button
+          type="button"
+          onClick={() => {
+            if (!clientId) return;
+            window.dispatchEvent(
+              new CustomEvent("c47:dm:retry", { detail: { clientId } })
+            );
+          }}
+          aria-label="Retry sending message"
+          className="inline-flex min-h-8 items-center gap-1 rounded-full bg-cream px-3 py-1 text-[11px] font-semibold text-ember transition-colors hover:bg-bone active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+        >
+          <RotateCcw className="size-3" />
+          Retry
+        </button>
+      )}
+    </div>
   );
 }

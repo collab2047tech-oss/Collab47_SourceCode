@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   sendMessage,
+  type SendMessageResult,
   getOrCreate1to1Conversation,
   createGroupConversation,
   acceptMessageRequest,
@@ -17,9 +18,33 @@ import {
 import { getMyConnections, type MiniProfile } from "@/lib/db/social";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { SUPABASE_URL } from "@/lib/supabase/env";
+import { RATE_LIMITED } from "@/lib/security/ratelimit";
 import type { DMPermission } from "@/lib/supabase/types";
 
-export async function sendMessageAction(formData: FormData) {
+/**
+ * Moderation verdicts are PERMANENT failures: the identical payload will always
+ * be rejected, so offering a Retry that silently re-fails would be dishonest.
+ * These are the exact human strings the moderation layer returns
+ * (lib/moderation/guardrail.ts friendlyReason + moderate.ts Llama-Guard verdict);
+ * kept in sync there. A permission-matrix block is flagged separately via
+ * `blockedReason` (also permanent). Everything else - rate limits, network/DB
+ * errors, a thrown action - is transient and stays retryable.
+ */
+const MODERATION_REASONS = new Set([
+  "Content blocked by policy.",
+  "This violates our community guidelines.",
+  "Looks like a personal identifier. Doxxing is not allowed.",
+  "This reads like a scam or spam.",
+]);
+
+export interface SendActionResult extends SendMessageResult {
+  /** True when re-sending the identical payload can never succeed (block/moderation). */
+  permanent?: boolean;
+}
+
+export async function sendMessageAction(
+  formData: FormData
+): Promise<SendActionResult> {
   const conversationId = formData.get("conversationId") as string;
   const body = formData.get("body") as string;
   const clientId = (formData.get("client_id") as string | null)?.trim() || undefined;
@@ -34,19 +59,29 @@ export async function sendMessageAction(formData: FormData) {
   }
 
   if (!conversationId || (!body?.trim() && !imageUrl)) {
-    return { ok: false, error: "Missing fields" };
+    return { ok: false, error: "Missing fields", permanent: false };
   }
 
   // No revalidatePath here: display is fully optimistic (the temp bubble shows
   // instantly) and reconciled by the realtime INSERT echo + the MessagesProvider
   // rail update, so a heavy server re-render of the whole thread/inbox on every
   // send would only fight the realtime channel and re-introduce the ~1s lag.
-  return sendMessage({
+  const result = await sendMessage({
     conversationId,
     body: (body ?? "").trim(),
     imageUrl,
     clientId,
   });
+
+  if (result.ok) return result;
+
+  // Classify the failure so the composer can show an honest bubble: permanent
+  // failures (permission block / moderation) suppress Retry; transient ones
+  // (rate limit, network/DB error) keep it.
+  const permanent =
+    Boolean(result.blockedReason) ||
+    (!!result.error && MODERATION_REASONS.has(result.error));
+  return { ...result, permanent };
 }
 
 /**

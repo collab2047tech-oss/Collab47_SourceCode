@@ -25,6 +25,10 @@ export interface ThreadMessage extends MessageWithSender {
   status?: "sending" | "failed";
   /** Local preview object-URL for an image still uploading (temp only). */
   localImageUrl?: string;
+  /** Human reason shown on a failed bubble (rate-limit / moderation / block / network). */
+  failReason?: string;
+  /** True when a retry can never succeed (permission block / moderation): Retry is hidden. */
+  failPermanent?: boolean;
 }
 
 interface SendArgs {
@@ -41,8 +45,14 @@ interface ThreadContextValue {
   pushOptimistic: (args: SendArgs) => void;
   /** Mark a temp confirmed - the realtime echo finalizes it; drop on match. */
   confirmOptimistic: (clientId: string) => void;
-  /** Flip a temp to the failed state so it can be retried. */
-  failOptimistic: (clientId: string, reason?: string) => void;
+  /**
+   * Flip a temp to the failed state. `reason` is surfaced on the bubble; when
+   * `permanent` is true (permission block / moderation) the Retry affordance is
+   * suppressed, since re-sending the identical payload can never succeed.
+   */
+  failOptimistic: (clientId: string, reason?: string, permanent?: boolean) => void;
+  /** Flip a failed temp back to "sending" (optimistic retry) so it stops reading as not-delivered. */
+  retryOptimistic: (clientId: string) => void;
   /** Whether the composer's blocked footer should show (ChatMenu block toggle). */
   blockedByMenu: boolean;
   setBlockedByMenu: (blocked: boolean) => void;
@@ -60,6 +70,57 @@ function sortAsc(list: ThreadMessage[]): ThreadMessage[] {
   );
 }
 
+// ── Unsent-temp persistence ──────────────────────────────────────────────────
+// Optimistic temps live only in memory, so a message that is still sending (or
+// failed) when the user navigates away is otherwise destroyed silently. We
+// persist unconfirmed temps per-conversation to localStorage and restore them
+// (as failed, since any in-flight send died with the page) on the next mount, so
+// the user never loses a message behind a navigation.
+const UNSENT_PREFIX = "c47:dm:unsent:";
+// Cap the persisted image preview so a large data-URL can never blow the
+// localStorage quota; over the cap we keep the text + failed state, drop preview.
+const MAX_PERSISTED_PREVIEW = 700_000;
+
+interface PersistedTemp {
+  clientId: string;
+  body: string;
+  created_at: string;
+  localImageUrl?: string;
+  failReason?: string;
+  failPermanent?: boolean;
+  /** Whether the temp carried an image; its File cannot survive a reload. */
+  hadImage?: boolean;
+}
+
+function unsentKey(conversationId: string): string {
+  return `${UNSENT_PREFIX}${conversationId}`;
+}
+
+function readPersistedTemps(conversationId: string): PersistedTemp[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(unsentKey(conversationId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as PersistedTemp[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePersistedTemps(conversationId: string, temps: PersistedTemp[]) {
+  if (typeof window === "undefined") return;
+  try {
+    if (temps.length === 0) {
+      window.localStorage.removeItem(unsentKey(conversationId));
+    } else {
+      window.localStorage.setItem(unsentKey(conversationId), JSON.stringify(temps));
+    }
+  } catch {
+    /* private mode / quota - persistence is best-effort. */
+  }
+}
+
 export function ThreadProvider({
   conversationId,
   initialMessages,
@@ -75,9 +136,48 @@ export function ThreadProvider({
   children: React.ReactNode;
 }) {
   const store = useMessagesStore();
-  const [messages, setMessages] = useState<ThreadMessage[]>(
-    () => sortAsc(initialMessages as ThreadMessage[])
-  );
+  const [messages, setMessages] = useState<ThreadMessage[]>(() => {
+    const base = sortAsc(initialMessages as ThreadMessage[]);
+    // Restore any unsent/failed temps left behind by a previous navigation,
+    // skipping ones the server has since confirmed (same client_id already real).
+    const persisted = readPersistedTemps(conversationId);
+    if (persisted.length === 0) return base;
+    const realClientIds = new Set(
+      base.map((m) => m.client_id).filter((id): id is string => !!id)
+    );
+    const meFallback: MiniProfile = {
+      id: currentUserId,
+      handle: "",
+      name: "You",
+      avatar_url: null,
+      college: null,
+    };
+    const restored: ThreadMessage[] = persisted
+      .filter((t) => t.clientId && !realClientIds.has(t.clientId))
+      .map((t) => ({
+        id: `temp:${t.clientId}`,
+        conversation_id: conversationId,
+        sender_id: currentUserId,
+        body: t.body,
+        image_url: null,
+        is_request: false,
+        read_at: null,
+        created_at: t.created_at,
+        client_id: t.clientId,
+        sender: meFallback,
+        // An interrupted "sending" temp cannot still be in flight after a
+        // reload - restore it as failed so it is never lost. Text is retryable;
+        // an image's File cannot survive a reload, so an image temp is shown but
+        // its Retry is suppressed (a retry that drops the image would be
+        // dishonest).
+        status: "failed" as const,
+        localImageUrl: t.localImageUrl,
+        failReason:
+          t.failReason ?? (t.hadImage ? "Photo not delivered." : "Not delivered."),
+        failPermanent: Boolean(t.failPermanent) || Boolean(t.hadImage),
+      }));
+    return sortAsc([...base, ...restored]);
+  });
   const [blockedByMenu, setBlockedByMenu] = useState(false);
   const [hasMore, setHasMore] = useState(initialMessages.length >= 50);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
@@ -166,10 +266,30 @@ export function ThreadProvider({
   );
 
   const failOptimistic = useCallback<ThreadContextValue["failOptimistic"]>(
+    (clientId, reason, permanent) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.client_id === clientId
+            ? {
+                ...m,
+                status: "failed",
+                failReason: reason ?? m.failReason ?? "Not delivered.",
+                failPermanent: permanent ?? false,
+              }
+            : m
+        )
+      );
+    },
+    []
+  );
+
+  const retryOptimistic = useCallback<ThreadContextValue["retryOptimistic"]>(
     (clientId) => {
       setMessages((prev) =>
         prev.map((m) =>
-          m.client_id === clientId ? { ...m, status: "failed" } : m
+          m.client_id === clientId
+            ? { ...m, status: "sending", failReason: undefined, failPermanent: undefined }
+            : m
         )
       );
     },
@@ -199,6 +319,35 @@ export function ThreadProvider({
       setLoadingEarlier(false);
     }
   }, [conversationId, messages, hasMore, loadingEarlier]);
+
+  // Persist unconfirmed temps (sending/failed) so they survive navigation, and
+  // clear them the instant they reconcile (status cleared or temp replaced by a
+  // real row). Keyed per-conversation; runs after every message change.
+  useEffect(() => {
+    const temps: PersistedTemp[] = messages
+      .filter(
+        (m) =>
+          m.id.startsWith("temp:") &&
+          !!m.client_id &&
+          (m.status === "sending" || m.status === "failed")
+      )
+      .map((m) => {
+        const preview =
+          m.localImageUrl && m.localImageUrl.length <= MAX_PERSISTED_PREVIEW
+            ? m.localImageUrl
+            : undefined;
+        return {
+          clientId: m.client_id as string,
+          body: m.body ?? "",
+          created_at: m.created_at,
+          localImageUrl: preview,
+          failReason: m.failReason,
+          failPermanent: m.failPermanent,
+          hadImage: !!m.localImageUrl,
+        };
+      });
+    writePersistedTemps(conversationId, temps);
+  }, [messages, conversationId]);
 
   // Realtime: INSERT (new messages, including our own echo) + UPDATE (read_at).
   useEffect(() => {
@@ -322,6 +471,7 @@ export function ThreadProvider({
     pushOptimistic,
     confirmOptimistic,
     failOptimistic,
+    retryOptimistic,
     blockedByMenu,
     setBlockedByMenu,
     loadEarlier,

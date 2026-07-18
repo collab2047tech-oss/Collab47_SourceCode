@@ -86,31 +86,13 @@ export default function NewProjectPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="Deadline"
-            name="deadline"
-            type="date"
-            required
-            min={new Date().toISOString().split("T")[0]}
-          />
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="slot_count" className="text-caption text-ink">
-              Team slots (1 to 8)
-            </label>
-            <input
-              id="slot_count"
-              name="slot_count"
-              type="number"
-              required
-              min={1}
-              max={8}
-              defaultValue={3}
-              className="h-12 w-full rounded-md border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-ink focus:outline-none"
-            />
-          </div>
-        </div>
+        <Input
+          label="Deadline"
+          name="deadline"
+          type="date"
+          required
+          min={new Date().toISOString().split("T")[0]}
+        />
 
         {error && (
           <p className="text-sm text-ember">{error}</p>
