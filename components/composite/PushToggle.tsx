@@ -65,13 +65,13 @@ export function PushToggle() {
           type="button"
           onClick={toggle}
           disabled={busy}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron disabled:opacity-60"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-cream transition-colors hover:bg-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:opacity-60"
         >
           {busy ? <Loader2 className="size-4 animate-spin" /> : null}
           {enabled ? "Turn off" : "Enable"}
         </button>
       </div>
-      {msg ? <p className="mt-3 text-xs text-red-600">{msg}</p> : null}
+      {msg ? <p className="mt-3 text-xs text-ember">{msg}</p> : null}
     </div>
   );
 }

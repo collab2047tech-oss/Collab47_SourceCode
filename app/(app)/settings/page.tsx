@@ -26,9 +26,14 @@ export default async function SettingsPage() {
   const profileRow = profile as typeof profile & {
     last_name_change_at?: string | null;
     last_handle_change_at?: string | null;
+    digest_opt_out?: boolean | null;
   };
   const nameChange = computeChangeWindow(profileRow.last_name_change_at ?? null);
   const handleChange = computeChangeWindow(profileRow.last_handle_change_at ?? null);
+
+  // Weekly-digest subscription state. `digest_opt_out` defaults to false in the
+  // DB (0051), so a member with no explicit value is receiving the digest.
+  const digestOptOut = profileRow.digest_opt_out ?? false;
 
   const initial: SettingsInitial = {
     name: profile.name ?? "",
@@ -40,6 +45,7 @@ export default async function SettingsPage() {
     dm_permission: profile.dm_permission ?? "everyone",
     privacy,
     notificationPrefs: profile.notification_prefs ?? null,
+    digestOptOut,
     nameChange,
     handleChange,
   };

@@ -5,13 +5,14 @@ import { PushToggle } from "@/components/composite/PushToggle";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { updateDmPermissionAction } from "@/app/(app)/messages/actions";
 import {
   updateAccountAction,
   updatePrivacyAction,
   updateNotificationPrefsAction,
+  updateDigestOptOutAction,
   deleteAccountAction,
   signOutAction,
 } from "@/app/(app)/settings/actions";
@@ -26,6 +27,7 @@ import {
   Trash2,
   MessageSquare,
   Check,
+  Mail,
 } from "lucide-react";
 
 /** A change-limited field's current window state, computed server-side. */
@@ -52,6 +54,8 @@ export interface SettingsInitial {
   } | null;
   /** Saved notification prefs from the database. Null when the row has no value yet. */
   notificationPrefs: Record<string, { email: boolean; push: boolean }> | null;
+  /** True when the member has opted OUT of the weekly digest email (default false = receiving). */
+  digestOptOut: boolean;
   /** 7-day change window for the full name. */
   nameChange: ChangeWindowState;
   /** 7-day change window for the handle. */
@@ -468,8 +472,12 @@ function PrivacySection({ initialPrivacy }: { initialPrivacy: SettingsInitial["p
 }
 
 // ---------------------------------------------------------------------------
-// Notifications: only In-app is real today. Email + Push are honestly marked
-// "Coming soon" (disabled) but their prefs still persist for when they wire up.
+// Notifications. Three real controls today: In-app (always on), device Push,
+// and the Weekly digest email (a dedicated control below - the digest actually
+// ships, so it gets a live toggle, not a "coming soon" placeholder). The
+// per-event EMAIL column below is honestly marked "Coming soon" (disabled)
+// because per-event email delivery is not built yet; its prefs still persist
+// for when it wires up.
 // ---------------------------------------------------------------------------
 
 const NOTIF_EVENTS = [
@@ -477,13 +485,73 @@ const NOTIF_EVENTS = [
   { key: "direct_messages", label: "Direct messages" },
   { key: "branch_news", label: "Career-Impact news for your branch" },
   { key: "project_invites", label: "Collab Project invites" },
-  { key: "weekly_digest", label: "Weekly digest" },
 ];
+
+// ---------------------------------------------------------------------------
+// Weekly digest email: a REAL control. Writes profiles.digest_opt_out (the same
+// flag the emailed unsubscribe link sets), which runWeeklyDigest honours. On =
+// subscribed (digest_opt_out false). Optimistic with rollback on failure.
+// ---------------------------------------------------------------------------
+
+function WeeklyDigestToggle({ initialOptOut }: { initialOptOut: boolean }) {
+  const [optOut, setOptOut] = useState(initialOptOut);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function toggle() {
+    const prev = optOut;
+    const next = !optOut; // flipping the switch off means opting OUT
+    setOptOut(next);
+    setError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const result = await updateDigestOptOutAction(next);
+      if (result.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      } else {
+        setOptOut(prev);
+        setError("Could not save. Try again.");
+      }
+    });
+  }
+
+  const subscribed = !optOut;
+
+  return (
+    <div className="rounded-xl border border-bone bg-paper p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 text-saffron">
+            <Mail className="size-5" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">Weekly digest email</p>
+            <p className="text-xs text-ash">
+              {subscribed
+                ? "A short weekly summary of your network activity, sent to your email. Turn this off to stop receiving it."
+                : "You are unsubscribed from the weekly digest. Turn this on to start receiving it again."}
+            </p>
+          </div>
+        </div>
+        <Switch label="Weekly digest email" on={subscribed} onChange={toggle} />
+      </div>
+      <div className="mt-2 flex h-5 items-center gap-4 pl-8 text-xs">
+        {isPending && <span className="text-ash">Saving...</span>}
+        {saved && !isPending && <span className="font-medium text-moss">Saved.</span>}
+        {error && <span className="text-ember">{error}</span>}
+      </div>
+    </div>
+  );
+}
 
 function NotificationsSection({
   initialNotificationPrefs,
+  initialDigestOptOut,
 }: {
   initialNotificationPrefs: SettingsInitial["notificationPrefs"];
+  initialDigestOptOut: boolean;
 }) {
   const [prefs, setPrefs] = useState<Record<string, { email: boolean; push: boolean }>>(() =>
     Object.fromEntries(
@@ -522,11 +590,13 @@ function NotificationsSection({
     <section className="rounded-2xl border border-bone bg-paper p-6">
       <h2 className="font-serif text-2xl text-ink">Notifications</h2>
       <p className="mt-1 text-sm text-ash">
-        In-app notifications are always on. Turn on push to get alerts on this device. Email is coming soon.
+        In-app notifications are always on. Turn on push for alerts on this device, and control the
+        weekly digest email below. Per-event email is coming soon.
       </p>
 
-      <div className="mt-5">
+      <div className="mt-5 space-y-3">
         <PushToggle />
+        <WeeklyDigestToggle initialOptOut={initialDigestOptOut} />
       </div>
 
       <div className="mt-6 grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 sm:gap-x-6">
@@ -558,8 +628,8 @@ function NotificationsSection({
       </div>
 
       <p className="mt-4 rounded-lg border border-bone bg-cream/60 px-4 py-3 text-xs text-ash">
-        Push notifications are live (enable them above). Per-event email controls are coming soon,
-        once email delivery is switched on.
+        Push notifications and the weekly digest email are live (controls above). Per-event email
+        controls are coming soon, once per-event email delivery is switched on.
       </p>
 
       <div className="mt-3 flex h-5 items-center gap-4 text-sm">
@@ -580,6 +650,41 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
   const [signOutPending, startSignOutTransition] = useTransition();
   const [deletePending, startDeleteTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
+
+  // Delete-account overlay a11y: focus the SAFE (Cancel) action on open so an
+  // accidental Enter never deletes, close on Escape, and trap Tab inside the
+  // dialog while it is open.
+  useEffect(() => {
+    if (!confirmDelete) return;
+    cancelDeleteRef.current?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setConfirmDelete(false);
+        return;
+      }
+      if (e.key === "Tab") {
+        const root = deleteDialogRef.current;
+        if (!root) return;
+        const focusables = root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirmDelete]);
 
   function handleSignOut() {
     startSignOutTransition(async () => {
@@ -613,8 +718,9 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
             <button
               key={s.id}
               onClick={() => setActive(s.id)}
+              aria-current={active === s.id ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 focus-visible:ring-offset-cream",
                 active === s.id ? "bg-ink text-cream" : "text-ink hover:bg-bone"
               )}
             >
@@ -626,14 +732,14 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
           <button
             onClick={handleSignOut}
             disabled={signOutPending}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-bone disabled:opacity-50"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-bone focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:opacity-50"
           >
             <LogOut className="size-4" /> {signOutPending ? "Signing out..." : "Sign out"}
           </button>
           <button
             onClick={() => setConfirmDelete(true)}
             disabled={deletePending}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ember transition-colors hover:bg-ember/10 disabled:opacity-50"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-ember transition-colors hover:bg-ember/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:opacity-50"
           >
             <Trash2 className="size-4" /> {deletePending ? "Deleting..." : "Delete account"}
           </button>
@@ -646,7 +752,10 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
             {active === "privacy" && <PrivacySection initialPrivacy={initial.privacy} />}
 
             {active === "notifications" && (
-              <NotificationsSection initialNotificationPrefs={initial.notificationPrefs} />
+              <NotificationsSection
+                initialNotificationPrefs={initial.notificationPrefs}
+                initialDigestOptOut={initial.digestOptOut}
+              />
             )}
 
             {active === "dms" && <DmPermissionsSection initial={initial.dm_permission} />}
@@ -686,11 +795,23 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
         </Reveal>
       </div>
 
-      {/* Delete account confirm overlay */}
+      {/* Delete account confirm overlay (danger zone: confirm-gated, ember-accented) */}
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-bone bg-paper p-6 shadow-lg">
-            <h3 className="font-serif text-2xl text-ink">Delete account?</h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4"
+          onClick={() => setConfirmDelete(false)}
+        >
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            className="w-full max-w-sm rounded-2xl border border-ember/30 bg-paper p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="delete-account-title" className="font-serif text-2xl text-ember">
+              Delete account?
+            </h3>
             <p className="mt-3 text-sm leading-relaxed text-ash">
               Your account will be deactivated and you will be signed out. You can restore it within
               14 days by signing back in with the same email. After 14 days, your data is permanently
@@ -705,7 +826,12 @@ export function SettingsView({ initial }: { initial: SettingsInitial }) {
               >
                 Yes, delete
               </Button>
-              <Button variant="secondary" size="md" onClick={() => setConfirmDelete(false)}>
+              <Button
+                ref={cancelDeleteRef}
+                variant="secondary"
+                size="md"
+                onClick={() => setConfirmDelete(false)}
+              >
                 Cancel
               </Button>
             </div>

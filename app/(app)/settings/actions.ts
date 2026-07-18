@@ -67,12 +67,14 @@ export async function updatePrivacyAction(
 export async function updateNotificationPrefsAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
+  // Per-event email/push prefs. `weekly_digest` is intentionally NOT here: the
+  // digest is controlled by its own real toggle via updateDigestOptOutAction
+  // (profiles.digest_opt_out), not by this placeholder notification_prefs map.
   const keys = [
     "new_follower",
     "direct_messages",
     "branch_news",
     "project_invites",
-    "weekly_digest",
   ];
 
   const prefs: Record<string, { email: boolean; push: boolean }> = {};
@@ -88,6 +90,32 @@ export async function updateNotificationPrefsAction(
 
   // Optimistic UI handles the visual state; skip the /settings re-render to keep
   // toggles instant. Prefs are persisted for when email/push are wired.
+  return { ok: true };
+}
+
+export async function updateDigestOptOutAction(
+  optOut: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  // Weekly-digest opt-out for the LOGGED-IN user. This writes the SAME
+  // `profiles.digest_opt_out` flag the emailed one-click unsubscribe link sets
+  // (app/api/unsubscribe), but from an authenticated session instead of a signed
+  // token. `runWeeklyDigest` (lib/email/digest.ts) only sends to profiles where
+  // digest_opt_out = false, so this is the real, honest control - not a
+  // placeholder. RLS `profiles_write_own` (auth.uid() = id) scopes the write to
+  // the user's own row; the 0040 column guard only reverts verified/suspended_at,
+  // so this column is freely user-writable (same path as updatePrivacy).
+  const sb = await getSupabaseServer();
+  if (!sb) return { ok: false, error: "Database not connected." };
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { error } = await sb
+    .from("profiles")
+    .update({ digest_opt_out: optOut })
+    .eq("id", user.id);
+
+  if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
