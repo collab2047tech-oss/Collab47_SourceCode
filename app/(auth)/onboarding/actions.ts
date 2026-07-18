@@ -14,10 +14,19 @@ const ACCOUNT_TYPES: AccountType[] = [
   "industry",
 ];
 
-// Used as a <form action>. Returns void; on validation failure it redirects
-// back to onboarding with an ?error= the page can surface.
-export async function completeOnboarding(formData: FormData): Promise<void> {
+/** Result surfaced back to the onboarding client. */
+export type OnboardingState = { ok: false; error: string } | null;
+
+// Used with useActionState. CRITICAL: validation failures RETURN an error, they
+// must never redirect. A redirect here makes React remount the onboarding client,
+// which resets every useState and dumps the user back on step 1 with all of their
+// answers wiped (the "username taken" bug). Only SUCCESS redirects.
+export async function completeOnboarding(
+  _prev: OnboardingState,
+  formData: FormData,
+): Promise<OnboardingState> {
   const name = (formData.get("name") ?? "").toString().trim();
+  const title = (formData.get("title") ?? "").toString().trim();
   let handle = (formData.get("handle") ?? "").toString().toLowerCase().trim();
   const rawType = (formData.get("account_type") ?? "").toString().trim();
   const account_type = ACCOUNT_TYPES.includes(rawType as AccountType)
@@ -35,22 +44,22 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
   const birthdate = (formData.get("birthdate") ?? "").toString().trim();
   const interests = formData.getAll("interests").map((x) => x.toString()).slice(0, 8);
 
-  if (!account_type) redirect("/onboarding?error=" + encodeURIComponent("Please choose how you are joining."));
-  if (!name) redirect("/onboarding?error=name");
-  if (!handle.match(/^[a-z0-9_]{3,32}$/)) redirect("/onboarding?error=handle");
-  if (isReserved(handle)) redirect("/onboarding?error=" + encodeURIComponent("That username is reserved."));
-  if (interests.length < 3) redirect("/onboarding?error=" + encodeURIComponent("Please select at least 3 interests."));
+  if (!account_type) return { ok: false, error: "Please choose how you are joining." };
+  if (!name) return { ok: false, error: "Enter your full name." };
+  if (!handle.match(/^[a-z0-9_]{3,32}$/)) return { ok: false, error: "Username must be 3 to 32 characters: letters, numbers, underscore." };
+  if (isReserved(handle)) return { ok: false, error: "That username is reserved. Pick another." };
+  if (interests.length < 3) return { ok: false, error: "Please pick at least 3 interests." };
 
   // Moderate the user-entered free-text (name + college) in a single pass
   // before persisting - profiles are world-readable. URLs/dates/enums are not
   // moderated. On a block, redirect back with the reason like other failures.
-  const moderationText = [name, college]
+  const moderationText = [name, college, ...interests]
     .filter((v) => v.length > 0)
     .join(" ");
   if (moderationText) {
     const moderationResult = await moderateContent(moderationText);
     if (!moderationResult.ok) {
-      redirect("/onboarding?error=" + encodeURIComponent(moderationResult.reason ?? "Content blocked by policy."));
+      return { ok: false, error: moderationResult.reason ?? "Content blocked by policy." };
     }
   }
 
@@ -74,10 +83,12 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
     case "researcher":
       collegeCol = college; // institution / lab
       branchCol = branch; // field / area
+      cityCol = city;
       break;
     case "faculty":
       collegeCol = college; // institution
       branchCol = branch; // department
+      cityCol = city;
       break;
     case "institution":
       orgCol = organization; // organization name
@@ -87,12 +98,14 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
       orgCol = organization; // company / org name
       // Combine role and industry sector so neither is lost (no role column).
       branchCol = role && branch ? `${role} - ${branch}` : role || branch || undefined;
+      cityCol = city;
       break;
   }
 
   const res = await upsertOnboardingProfile({
     handle,
     name,
+    title,
     account_type,
     college: collegeCol,
     organization: orgCol,
@@ -104,7 +117,7 @@ export async function completeOnboarding(formData: FormData): Promise<void> {
   });
 
   if (!res.ok) {
-    redirect(`/onboarding?error=${encodeURIComponent(res.error ?? "save")}`);
+    return { ok: false, error: res.error ?? "Could not save your profile. Try again." };
   }
   redirect("/home");
 }

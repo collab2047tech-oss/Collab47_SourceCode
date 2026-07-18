@@ -34,6 +34,8 @@ export interface Profile {
   id: string;
   handle: string;
   name: string;
+  /** Optional honorific shown before the name (Mr, Mrs, Ms, Dr, Prof, Er). */
+  title: string | null;
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;

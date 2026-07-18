@@ -10,6 +10,7 @@ import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { GOOGLE_AUTH_ENABLED, PHONE_AUTH_ENABLED } from "@/app/(auth)/authProviders";
 import { isValidEmailFormat } from "@/lib/security/email-validate";
 import { signUpAction } from "@/app/(auth)/signup/actions";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -107,7 +108,7 @@ export default function SignupPage() {
  <div className="container-edit flex min-h-dvh items-center justify-center py-20">
  <Reveal className="w-full max-w-md">
  <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
-            Collab47.
+            <Wordmark />
           </Link>
  <p className="text-caption mt-12">Sign up</p>
  <h1 className="mt-4 font-serif text-5xl text-ink">

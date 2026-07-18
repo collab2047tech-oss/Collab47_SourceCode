@@ -1,5 +1,18 @@
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { sendPushToUser } from "@/lib/push/send";
+
+// Kinds worth a phone/browser push. Noisy/low-value kinds (like, repost, system)
+// stay in-app only. The user's push subscription itself is the opt-in.
+const PUSH_KINDS = new Set([
+  "dm",
+  "dm_request",
+  "comment",
+  "mention",
+  "follow",
+  "project_invite",
+  "project_accepted",
+]);
 
 /** Unread notification count for the current user (read_at is null). */
 export async function getUnreadCount(): Promise<number> {
@@ -103,6 +116,18 @@ export async function createNotification(input: {
         href: input.href,
       },
     });
+
+    // Fresh notification (not a coalesce bump) -> also push to the recipient's
+    // subscribed browsers for the kinds worth interrupting them. No-ops if they
+    // never enabled push. Fire-and-forget.
+    if (PUSH_KINDS.has(input.kind)) {
+      void sendPushToUser(input.userId, {
+        title: input.actorName,
+        body: input.text,
+        url: input.href,
+        tag: `${input.kind}:${input.actorName}`,
+      });
+    }
   } catch {
     // Best-effort: a failed notification must never surface to the caller.
   }

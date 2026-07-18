@@ -26,7 +26,7 @@ export function Quote() {
  <div className="mt-10 flex items-center gap-4 sm:mt-12">
  <span className="h-px w-10 bg-cream/30" aria-hidden />
  <p className="text-caption text-cream/60">
-              Collab47 . Built for India. Built to Lead.
+              Collab47 &#183; Connect. Create. Succeed.
             </p>
           </div>
         </Reveal>

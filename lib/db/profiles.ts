@@ -4,6 +4,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
 import { isReserved } from "@/lib/data/reserved-handles";
 import { moderateContent } from "@/lib/moderation/moderate";
+import { sendWelcomeEmail } from "@/lib/email/notify";
 import type { AccountType, Profile } from "@/lib/supabase/types";
 
 // ---------------------------------------------------------------------------
@@ -87,6 +88,7 @@ export const getMyProfile = cache(async (): Promise<Profile | null> => {
 export async function upsertOnboardingProfile(payload: {
   handle: string;
   name: string;
+  title?: string;
   account_type: AccountType;
   /** Listed institution or free text. Maps to the `college` column for
    *  student/researcher/faculty (their lab/institution lives here too). */
@@ -123,12 +125,22 @@ export async function upsertOnboardingProfile(payload: {
     .maybeSingle();
   if (clash) return { ok: false, error: "That username is taken. Pick another." };
 
+  // Was this account already onboarded? If so, this is a re-onboard/edit and we
+  // must NOT re-send the welcome email.
+  const { data: existing } = await sb
+    .from("profiles")
+    .select("onboarded")
+    .eq("id", user.id)
+    .maybeSingle();
+  const wasOnboarded = existing?.onboarded === true;
+
   // Persist only the fields relevant to the chosen account type. Unused
   // columns are written as null so a re-onboard never leaves stale data.
   const row = {
     id: user.id,
     handle: payload.handle,
     name: payload.name,
+    title: payload.title?.trim() || null,
     account_type: payload.account_type,
     college: payload.college?.trim() || null,
     organization: payload.organization?.trim() || null,
@@ -145,6 +157,11 @@ export async function upsertOnboardingProfile(payload: {
     // Lost the race to a concurrent claim on the same handle.
     if (isUniqueViolation(error)) return { ok: false, error: "That username is taken." };
     return { ok: false, error: error.message };
+  }
+
+  // First-time onboard -> welcome email (fire-and-forget, never blocks).
+  if (!wasOnboarded) {
+    void sendWelcomeEmail(user.email, payload.name, payload.account_type);
   }
   return { ok: true };
 }

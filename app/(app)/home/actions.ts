@@ -81,7 +81,7 @@ export async function createPostAction(
 
   const hashtagsRaw = (formData.get("hashtags") as string | null) ?? "";
   // Lowercase, strip leading '#', cap each tag to 40 chars, de-dupe, and cap
-  // the array to 8 entries to guard against storage bloat/abuse.
+  // the array to 15 entries to guard against storage bloat/abuse.
   const seenTags = new Set<string>();
   const hashtags: string[] = [];
   for (const raw of hashtagsRaw.split(" ")) {
@@ -89,7 +89,7 @@ export async function createPostAction(
     if (!t || seenTags.has(t)) continue;
     seenTags.add(t);
     hashtags.push(t);
-    if (hashtags.length >= 8) break;
+    if (hashtags.length >= 15) break;
   }
 
   // Media is uploaded CLIENT-SIDE directly to Supabase Storage (so large files

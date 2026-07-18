@@ -1,6 +1,7 @@
 "use client";
 
 import { Reveal } from "@/components/motion/Reveal";
+import { PushToggle } from "@/components/composite/PushToggle";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
@@ -521,8 +522,12 @@ function NotificationsSection({
     <section className="rounded-2xl border border-bone bg-paper p-6">
       <h2 className="font-serif text-2xl text-ink">Notifications</h2>
       <p className="mt-1 text-sm text-ash">
-        In-app notifications are always on. Email and push are coming soon.
+        In-app notifications are always on. Turn on push to get alerts on this device. Email is coming soon.
       </p>
+
+      <div className="mt-5">
+        <PushToggle />
+      </div>
 
       <div className="mt-6 grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1 sm:gap-x-6">
         <span />
@@ -553,8 +558,8 @@ function NotificationsSection({
       </div>
 
       <p className="mt-4 rounded-lg border border-bone bg-cream/60 px-4 py-3 text-xs text-ash">
-        Email and push notifications are coming soon. We are building email delivery and web push so
-        you can get alerts off-app and on this device.
+        Push notifications are live (enable them above). Per-event email controls are coming soon,
+        once email delivery is switched on.
       </p>
 
       <div className="mt-3 flex h-5 items-center gap-4 text-sm">

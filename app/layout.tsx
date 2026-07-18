@@ -1,19 +1,49 @@
 import type { Metadata, Viewport } from "next";
+import { Sora, Inter, JetBrains_Mono, Noto_Sans_Devanagari } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { LenisProvider } from "@/components/motion/LenisProvider";
 
+// Self-hosted (build-time) versions of the exact same families the site already
+// used - identical look, but no render-blocking third-party fetch and fallback
+// metrics that remove the font-swap layout shift. Exposed as CSS variables that
+// globals.css maps onto --font-serif/--font-sans/--font-mono/--font-indic.
+const sora = Sora({ subsets: ["latin"], variable: "--font-sora", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains", display: "swap" });
+const notoDevanagari = Noto_Sans_Devanagari({
+  subsets: ["devanagari", "latin"],
+  weight: ["400", "600"],
+  variable: "--font-noto-devanagari",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Collab47. Where talent, innovation and opportunity converge.",
+  metadataBase: new URL("https://collab47.com"),
+  title: {
+    default: "Collab47. Where talent, innovation and opportunity converge.",
+    template: "%s | Collab47",
+  },
   description:
     "India's unified academia-industry collaboration ecosystem. Showcase expertise, discover opportunities, and build impactful collaborations - for students, researchers, faculty, institutions and industry.",
-  metadataBase: new URL("https://collab47.com"),
+  applicationName: "Collab47",
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Collab47",
-    description:
-      "India's unified academia-industry collaboration ecosystem. Built for India. Built to Lead.",
     type: "website",
+    siteName: "Collab47",
+    url: "https://collab47.com",
+    locale: "en_IN",
+    title: "Collab47. Where talent, innovation and opportunity converge.",
+    description:
+      "India's unified academia-industry collaboration ecosystem. Showcase expertise, discover opportunities, and build impactful collaborations - for students, researchers, faculty, institutions and industry.",
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    title: "Collab47",
+    description: "India's unified academia-industry collaboration ecosystem.",
+  },
+  robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
@@ -28,17 +58,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="en-IN"
+      className={`${sora.variable} ${inter.variable} ${jetbrainsMono.variable} ${notoDevanagari.variable}`}
+    >
       <body>
         <LenisProvider>{children}</LenisProvider>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

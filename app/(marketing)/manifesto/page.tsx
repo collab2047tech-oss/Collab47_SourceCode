@@ -28,6 +28,8 @@ export default function ManifestoPage() {
             </h1>
           </Reveal>
 
+          {/* Byline hidden for now (kept in code, not deleted). Flip false -> true to restore. */}
+          {false && (
           <Reveal delay={0.18}>
  <div className="mt-12 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-t border-bone pt-6">
  <p className="text-caption">By</p>
@@ -35,10 +37,11 @@ export default function ManifestoPage() {
  Akshpreet Singh, <span className="">CEO.</span>
               </p>
  <p className="text-body-sm text-ash">
-                With the founding team.
+                With the team.
               </p>
             </div>
           </Reveal>
+          )}
         </div>
       </section>
 
@@ -189,14 +192,14 @@ export default function ManifestoPage() {
                 style={{ maxWidth: "65ch" }}
               >
                 A note on how we are funding this. Collab47 is bootstrapped.
-                Six cofounders, our own capital, and an unreasonable
+                Our own capital, and an unreasonable
                 conviction that this is worth doing slowly and well. Zero ads on the student surface. No selling
                 of student data to coaching cartels. No paid visibility for
                 the loud. Real opportunities, vetted, from real companies and
                 real labs. When we do raise, it will be from people who
                 understand that a student network has to earn the trust of
                 students before it earns anything else. Until then, the
-                founders pay for the servers.
+                we pay for the servers.
               </p>
             </Reveal>
 
@@ -230,8 +233,10 @@ export default function ManifestoPage() {
       </article>
 
       {/* ============================================================
-          SIGN-OFF
+          SIGN-OFF - hidden for now (kept in code, not deleted).
+          Flip false -> true to restore the signature.
           ============================================================ */}
+      {false && (
  <section className="border-t border-bone bg-paper">
  <div className="container-edit py-20">
  <div className="mx-auto max-w-2xl">
@@ -259,6 +264,7 @@ export default function ManifestoPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* ============================================================
           CTA STRIP

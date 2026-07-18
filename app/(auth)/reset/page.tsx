@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -68,7 +69,7 @@ export default function ResetPasswordPage() {
  <div className="container-edit flex min-h-dvh items-center justify-center py-20">
  <Reveal className="w-full max-w-md">
  <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
-            Collab47.
+            <Wordmark />
           </Link>
 
           {done ? (

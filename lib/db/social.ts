@@ -340,7 +340,7 @@ export async function getExcludedSuggestionIds(viewerId: string): Promise<Set<st
 // Cohort columns the ranker needs (interests / year / city / verified) plus the
 // display columns. Used by every suggestion path so ranking is possible.
 const SUGGEST_COLS =
-  "id, handle, name, avatar_url, college, branch, interests, year_of_study, city, verified";
+  "id, handle, name, avatar_url, college, branch, interests, year_of_study, city, verified, cluster_id";
 
 export async function getSuggestedConnections(limit = 10): Promise<MiniProfile[]> {
   const ranked = await getSuggestedPeople(limit);
@@ -388,9 +388,10 @@ export async function getSuggestedPeople(limit = 12): Promise<SuggestedPerson[]>
 
   const { data: me } = await sb
     .from("profiles")
-    .select("college, branch, city, year_of_study, interests")
+    .select("college, branch, city, year_of_study, interests, cluster_id")
     .eq("id", user.id)
     .maybeSingle();
+  const myCluster = (me?.cluster_id as number | null) ?? null;
 
   // Mutual-follow recall: who do the people I follow also follow? Those are
   // strong PYMK candidates (second-degree network), mirroring feed.ts.
@@ -451,6 +452,18 @@ export async function getSuggestedPeople(limit = 12): Promise<SuggestedPerson[]>
       addRows(data as MiniProfile[] | null);
     })());
   }
+  // Community recall: people in your Louvain community (computed from the REAL
+  // follow + connection graph, migration 0049 / cron). This is the true "people
+  // from your cluster" signal - the community that emerges from actual ties, not
+  // a college/branch guess.
+  if (myCluster !== null) {
+    pulls.push((async () => {
+      const { data } = await sb.from("profiles").select(SUGGEST_COLS).eq("cluster_id", myCluster)
+        .neq("id", user.id).is("deleted_at", null).is("suspended_at", null)
+        .not("privacy->>searchable", "eq", "false").limit(80);
+      addRows(data as MiniProfile[] | null);
+    })());
+  }
   await Promise.all(pulls);
 
   // Fallback: if recall is empty (sparse network), pull any real users so the
@@ -479,7 +492,10 @@ export async function getSuggestedPeople(limit = 12): Promise<SuggestedPerson[]>
       : 0;
     const mutuals = mutualCount.get(p.id) ?? 0;
     const mutualScore = Math.min(1, mutuals / 5);
-    const score = field.score + 0.6 * sem + 0.5 * mutualScore + (p.verified ? 0.05 : 0);
+    const sameCluster =
+      myCluster !== null && (p as { cluster_id?: number | null }).cluster_id === myCluster;
+    const score =
+      field.score + 0.6 * sem + 0.5 * mutualScore + (sameCluster ? 0.55 : 0) + (p.verified ? 0.05 : 0);
 
     // Reason string, most specific signal first (LinkedIn PYMK style).
     let reason = "On Collab47";
@@ -487,6 +503,7 @@ export async function getSuggestedPeople(limit = 12): Promise<SuggestedPerson[]>
     else if (field.sameCollege) reason = "Same college";
     else if (viewer.branch && p.branch && viewer.branch.toLowerCase() === p.branch.toLowerCase())
       reason = "Same branch";
+    else if (sameCluster) reason = "In your community";
     else if (sem >= 0.7) reason = "Shares your interests";
     else if (field.sameCity) reason = "Same city";
 

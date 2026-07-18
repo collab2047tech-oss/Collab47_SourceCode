@@ -4,40 +4,6 @@ import { Nav } from "@/components/landing/Nav";
 import { Footer } from "@/components/landing/Footer";
 import { Reveal } from "@/components/motion/Reveal";
 import { SplitWords } from "@/components/motion/SplitWords";
-import { Avatar } from "@/components/primitives/Avatar";
-
-const founders = [
-  {
-    name: "Akshpreet",
-    role: "CEO and Co-founder",
-    bio: "Sets the long arc. Spends his weeks talking to students so the product never drifts from the people it is built for.",
-  },
-  {
-    name: "SSMallick",
-    role: "MD and Chief Growth Officer",
-    bio: "Runs the ground game. From campus chapters to founding-class outreach, every early user comes through a system he wrote on paper first.",
-  },
-  {
-    name: "Shaurya Punj",
-    role: "CTO and Founding Engineer",
-    bio: "Owns the stack end to end. Believes a network for builders should itself be built quietly, in public, with proof you can read in the commit log.",
-  },
-  {
-    name: "Rachit",
-    role: "CMO, Academic",
-    bio: "Translates between professors, placement cells and 19-year-olds. Knows where the syllabus ends and where real work has to begin.",
-  },
-  {
-    name: "Partha",
-    role: "CMO, Industry and CAO",
-    bio: "The bridge into companies actually hiring. Brings the recruiter side of the table to a network that has had only one side for too long.",
-  },
-  {
-    name: "Agnivo",
-    role: "Tech Advisor",
-    bio: "The senior eye on architecture. Helps a young engineering team make decisions they will still be proud of in three years.",
-  },
-];
 
 const values = [
   {
@@ -76,16 +42,16 @@ export default function AboutPage() {
 
           <Reveal delay={0.1}>
  <h1 className="mt-8 max-w-5xl text-[2.5rem] leading-[1.04] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-lg md:text-display-xl">
-              <SplitWords text="Six founders." />
+              <SplitWords text="The missing link" />
               <br />
               <SplitWords
-                text="One India."
+                text="between academia"
                 delay={0.25}
                 wordClassName="text-saffron"
               />
               <br />
               <SplitWords
-                text="Built for the generation building 2047."
+                text="and industry."
                 delay={0.5}
               />
             </h1>
@@ -151,54 +117,6 @@ export default function AboutPage() {
                 is the work.
               </p>
             </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* TEAM */}
- <section className="section">
- <div className="container-edit">
-          <Reveal>
- <p className="text-caption rule-top inline-block">The founders</p>
-          </Reveal>
-
-          <Reveal delay={0.1}>
- <h2 className="mt-8 max-w-4xl text-[2.25rem] leading-[1.08] tracking-tight font-serif text-ink sm:mt-10 sm:text-display-md lg:text-display-lg">
- The six people <span className="text-saffron">on the hook</span> for this.
-            </h2>
-          </Reveal>
-
-          <Reveal delay={0.2}>
- <p className="mt-8 max-w-2xl text-body-lg text-ash">
-              No outside capital. No advisory board larger than the operating
-              team. Equity is held by the people doing the work, in proportion
-              to the work being done.
-            </p>
-          </Reveal>
-
- <div className="mt-14 grid grid-cols-1 gap-px bg-bone sm:mt-20 sm:grid-cols-2 lg:grid-cols-3">
-            {founders.map((f, i) => (
-              <Reveal key={f.name} delay={i * 0.05}>
- <article className="group flex h-full flex-col gap-5 border border-transparent bg-paper p-7 transition-all duration-300 hover:-translate-y-1 hover:border-saffron hover:bg-cream sm:gap-6 sm:p-8">
- <div className="flex items-start gap-4">
-                    <Avatar
-                      name={f.name}
-                      size="xl"
- className="bg-cream group-hover:bg-paper"
-                    />
-                  </div>
-                  <div>
- <p className="font-serif text-[1.75rem] leading-none text-ink sm:text-[2rem]">
-                      {f.name}
-                    </p>
- <p className="mt-3 text-caption text-saffron">
-                      {f.role}
-                    </p>
-                  </div>
- <p className="mt-auto text-body text-ink/75">{f.bio}</p>
-                </article>
-              </Reveal>
-            ))}
           </div>
         </div>
       </section>

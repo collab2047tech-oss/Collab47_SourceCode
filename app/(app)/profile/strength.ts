@@ -26,10 +26,10 @@ export function computeStrength(
   counts: { posts: number; projects: number; connections: number }
 ): StrengthResult {
   const hasBanner = Boolean(p.banner_preset) || Boolean(p.cover_url);
-  const links = p.links ?? {};
-  const hasLink = Object.values(links).some(
-    (v) => typeof v === "string" && v.trim() !== ""
-  );
+  // const links = p.links ?? {};
+  // const hasLink = Object.values(links).some(
+  //   (v) => typeof v === "string" && v.trim() !== ""
+  // );
 
   const items: StrengthItem[] = [
     { key: "avatar", label: "Add a profile photo", done: Boolean(p.avatar_url), href: "/profile/edit", weight: 3 },
@@ -39,7 +39,9 @@ export function computeStrength(
     { key: "branch", label: "Add your branch", done: Boolean(p.branch), href: "/profile/edit", weight: 1 },
     { key: "year", label: "Add your year of study", done: Boolean(p.year_of_study), href: "/profile/edit", weight: 1 },
     { key: "city", label: "Add your city", done: Boolean(p.city), href: "/profile/edit", weight: 1 },
-    { key: "link", label: "Add at least one link", done: hasLink, href: "/profile/edit", weight: 2 },
+    // Links are hidden for now, so this item is disabled - leaving it in would
+    // cap profile strength at 91% forever and point at a field that is not shown.
+    // { key: "link", label: "Add at least one link", done: hasLink, href: "/profile/edit", weight: 2 },
     { key: "posts", label: "Publish 3 posts", done: counts.posts >= 3, href: "/home", weight: 3 },
     { key: "project", label: "Start or join a project", done: counts.projects >= 1, href: "/collabs/new", weight: 2 },
     { key: "connections", label: "Make 5 connections", done: counts.connections >= 5, href: "/network", weight: 2 },

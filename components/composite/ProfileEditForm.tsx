@@ -381,8 +381,8 @@ export function ProfileEditForm({
 
       {/* Avatar + name + handle */}
       <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
-        <h2 className="font-serif text-2xl text-ink">Avatar</h2>
-        <p className="mt-1 text-sm text-ash">Square images work best.</p>
+        <h2 className="font-serif text-2xl text-ink">Profile photo</h2>
+        <p className="mt-1 text-sm text-ash">A clear headshot works best. Square images look sharpest.</p>
         <div className="mt-6 flex items-center gap-6">
           <Avatar
             name={name || "User"}
@@ -510,7 +510,11 @@ export function ProfileEditForm({
         </div>
       </div>
 
-      {/* Links */}
+      {/* Links - HIDDEN FOR NOW (kept in code, not deleted). Flip false -> true
+          to restore. IMPORTANT: the matching links plumbing in
+          app/(app)/profile/edit/actions.ts is commented out in lockstep. Restore
+          BOTH together: re-enabling only one of them wipes saved links on save. */}
+      {false && (
       <div className="rounded-lg border border-bone bg-paper p-5 sm:p-6">
         <h2 className="font-serif text-2xl text-ink">Links</h2>
         <p className="mt-1 text-sm text-ash">
@@ -555,6 +559,7 @@ export function ProfileEditForm({
           />
         </div>
       </div>
+      )}
 
       {/* Actions */}
       {error ? <p className="text-sm text-ember">{error}</p> : null}

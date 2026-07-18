@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { getNewsItem } from "@/lib/news/fetch";
 import { getNewsComments, isNewsSaved } from "@/lib/db/newsEngage";
 import { getMyProfile } from "@/lib/db/profiles";
@@ -8,6 +10,34 @@ import { NewsCommentThread } from "./NewsCommentThread";
 import { Reveal } from "@/components/motion/Reveal";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ id: string }> },
+): Promise<Metadata> {
+  const { id } = await params;
+  const item = await getNewsItem(id);
+  if (!item) return { title: "Story not found", robots: { index: false, follow: false } };
+  const description = (item.summary ?? item.title).slice(0, 160);
+  const url = `/news/${item.id}`;
+  return {
+    title: item.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      url,
+      title: item.title,
+      description,
+      publishedTime: item.published_at,
+      images: item.image_url ? [{ url: item.image_url }] : undefined,
+    },
+    twitter: {
+      card: item.image_url ? "summary_large_image" : "summary",
+      title: item.title,
+      description,
+    },
+  };
+}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -28,18 +58,27 @@ export default async function NewsReaderPage({ params }: { params: Promise<{ id:
     getMyProfile(),
   ]);
 
-  if (!item) {
-    return (
-      <div className="mx-auto max-w-2xl py-20 text-center">
-        <h1 className="font-serif text-h2 text-ink">Story not found.</h1>
-        <Link href="/news" className="mt-4 inline-block text-saffron underline">Back to News</Link>
-      </div>
-    );
-  }
+  if (!item) notFound();
 
 
   return (
     <div className="mx-auto max-w-2xl pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "NewsArticle",
+            headline: item.title,
+            datePublished: item.published_at,
+            image: item.image_url ? [item.image_url] : undefined,
+            articleSection: item.source,
+            url: `https://collab47.com/news/${item.id}`,
+            mainEntityOfPage: `https://collab47.com/news/${item.id}`,
+            publisher: { "@type": "Organization", name: item.source },
+          }),
+        }}
+      />
       <Link href="/news" className="inline-flex items-center gap-2 text-sm text-ink/70 transition-colors hover:text-ink">
         <ArrowLeft className="size-4" /> Back to News
       </Link>

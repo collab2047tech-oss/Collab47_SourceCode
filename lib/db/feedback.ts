@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { isCurrentUserAdmin } from "@/lib/auth/admin";
+import { sendFeedbackAlert } from "@/lib/email/notify";
 
 export type FeedbackKind = "bug" | "feature" | "other";
 export type FeedbackStatus = "open" | "in_progress" | "resolved" | "wont_fix";
@@ -51,7 +52,18 @@ export async function submitFeedback(input: {
     page_url: clamp(input.page_url, 300) || null,
     user_agent: clamp(input.user_agent, 400) || null,
   });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+
+  // Fire-and-forget: alert the admin team so a report never sits unseen. Never
+  // blocks or fails the user's submission.
+  void sendFeedbackAlert({
+    kind,
+    subject,
+    body,
+    pageUrl: clamp(input.page_url, 300) || null,
+    reporterEmail: user.email ?? null,
+  });
+  return { ok: true };
 }
 
 /** Admin: list all feedback (newest first), optionally filtered by status. */

@@ -3,7 +3,7 @@
 import { useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
-import { addNewsCommentAction } from "@/app/(app)/news/actions";
+import { addNewsCommentAction } from "@/app/(content)/news/actions";
 import type { NewsComment } from "@/lib/db/newsEngage";
 
 function timeAgo(iso: string): string {

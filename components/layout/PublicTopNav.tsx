@@ -6,6 +6,8 @@ import { getUnreadCount } from "@/lib/db/notifications";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { Home, Compass, Users, Briefcase, CalendarDays, MessageSquare, Newspaper, Bell } from "lucide-react";
 import { PublicMobileMenu } from "./PublicTopNavMobile";
+import { FeedbackWidget } from "@/components/composite/FeedbackWidget";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 const LINKS = [
   { href: "/home", label: "Home", icon: Home },
@@ -45,6 +47,7 @@ export async function PublicTopNav() {
   const badge = unread > 9 ? "9+" : unread > 0 ? String(unread) : null;
 
   return (
+    <>
     <header className="fixed top-0 z-50 w-full border-b border-bone bg-cream/85 backdrop-blur-md">
       <div className="container-edit flex h-16 items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-6 lg:gap-8">
@@ -52,14 +55,17 @@ export async function PublicTopNav() {
             href="/home"
             className="shrink-0 font-serif text-2xl font-normal tracking-tight text-ink transition-opacity hover:opacity-80"
           >
-            Collab47.
+            <Wordmark />
           </Link>
-          <nav className="hidden items-center gap-6 lg:flex">
+          {/* Horizontally scrollable so the link row is never clipped on narrow
+              or mid-width screens. Without overflow-x-auto the last items (Collabs,
+              Events, Messages) get cut off with no way to reach them. */}
+          <nav className="hidden min-w-0 flex-1 items-center gap-5 overflow-x-auto no-scrollbar lg:flex xl:gap-6">
             {LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="flex items-center gap-1.5 text-sm text-ink/75 transition-colors hover:text-saffron"
+                className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-ink/75 transition-colors hover:text-saffron"
               >
                 <l.icon className="size-4" />
                 {l.label}
@@ -95,5 +101,9 @@ export async function PublicTopNav() {
         </div>
       </div>
     </header>
+    {/* Signed-in members can report a bug / request a feature from public pages
+        (/u, /p, /c, news) too, not just inside the gated app shell. */}
+    <FeedbackWidget />
+    </>
   );
 }

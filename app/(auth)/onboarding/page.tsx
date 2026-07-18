@@ -1,27 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useActionState, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Button } from "@/components/primitives/Button";
 import { CollegeCombobox } from "@/components/composite/CollegeCombobox";
-import {
-  ArrowRight,
-  ArrowLeft,
-  Check,
-  GraduationCap,
-  Microscope,
-  BookOpen,
-  Building2,
-  Rocket,
-  Pencil,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Pencil, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { completeOnboarding } from "./actions";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import type { AccountType } from "@/lib/supabase/types";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 // ---------------------------------------------------------------------------
 // Static option data (all neutral / generic - no real personal data)
@@ -49,6 +39,8 @@ const BRANCHES = [
 ];
 
 const YEARS = ["1st", "2nd", "3rd", "4th", "5th", "Postgrad", "Alumni"];
+
+const TITLES = ["Mr", "Mrs", "Ms", "Dr", "Prof", "Er"] as const;
 
 const INTERESTS = [
   "AI / ML", "Web Dev", "App Dev", "Data Science", "Cybersecurity",
@@ -149,6 +141,7 @@ export default function OnboardingPage() {
 interface FlowData {
   account_type: AccountType | null;
   name: string;
+  title: string;
   handle: string;
   // Affiliation: college maps to either college or organization column.
   college: string;
@@ -172,6 +165,7 @@ function OnboardingFlow() {
   const [data, setData] = useState<FlowData>({
     account_type: null,
     name: "",
+    title: "",
     handle: "",
     college: "",
     organization: "",
@@ -187,7 +181,28 @@ function OnboardingFlow() {
   useEffect(() => {
     const sb = getSupabaseBrowser();
     if (!sb) return;
-    sb.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
+    sb.auth.getUser().then(({ data }) => {
+      const user = data.user;
+      setEmail(user?.email ?? "");
+
+      // Prefill from the OAuth identity (Google returns full_name / name +
+      // avatar). This is the single biggest lever on "signup in under a minute":
+      // a Google user lands on the identity step with their real name and a
+      // suggested username already filled, and only has to confirm.
+      const meta = (user?.user_metadata ?? {}) as {
+        full_name?: string;
+        name?: string;
+        avatar_url?: string;
+        picture?: string;
+      };
+      const oauthName = (meta.full_name || meta.name || "").trim();
+      if (oauthName) {
+        setData((d) =>
+          // Never clobber something the person already typed.
+          d.name.trim() ? d : { ...d, name: oauthName, handle: d.handle || slugify(oauthName) }
+        );
+      }
+    });
   }, []);
 
   const errorParam = params.get("error");
@@ -248,13 +263,56 @@ function OnboardingFlow() {
 
   // Per-step continue guard.
   const handleValid = /^[a-z0-9_]{3,32}$/.test(data.handle);
+
+  // Live username availability. Tells people a username is taken WHILE they type
+  // instead of after they finish the whole flow. The server action still enforces
+  // uniqueness authoritatively; this is purely to save the round trip.
+  const [handleStatus, setHandleStatus] =
+    useState<"idle" | "checking" | "ok" | "taken" | "reserved">("idle");
+
+  const [customInterest, setCustomInterest] = useState("");
+
+  function addCustomInterest() {
+    const raw = customInterest.trim().replace(/\s+/g, " ");
+    if (!raw) return;
+    // Match the preset casing when it is really a preset, so we never store a
+    // near-duplicate like "robotics" alongside "Robotics".
+    const preset = INTERESTS.find((i) => i.toLowerCase() === raw.toLowerCase());
+    const value = preset ?? raw;
+    if (data.interests.some((i) => i.toLowerCase() === value.toLowerCase())) {
+      setCustomInterest("");
+      return;
+    }
+    if (data.interests.length >= MAX_INTERESTS) return;
+    setData({ ...data, interests: [...data.interests, value] });
+    setCustomInterest("");
+  }
+
+  useEffect(() => {
+    const h = data.handle;
+    if (!/^[a-z0-9_]{3,32}$/.test(h)) {
+      setHandleStatus("idle");
+      return;
+    }
+    setHandleStatus("checking");
+    const t = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/handle-available?handle=${encodeURIComponent(h)}`);
+        const json = (await res.json()) as { available: boolean; status: string };
+        setHandleStatus(json.available ? "ok" : json.status === "reserved" ? "reserved" : "taken");
+      } catch {
+        setHandleStatus("idle");
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [data.handle]);
   const affiliationValue = usesOrganization ? data.organization : data.college;
   const canContinue = (() => {
     switch (currentKey) {
       case "type":
         return !!data.account_type;
       case "identity":
-        return data.name.trim().length > 0 && handleValid;
+        return data.name.trim().length > 0 && handleValid && handleStatus !== "taken" && handleStatus !== "reserved";
       case "affiliation":
         return affiliationValue.trim().length > 0;
       case "field":
@@ -279,7 +337,7 @@ function OnboardingFlow() {
         {/* Header + progress */}
         <div className="flex items-center justify-between gap-4">
           <Link href="/" className="font-serif text-2xl text-ink">
-            Collab47.
+            <Wordmark />
           </Link>
           <div className="hidden flex-1 items-center justify-center gap-1.5 px-6 sm:flex">
             {Array.from({ length: total }).map((_, i) => (
@@ -398,12 +456,38 @@ function OnboardingFlow() {
                       />
                     </div>
                     <div className="mt-5 flex flex-col gap-2">
+                      <label className="text-caption text-ink">Title (optional)</label>
+                      <div className="flex flex-wrap gap-2">
+                        {TITLES.map((t) => {
+                          const active = data.title === t;
+                          return (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setData({ ...data, title: active ? "" : t })}
+                              className={cn(
+                                "rounded-full border px-4 py-2 text-sm font-medium transition-all",
+                                active
+                                  ? "border-saffron bg-saffron text-cream"
+                                  : "border-bone bg-paper text-ink hover:border-saffron hover:text-saffron-dk"
+                              )}
+                            >
+                              {t}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-col gap-2">
                       <label htmlFor="ob-handle" className="text-caption text-ink">Username</label>
                       <input
                         id="ob-handle"
                         className={cn(
                           "h-14 w-full rounded-lg border bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:outline-none focus:ring-2 focus:ring-saffron/20",
-                          data.handle && !handleValid ? "border-ember focus:border-ember" : "border-ink/15 focus:border-saffron"
+                          data.handle && (!handleValid || handleStatus === "taken" || handleStatus === "reserved")
+                            ? "border-ember focus:border-ember"
+                            : "border-ink/15 focus:border-saffron"
                         )}
                         placeholder="e.g. aarav_builds"
                         value={data.handle}
@@ -416,6 +500,21 @@ function OnboardingFlow() {
                         collab47.com/u/<span className="font-medium text-ink">{data.handle || "username"}</span>
                         {"  -  "}letters, numbers, underscore
                       </p>
+                      {handleValid && handleStatus !== "idle" ? (
+                        <p
+                          className={cn(
+                            "text-xs font-medium",
+                            handleStatus === "ok" && "text-moss",
+                            handleStatus === "checking" && "text-ash",
+                            (handleStatus === "taken" || handleStatus === "reserved") && "text-ember"
+                          )}
+                        >
+                          {handleStatus === "checking" && "Checking availability..."}
+                          {handleStatus === "ok" && `@${data.handle} is available`}
+                          {handleStatus === "taken" && `@${data.handle} is already taken. Try another.`}
+                          {handleStatus === "reserved" && `@${data.handle} is reserved. Try another.`}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -447,10 +546,12 @@ function OnboardingFlow() {
                         autoFocus
                       />
                     </div>
-                    {(data.account_type === "student" || data.account_type === "institution") && (
-                      <div className="mt-5 flex flex-col gap-2">
+                    {/* Asked of every account type now. Researchers, faculty and
+                        industry were previously never asked, and the server dropped
+                        the value even if it had been sent. */}
+                    <div className="mt-5 flex flex-col gap-2">
                         <label htmlFor="ob-city" className="text-caption text-ink">
-                          {data.account_type === "institution" ? "Location / city" : "City (optional)"}
+                          {data.account_type === "institution" ? "Location / city" : "Where are you based?"}
                         </label>
                         <input
                           id="ob-city"
@@ -459,8 +560,7 @@ function OnboardingFlow() {
                           value={data.city}
                           onChange={(e) => setData({ ...data, city: e.target.value })}
                         />
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )}
 
@@ -633,6 +733,64 @@ function OnboardingFlow() {
                         );
                       })}
                     </div>
+
+                    {/* Anything they picked that is not one of the presets, so a
+                        custom interest stays visible and removable. */}
+                    {data.interests.filter((i) => !INTERESTS.includes(i)).length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {data.interests
+                          .filter((i) => !INTERESTS.includes(i))
+                          .map((i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => toggleInterest(i)}
+                              className="flex items-center gap-2 rounded-full border border-saffron bg-saffron px-4 py-2 text-sm font-medium text-cream"
+                            >
+                              {i}
+                              <X className="size-3.5" />
+                            </button>
+                          ))}
+                      </div>
+                    ) : null}
+
+                    {/* Type your own. The preset grid can never cover every field. */}
+                    <div className="mt-5 flex flex-col gap-2">
+                      <label htmlFor="ob-custom-interest" className="text-caption text-ink">
+                        Not listed? Add your own
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          id="ob-custom-interest"
+                          className="h-12 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
+                          placeholder="e.g. Quantum computing"
+                          value={customInterest}
+                          maxLength={40}
+                          onChange={(e) => setCustomInterest(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomInterest();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={addCustomInterest}
+                          disabled={
+                            !customInterest.trim() || data.interests.length >= MAX_INTERESTS
+                          }
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {data.interests.length >= MAX_INTERESTS ? (
+                        <p className="text-xs text-ash">
+                          That is the maximum of {MAX_INTERESTS}. Remove one to add another.
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 )}
 
@@ -693,6 +851,11 @@ function ReviewStep({
   config: TypeConfig | null;
   onEdit: (k: StepKey) => void;
 }) {
+  // useActionState keeps ALL answers on screen when the server rejects (e.g. the
+  // username was taken). The old <form action={completeOnboarding}> redirected on
+  // error, which remounted this tree and wiped every field.
+  const [state, formAction, isSubmitting] = useActionState(completeOnboarding, null);
+
   const typeMeta = ACCOUNT_TYPES.find((t) => t.id === data.account_type);
   const first = data.name.trim().split(/\s+/)[0] || "there";
 
@@ -807,9 +970,10 @@ function ReviewStep({
       </div>
 
       {/* Submit */}
-      <form action={completeOnboarding} className="mt-8">
+      <form action={formAction} className="mt-8">
         <input type="hidden" name="account_type" value={data.account_type ?? ""} />
         <input type="hidden" name="name" value={data.name} />
+        <input type="hidden" name="title" value={data.title} />
         <input type="hidden" name="handle" value={data.handle} />
         <input type="hidden" name="college" value={usesOrganization ? "" : data.college} />
         <input type="hidden" name="organization" value={usesOrganization ? data.organization : ""} />
@@ -821,6 +985,23 @@ function ReviewStep({
         {data.interests.map((i) => (
           <input key={i} type="hidden" name="interests" value={i} />
         ))}
+        {state?.error ? (
+          <p className="mb-4 rounded-lg border border-ember/30 bg-ember/5 px-4 py-3 text-sm text-ember">
+            {state.error}
+            {/^That username is taken/i.test(state.error) ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => onEdit("identity")}
+                  className="underline underline-offset-2"
+                >
+                  Change username
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
@@ -830,8 +1011,8 @@ function ReviewStep({
           >
             <ArrowLeft className="size-4" /> Back
           </Button>
-          <Button type="submit" size="xl" className="rounded-full">
-            Create my profile <ArrowRight className="size-5" />
+          <Button type="submit" size="xl" className="rounded-full" disabled={isSubmitting}>
+            {isSubmitting ? "Creating..." : "Create my profile"} <ArrowRight className="size-5" />
           </Button>
         </div>
       </form>

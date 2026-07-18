@@ -8,6 +8,7 @@ import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { GOOGLE_AUTH_ENABLED, PHONE_AUTH_ENABLED } from "@/app/(auth)/authProviders";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -93,7 +94,7 @@ export default function LoginPage() {
  <div className="container-edit flex min-h-dvh items-center justify-center py-20">
  <Reveal className="w-full max-w-md">
  <Link href="/" className="font-serif text-3xl font-normal tracking-tight text-ink">
-            Collab47.
+            <Wordmark />
           </Link>
  <h1 className="mt-12 font-serif text-5xl text-ink">
  Welcome <span className="text-saffron">back.</span>

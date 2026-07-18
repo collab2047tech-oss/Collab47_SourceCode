@@ -5,6 +5,7 @@ import { Button } from "@/components/primitives/Button";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { Menu, X, ArrowRight } from "lucide-react";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 // Real destinations only (no dead links): landing-section anchors + real pages.
 const NAV = [
@@ -13,14 +14,6 @@ const NAV = [
   { href: "/about", label: "About" },
   { href: "/manifesto", label: "Manifesto" },
 ];
-
-function Wordmark({ className }: { className?: string }) {
-  return (
- <span className={cn("font-serif font-medium tracking-tight text-ink", className)}>
- Collab<span className="text-saffron">47</span>
-    </span>
-  );
-}
 
 export function Nav() {
   const [scrolled, setScrolled] = useState(false);
@@ -51,14 +44,8 @@ export function Nav() {
     >
  <div className="container-edit flex h-16 items-center justify-between gap-6 sm:h-20">
         {/* Brand */}
- <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5 transition-opacity hover:opacity-90">
-          <span
-            aria-hidden
- className="flex size-8 items-center justify-center rounded-lg bg-ink text-[15px] font-semibold text-cream sm:size-9"
-          >
-            C
-          </span>
- <Wordmark className="text-xl sm:text-2xl" />
+ <Link href="/" onClick={() => setOpen(false)} className="flex items-center transition-opacity hover:opacity-90">
+ <Wordmark size="md" />
         </Link>
 
         {/* Center nav (desktop) */}

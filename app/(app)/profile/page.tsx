@@ -94,7 +94,11 @@ export default async function ProfilePage() {
   });
 
   const p = profile;
-  const socialLinks = buildSocialLinks(p.links);
+  // Social links are HIDDEN sitewide for now (collection is disabled in
+  // ProfileEditForm + profile/edit/actions.ts). Forcing this to empty hides every
+  // link surface at once without leaving dangling refs. Existing rows in
+  // profiles.links are untouched, so restoring is a one-line revert.
+  const socialLinks: ReturnType<typeof buildSocialLinks> = [];
 
   return (
     <div className="min-h-dvh bg-cream">

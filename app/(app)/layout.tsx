@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
 import {
@@ -27,6 +28,10 @@ function toRail(c: ConversationPreview): RailConversation {
     isRequest: c.isRequest,
   };
 }
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [profile, unreadCount, messagesUnread, allConvs] = await Promise.all([

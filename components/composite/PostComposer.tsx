@@ -193,10 +193,25 @@ export function PostComposer({
   }
 
   // ---- Hashtag chip input + autocomplete ----
+  const MAX_TAGS = 15;
+
+  // Accepts one OR many tags at once: pasting "#Collab47 #BuildInPublic, day1"
+  // becomes three separate chips. Splits on whitespace / commas / #, sanitises
+  // each token, de-dupes against existing chips, and respects the MAX_TAGS cap.
   function commitTag(raw: string) {
-    const tag = raw.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
-    if (tag && !hashtags.includes(tag) && hashtags.length < 8) {
-      setHashtags((prev) => [...prev, tag]);
+    const tokens = raw
+      .split(/[\s,#]+/)
+      .map((t) => t.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase())
+      .filter(Boolean);
+    if (tokens.length > 0) {
+      setHashtags((prev) => {
+        const next = [...prev];
+        for (const t of tokens) {
+          if (next.length >= MAX_TAGS) break;
+          if (!next.includes(t)) next.push(t);
+        }
+        return next;
+      });
     }
     setHashInput("");
     setTagMenuOpen(false);
@@ -208,6 +223,16 @@ export function PostComposer({
       commitTag(hashInput);
     } else if (e.key === "Backspace" && hashInput === "" && hashtags.length > 0) {
       setHashtags((prev) => prev.slice(0, -1));
+    }
+  }
+
+  // Paste a whole batch of tags at once (e.g. a line of "#a #b #c") and have
+  // them fan out into individual chips instead of landing as one blob.
+  function handleHashPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text");
+    if (/[\s,#]/.test(text)) {
+      e.preventDefault();
+      commitTag(`${hashInput} ${text}`);
     }
   }
 
@@ -495,7 +520,8 @@ export function PostComposer({
                   onFocus={() => setTagMenuOpen(true)}
                   onBlur={() => setTimeout(() => setTagMenuOpen(false), 120)}
                   onKeyDown={handleHashKeyDown}
-                  placeholder="Add tags - press space or enter"
+                  onPaste={handleHashPaste}
+                  placeholder="Add tags - paste a batch or type, space to separate"
                   disabled={isDemo || isPending}
                   className="min-w-0 flex-1 bg-transparent py-2.5 text-sm text-ink placeholder:text-ash focus:outline-none disabled:cursor-not-allowed"
                 />

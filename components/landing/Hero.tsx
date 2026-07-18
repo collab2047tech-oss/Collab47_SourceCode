@@ -13,15 +13,15 @@ export function Hero() {
         {/* Caption - English brand line (replaces the Hindi caption) */}
         <Reveal>
  <div className="rule-top mb-8 max-w-md sm:mb-10">
- <p className="text-caption">Built for India. Built to Lead.</p>
+ <p className="text-caption">Connect. Create. Succeed.</p>
           </div>
         </Reveal>
 
         {/* Headline - clamp down hard on phones so it never overflows at 360px */}
- <h1 className="max-w-[16ch] text-[2.6rem] leading-[1.05] tracking-tight font-serif text-ink sm:text-display-lg md:text-display-xl">
-          <SplitWords text="Where talent and" />
+ <h1 className="max-w-[21ch] text-[2.6rem] leading-[1.05] tracking-tight font-serif text-ink sm:text-display-lg md:text-display-xl">
+          <SplitWords text="Where talent, innovation" />
           <br />
-          <SplitWords text="opportunity" delay={0.15} />{" "}
+          <SplitWords text="and opportunity" delay={0.15} />{" "}
           <SplitWords
             text="converge."
             delay={0.3}

@@ -1,6 +1,6 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Avatar } from "@/components/primitives/Avatar";
-import { Button } from "@/components/primitives/Button";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
 import { PublicTopNav } from "@/components/layout/PublicTopNav";
@@ -68,28 +68,46 @@ function buildSocialLinks(links: ProfileLinks | null | undefined) {
   }));
 }
 
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params;
+  const profile = await getProfileByHandle(handle);
+
+  if (!profile) {
+    return { title: "Profile not found", robots: { index: false, follow: false } };
+  }
+
+  const title = `${profile.name} (@${profile.handle})`;
+  const description = profile.bio
+    ? profile.bio.slice(0, 160)
+    : `${profile.name} (@${profile.handle})${profile.college ? ` at ${profile.college}` : ""} on Collab47.`;
+  const canonical = `/u/${profile.handle}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    // OG + Twitter images come from the dynamic app/u/[handle]/opengraph-image.tsx
+    // (branded card) via the file convention, so they are intentionally omitted here.
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      url: canonical,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
+
 export default async function PublicProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
   const profile = await getProfileByHandle(handle);
 
   if (!profile) {
-    return (
-      <main className="min-h-dvh bg-cream">
-        <PublicTopNav />
-        <div className="container-edit pt-40">
-          <p className="text-caption">@{handle}</p>
-          <h1 className="mt-4 font-serif text-5xl text-ink">
-            Profile <span className="italic text-saffron">not found.</span>
-          </h1>
-          <p className="mt-4 text-body text-ash">
-            This handle is either available or the user has not signed up yet.
-          </p>
-          <Link href="/signup" className="mt-8 inline-block">
-            <Button size="lg">Claim this handle</Button>
-          </Link>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   // Privacy gate. A PRIVATE profile shows its basics (banner, identity, counts)
@@ -103,7 +121,26 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     (profile.privacy as { public_profile?: boolean } | null)?.public_profile === false;
   const canViewContent = await canViewProfileContent(viewerId, profile);
 
-  const socialLinks = buildSocialLinks(profile.links);
+  // Social links are HIDDEN sitewide for now (collection is disabled in
+  // ProfileEditForm + profile/edit/actions.ts). Forcing this to empty hides every
+  // link surface at once without leaving dangling refs. Existing rows in
+  // profiles.links are untouched, so restoring is a one-line revert.
+  const socialLinks: ReturnType<typeof buildSocialLinks> = [];
+
+  const profileJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    mainEntity: {
+      "@type": "Person",
+      name: profile.name,
+      alternateName: `@${profile.handle}`,
+      description: profile.bio ?? undefined,
+      image: profile.avatar_url ?? undefined,
+      affiliation: profile.college ?? undefined,
+      url: `https://collab47.com/u/${profile.handle}`,
+      sameAs: socialLinks.map((l) => l.href),
+    },
+  };
 
   // Always fetch the lightweight identity data (follow/connection state for the
   // action button). Content queries (posts, verified projects, authored projects)
@@ -147,6 +184,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   return (
     <main className="min-h-dvh bg-cream">
       <PublicTopNav />
+
+      {!isPrivate ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(profileJsonLd) }} />
+      ) : null}
 
       {/* Record this profile view once (dedup + self-skip handled server-side). */}
       <ProfileViewTracker targetId={profile.id} />

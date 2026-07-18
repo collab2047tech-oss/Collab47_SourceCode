@@ -12,7 +12,7 @@ import {
   type InterestProfile,
 } from "@/lib/newsPersonalize";
 import { NewsActions } from "@/components/composite/NewsActions";
-import { loadMoreNewsAction } from "@/app/(app)/news/actions";
+import { loadMoreNewsAction } from "@/app/(content)/news/actions";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();

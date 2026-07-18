@@ -28,17 +28,20 @@ export async function updateProfileAction(formData: FormData) {
   const clampFocal = (n: number) =>
     Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 50;
 
-  // Social links. Always send the object so cleared fields are persisted as removed.
-  const linkField = (key: string) =>
-    (formData.get(`link_${key}`) as string | null)?.trim() ?? "";
-  const links: Record<string, string> = {
-    website: linkField("website"),
-    github: linkField("github"),
-    linkedin: linkField("linkedin"),
-    instagram: linkField("instagram"),
-    twitter: linkField("twitter"),
-    youtube: linkField("youtube"),
-  };
+  // Social links plumbing - DISABLED in lockstep with the hidden Links card in
+  // ProfileEditForm. If this ran while the form fields are hidden, every field
+  // would read as "" and saving a profile would ERASE the user's stored links.
+  // Restore this together with the form block, never separately.
+  // const linkField = (key: string) =>
+  //   (formData.get(`link_${key}`) as string | null)?.trim() ?? "";
+  // const links: Record<string, string> = {
+  //   website: linkField("website"),
+  //   github: linkField("github"),
+  //   linkedin: linkField("linkedin"),
+  //   instagram: linkField("instagram"),
+  //   twitter: linkField("twitter"),
+  //   youtube: linkField("youtube"),
+  // };
 
   const payload: Parameters<typeof updateProfile>[0] = {
     name,
@@ -47,7 +50,6 @@ export async function updateProfileAction(formData: FormData) {
     branch,
     year_of_study,
     city,
-    links,
   };
   if (avatar_url) payload.avatar_url = avatar_url;
   else if (avatarRemoved) payload.avatar_url = ""; // clear the saved avatar

@@ -16,7 +16,7 @@ import {
   reportNewsAction,
   setNewsSavedAction,
   setNewsTopicSignalAction,
-} from "@/app/(app)/news/actions";
+} from "@/app/(content)/news/actions";
 
 interface NewsActionsProps {
   newsId: string;

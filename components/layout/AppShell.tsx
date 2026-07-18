@@ -25,6 +25,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { Wordmark } from "@/components/brand/Wordmark";
 
 const nav = [
   { href: "/home", label: "Home", icon: Home },
@@ -111,7 +112,7 @@ export function AppShell({
             href="/home"
             className="font-serif text-2xl font-normal text-ink transition-opacity hover:opacity-80"
           >
-            Collab47.
+            <Wordmark />
           </Link>
 
           <Link
@@ -166,11 +167,8 @@ export function AppShell({
       <header className="sticky top-0 z-40 border-b border-bone bg-cream/85 backdrop-blur-md md:ml-60">
         <div className="flex h-16 items-center gap-3 px-4 md:px-8">
           {/* Mobile-only brand keeps orientation when sidebar is hidden */}
-          <Link
-            href="/home"
-            className="shrink-0 font-serif text-xl font-normal text-ink md:hidden"
-          >
-            C47.
+          <Link href="/home" className="shrink-0 md:hidden" aria-label="Collab47 home">
+            <Wordmark markOnly size="sm" />
           </Link>
           <GlobalSearch className="min-w-0 flex-1 md:max-w-md" />
           {me ? (

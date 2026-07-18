@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getMyEngagementState } from "@/lib/db/engagement";
@@ -10,6 +11,23 @@ import { cn } from "@/lib/cn";
 import { Hash } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ tag: string }> },
+): Promise<Metadata> {
+  const { tag: raw } = await params;
+  const tag = decodeURIComponent(raw).toLowerCase().replace(/^#/, "");
+  const title = `#${tag}`;
+  const description = `Posts tagged #${tag} on Collab47, India's academia-industry collaboration network.`;
+  const url = `/t/${tag}`;
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "website", url, title: `#${tag}`, description },
+    twitter: { card: "summary", title: `#${tag}`, description },
+  };
+}
 
 // Repost originals resolved via attachReposts() (PostgREST can't self-embed posts).
 const SELECT =

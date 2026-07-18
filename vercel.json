@@ -10,6 +10,14 @@
     {
       "path": "/api/cron/purge",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/clusters",
+      "schedule": "0 4 * * 1"
+    },
+    {
+      "path": "/api/cron/digest",
+      "schedule": "30 2 * * 1"
     }
   ]
 }

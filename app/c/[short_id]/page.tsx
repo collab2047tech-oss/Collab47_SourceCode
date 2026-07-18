@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PublicTopNav } from "@/components/layout/PublicTopNav";
 import { Avatar } from "@/components/primitives/Avatar";
@@ -18,6 +20,37 @@ import { ApplicationsPanel } from "@/components/composite/ApplicationsPanel";
 import { ProgressComposer } from "@/components/composite/ProgressComposer";
 import { DeliverForm } from "@/components/composite/DeliverForm";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ short_id: string }>;
+}): Promise<Metadata> {
+  const { short_id } = await params;
+  const sb = await getSupabaseServer();
+  const project = sb ? await getProjectByShortId(short_id) : null;
+
+  if (!project) {
+    return { title: "Project not found", robots: { index: false, follow: false } };
+  }
+
+  const title = project.title as string;
+  const brief = project.brief as string | null;
+  const description = brief ? brief.slice(0, 160) : "Open collaboration on Collab47";
+  const canonical = `/c/${short_id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      type: "article",
+      title,
+      description,
+      url: canonical,
+    },
+  };
+}
+
 export default async function ProjectPage({
   params,
 }: {
@@ -29,20 +62,7 @@ export default async function ProjectPage({
   const project = sb ? await getProjectByShortId(short_id) : null;
 
   if (!project) {
-    return (
-      <main className="min-h-dvh bg-cream">
-        <PublicTopNav />
-        <div className="container-edit pt-40">
-          <h1 className="font-serif text-4xl text-ink sm:text-5xl">
-            Project{" "}
-            <span className="italic text-saffron">not found.</span>
-          </h1>
-          <Link href="/collabs" className="mt-6 inline-block text-saffron underline">
-            Browse open briefs
-          </Link>
-        </div>
-      </main>
-    );
+    notFound();
   }
 
   // project is non-null here, so sb is guaranteed configured.

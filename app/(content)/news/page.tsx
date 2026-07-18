@@ -7,12 +7,27 @@
  * personalisation layer on top.
  */
 
+import type { Metadata } from "next";
 import { getRankedNewsForUser } from "@/lib/news/fetch";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import type { NewsItem } from "@/lib/supabase/types";
 import { InShortsFeed } from "@/components/composite/InShortsFeed";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "News",
+  description:
+    "The latest academia and industry news, curated for India's students, researchers, faculty, and builders. Fresh stories, updated daily on Collab47.",
+  alternates: { canonical: "/news" },
+  openGraph: {
+    type: "website",
+    url: "/news",
+    title: "News on Collab47",
+    description:
+      "The latest academia and industry news, curated for India's students, researchers, faculty, and builders.",
+  },
+};
 
 export default async function NewsPage() {
   const items: NewsItem[] = await getRankedNewsForUser(300);

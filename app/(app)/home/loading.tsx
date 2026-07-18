@@ -31,13 +31,10 @@ export default function HomeLoading() {
             </div>
           ))}
         </div>
-        <aside className="hidden lg:block">
-          <div className="space-y-4">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="card h-40 animate-pulse bg-bone/40" />
-            ))}
-          </div>
-        </aside>
+        {/* Right rail is reserved for advertising and renders empty, so the
+            skeleton must not promise cards that never arrive. The column is
+            kept so the feed width does not shift when loading finishes. */}
+        <aside className="hidden lg:block" aria-hidden="true" />
       </div>
     </div>
   );
