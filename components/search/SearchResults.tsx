@@ -37,15 +37,17 @@ function GroupHeader({ icon, label, count }: { icon?: React.ReactNode; label: st
   return (
     <div className="flex items-center gap-1.5 px-3 pb-1.5 pt-3">
       {icon}
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ash">{label}</span>
+      <span className="text-caption">{label}</span>
       <span className="text-[11px] tabular-nums text-ash">{count}</span>
     </div>
   );
 }
 
-// Always-visible active state for keyboard nav (never a faint tint that
-// disappears): cobalt-tinted bg + ink text, high contrast on white paper.
-const activeCls = "bg-saffron/10";
+// Keyboard-selected row: a warm cream fill plus a saffron left rule. The rule is
+// an inset ::before bar (not a border) so it never shifts the row content, and
+// it stays visible even when the pointer hovers a different (also-cream) row.
+const activeCls =
+  "relative bg-cream before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-saffron";
 
 interface RowProps {
   active?: boolean;
@@ -174,7 +176,9 @@ export function SearchResultsList({
 }) {
   const { people, posts, projects, hashtags } = results;
   return (
-    <div role="listbox" aria-label="Search results">
+    // divide-y draws a bone hairline between each present group only (never
+    // above the first), so the groups read as distinct bands on the paper panel.
+    <div role="listbox" aria-label="Search results" className="divide-y divide-bone/70">
       {people.length > 0 && (
         <section>
           <GroupHeader label="People" count={people.length} />

@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { Wordmark } from "@/components/brand/Wordmark";
+import { SidebarProfileCard } from "@/components/layout/SidebarProfileCard";
 
 const nav = [
   { href: "/home", label: "Home", icon: Home },
@@ -70,7 +71,6 @@ export function AppShell({
   const path = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const displayName = me?.name ?? "You";
-  const displayHandle = me?.handle ?? "";
 
   const isActive = (href: string) => path === href || path?.startsWith(href + "/");
 
@@ -105,62 +105,66 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-cream">
-      {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col justify-between border-r border-bone bg-cream px-6 py-8 md:flex">
-        <div>
+      {/*
+        Desktop sidebar. Three-band flex column so a SHORT viewport (e.g. 720px
+        height) never clips the nav: the wordmark + identity card are pinned at
+        the top (shrink-0), the nav is its OWN scroll container in the middle
+        (flex-1 + min-h-0 so it can actually shrink and scroll), and the primary
+        action is pinned at the bottom. min-h-0 is the load-bearing fix - without
+        it a flex child refuses to shrink below its content and the overflow is
+        clipped with no way to reach the lower nav items.
+      */}
+      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-bone bg-cream md:flex">
+        {/* Pinned: wordmark + identity card */}
+        <div className="shrink-0 px-6 pb-4 pt-8">
           <Link
             href="/home"
-            className="font-serif text-2xl font-normal text-ink transition-opacity hover:opacity-80"
+            aria-label="Collab47 home"
+            className="inline-flex rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
           >
             <Wordmark />
           </Link>
 
-          <Link
-            href="/profile"
-            className="mt-12 flex items-center gap-3 rounded-lg border border-bone bg-paper p-3 transition-all hover:-translate-y-0.5 hover:border-saffron/40"
-          >
-            <Avatar name={displayName} src={me?.avatar_url ?? undefined} size="sm" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink">{displayName}</p>
-              {displayHandle ? (
-                <p className="truncate text-xs text-ash">@{displayHandle}</p>
-              ) : null}
-            </div>
-          </Link>
-
-          <nav className="mt-8 flex flex-col gap-1">
-            {nav.map((n) => {
-              const active = isActive(n.href);
-              const showDm = n.href === "/messages" && dmBadge;
-              return (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
-                    active ? "bg-ink text-cream" : "text-ink/80 hover:bg-bone"
-                  )}
-                >
-                  <n.icon className="size-4" />
-                  {n.label}
-                  {showDm ? (
-                    <span className="ml-auto inline-flex min-w-4 items-center justify-center rounded-full bg-saffron px-1 text-[10px] font-semibold text-cream">
-                      {dmBadge}
-                    </span>
-                  ) : null}
-                </Link>
-              );
-            })}
-          </nav>
+          {me ? <SidebarProfileCard me={me} className="mt-6" /> : null}
         </div>
 
-        <Link
-          href="/home#composer"
-          className="flex items-center justify-center gap-2 rounded-full bg-saffron px-4 py-3 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-[0.98]"
-        >
-          <Plus className="size-4" /> New post
-        </Link>
+        {/* Scrollable: nav list (overscroll-contain so wheel momentum stays in
+            the sidebar; no-scrollbar keeps it clean like the rest of the app) */}
+        <nav className="no-scrollbar flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-6 py-2">
+          {nav.map((n) => {
+            const active = isActive(n.href);
+            const showDm = n.href === "/messages" && dmBadge;
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  active ? "bg-ink text-cream" : "text-ink/80 hover:bg-bone"
+                )}
+              >
+                <n.icon className="size-4" />
+                {n.label}
+                {showDm ? (
+                  <span className="ml-auto inline-flex min-w-4 items-center justify-center rounded-full bg-saffron px-1 text-[10px] font-semibold text-cream">
+                    {dmBadge}
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Pinned: primary action */}
+        <div className="shrink-0 px-6 pb-8 pt-3">
+          <Link
+            href="/home#composer"
+            className="flex items-center justify-center gap-2 rounded-full bg-saffron px-4 py-3 text-sm font-medium text-cream transition-colors hover:bg-saffron-dk active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
+          >
+            <Plus className="size-4" /> New post
+          </Link>
+        </div>
       </aside>
 
       {/* Top bar (mobile + desktop) */}
@@ -240,8 +244,10 @@ export function AppShell({
       {/* In-app feedback / bug report widget (floats bottom-right on every page) */}
       <FeedbackWidget />
 
-      {/* Mobile bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around border-t border-bone bg-cream/95 px-1 py-1.5 backdrop-blur-md md:hidden">
+      {/* Mobile bottom nav. pb grows to the iOS home-indicator inset so the row
+          never collides with the safe area; each item is >=44px tall (min-h) so
+          every tap target clears the accessibility floor. */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-stretch justify-around border-t border-bone bg-cream/95 px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden">
         {BOTTOM_NAV.map((n) => {
           const active = isActive(n.href);
           const showDm = n.href === "/messages" && dmBadge;
@@ -251,7 +257,7 @@ export function AppShell({
               href={n.href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-all active:scale-95",
+                "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-all active:scale-95",
                 active ? "text-saffron" : "text-ink/60 hover:text-ink"
               )}
             >
@@ -273,7 +279,7 @@ export function AppShell({
           aria-label={moreOpen ? "Close more menu" : "More"}
           aria-expanded={moreOpen}
           className={cn(
-            "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-all active:scale-95",
+            "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium transition-all active:scale-95",
             moreOpen ? "text-saffron" : "text-ink/60 hover:text-ink"
           )}
         >

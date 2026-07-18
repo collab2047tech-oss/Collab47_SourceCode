@@ -153,8 +153,11 @@ export function GlobalSearch({
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
+      {/* LinkedIn-style search field: a real input-shaped affordance (icon +
+          field + ⌘K hint), not a naked icon. min-h-11 clears the 44px tap
+          floor; the whole field lights up with a saffron ring on focus. */}
       <div
-        className="flex items-center gap-3 rounded-full border border-bone bg-paper px-4 py-2 transition-colors focus-within:border-saffron/40"
+        className="flex min-h-11 items-center gap-2.5 rounded-full border border-bone bg-paper px-4 transition-colors focus-within:border-saffron/50 focus-within:ring-2 focus-within:ring-saffron/25"
         role="combobox"
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -182,7 +185,7 @@ export function GlobalSearch({
               setQuery("");
               inputRef.current?.focus();
             }}
-            className="shrink-0 text-ash transition-colors hover:text-ink"
+            className="-mr-1 shrink-0 rounded-full p-1 text-ash transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
           >
             <X className="size-3.5" />
           </button>
@@ -281,7 +284,7 @@ function EmptyState({
     <div className="py-1">
       {recent.length > 0 && (
         <section>
-          <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest text-ash">
+          <p className="px-3 pb-1.5 pt-2 text-caption">
             Recent
           </p>
           {recent.map((q) => (
@@ -299,7 +302,7 @@ function EmptyState({
       )}
       {trending.length > 0 && (
         <section>
-          <p className="px-3 pb-1.5 pt-2 text-[11px] font-semibold uppercase tracking-widest text-ash">
+          <p className="px-3 pb-1.5 pt-2 text-caption">
             Trending
           </p>
           {trending.slice(0, 6).map((t) => (
