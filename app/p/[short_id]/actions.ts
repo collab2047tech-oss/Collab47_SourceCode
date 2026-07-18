@@ -9,7 +9,9 @@ export async function addCommentOnPostAction(formData: FormData) {
   const parentCommentId = formData.get("parentCommentId")?.toString() || null;
   if (!postId) return { ok: false as const, error: "Missing postId" };
   const res = await addComment({ postId, body, parentCommentId });
-  if (res.ok) revalidatePath(`/p`);
+  // '/p' is not a real route; the post pages live at '/p/[short_id]'. Match the
+  // delete action so the revalidate actually targets the post page.
+  if (res.ok) revalidatePath("/p/[short_id]", "page");
   return res;
 }
 

@@ -34,13 +34,16 @@ type ReactionMeta = {
   color: string;
 };
 
+// Locked Collab47 palette only (no raw Tailwind amber/rose/red/blue/green). The
+// icon shape carries the meaning; colors are drawn from the token set so this
+// bar is one visual system with PostCard's action bar.
 const REACTIONS: ReactionMeta[] = [
   { kind: "like",       label: "Like",       icon: <ThumbsUp    className="size-4" />, color: "text-saffron" },
-  { kind: "celebrate",  label: "Celebrate",  icon: <PartyPopper className="size-4" />, color: "text-amber-500" },
-  { kind: "support",    label: "Support",    icon: <HandHeart   className="size-4" />, color: "text-rose-400" },
-  { kind: "love",       label: "Love",       icon: <Heart       className="size-4" />, color: "text-red-500" },
-  { kind: "insightful", label: "Insightful", icon: <Lightbulb   className="size-4" />, color: "text-blue-400" },
-  { kind: "funny",      label: "Funny",      icon: <Laugh       className="size-4" />, color: "text-green-500" },
+  { kind: "celebrate",  label: "Celebrate",  icon: <PartyPopper className="size-4" />, color: "text-moss" },
+  { kind: "support",    label: "Support",    icon: <HandHeart   className="size-4" />, color: "text-navy" },
+  { kind: "love",       label: "Love",       icon: <Heart       className="size-4" />, color: "text-ember" },
+  { kind: "insightful", label: "Insightful", icon: <Lightbulb   className="size-4" />, color: "text-navy" },
+  { kind: "funny",      label: "Funny",      icon: <Laugh       className="size-4" />, color: "text-saffron" },
 ];
 
 function getReactionMeta(kind?: string): ReactionMeta {
@@ -71,11 +74,13 @@ export function PostDetailActions({
   const [liked, setLiked] = useState(initialLiked);
   const [reaction, setReaction] = useState<string | undefined>(initialReaction);
   const [saved, setSaved] = useState(initialSaved);
+  const [saves, setSaves] = useState(bookmarkCount);
   const [likes, setLikes] = useState(likeCount);
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [reposted, setReposted] = useState(false);
   const [repostToast, setRepostToast] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
@@ -151,12 +156,17 @@ export function PostDetailActions({
 
   function handleRepost() {
     setActionError(null);
+    if (reposted) return;
+    // Optimistic: flip to reposted + show the toast instantly; roll back on failure.
+    setReposted(true);
+    setRepostToast(true);
     startTransition(async () => {
       const res = await repostPostAction(postId);
       if (res.ok) {
-        setRepostToast(true);
         setTimeout(() => setRepostToast(false), 2500);
       } else {
+        setReposted(false);
+        setRepostToast(false);
         setActionError(res.error ?? "Could not repost.");
       }
     });
@@ -164,10 +174,16 @@ export function PostDetailActions({
 
   function toggleSave() {
     const next = !saved;
+    // Optimistic: flip the icon AND bump the count instantly; roll both back on
+    // failure (matches the feed PostCard save pattern).
     setSaved(next);
+    setSaves((c) => Math.max(0, next ? c + 1 : c - 1));
     startTransition(async () => {
       const res = await (next ? bookmarkPostAction(postId) : unbookmarkPostAction(postId));
-      if (!res.ok) setSaved(!next);
+      if (!res.ok) {
+        setSaved(!next);
+        setSaves((c) => Math.max(0, next ? c - 1 : c + 1));
+      }
     });
   }
 
@@ -221,7 +237,7 @@ export function PostDetailActions({
                 aria-label={r.label}
                 title={r.label}
                 className={cn(
-                  "flex size-9 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110 sm:size-8",
+                  "flex size-11 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-125 active:scale-110",
                   r.color,
                   reaction === r.kind && "scale-110 bg-bone"
                 )}
@@ -289,7 +305,7 @@ export function PostDetailActions({
         <Bookmark
           className={cn("size-4 transition-all", saved ? "fill-saffron stroke-saffron scale-110" : "stroke-current")}
         />
-        {bookmarkCount}
+        {saves}
       </button>
 
       {/* Repost */}
@@ -298,12 +314,13 @@ export function PostDetailActions({
         onClick={handleRepost}
         disabled={isPending}
         aria-label="Repost"
+        aria-pressed={reposted}
         className={cn(
           "flex min-h-10 items-center gap-1.5 transition-colors hover:text-ink active:scale-95 disabled:opacity-40",
-          repostToast && "text-moss"
+          reposted && "text-moss"
         )}
       >
-        <Repeat2 className={cn("size-4 transition-all", repostToast && "scale-110")} />
+        <Repeat2 className={cn("size-4 transition-all", reposted && "scale-110")} />
         {repostToast ? <span className="text-xs font-medium text-moss">Reposted</span> : null}
       </button>
 

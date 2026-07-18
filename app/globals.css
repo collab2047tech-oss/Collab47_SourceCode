@@ -297,3 +297,84 @@ body {
 /* Hide scrollbar on smooth-scroll containers */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ============================================================
+   POST DETAIL + MODAL (Builder B2) - additive only.
+   Entrance animations for the LinkedIn-style intercepted post overlay and a
+   single subtle fade for the full post page. The global prefers-reduced-motion
+   safety net above collapses all of these to instant automatically.
+   ============================================================ */
+
+/* Full post page: one quiet fade-in (no per-block stagger, no JS-gated
+   visibility - the content is present in the DOM and simply animates). */
+.c47-detail-in {
+  animation: c47-fade-up 0.5s var(--ease-out-soft) both;
+}
+
+/* Modal backdrop fade. */
+@keyframes c47-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.c47-modal-backdrop {
+  animation: c47-backdrop-in 150ms var(--ease-out-soft) both;
+}
+
+/* Modal panel entrance.
+   Mobile default = full-screen sheet slides up.
+   Desktop (>=1024px) = centered dialog scales 0.98 -> 1 + fades (200ms). */
+@keyframes c47-modal-sheet-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes c47-modal-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.c47-modal-panel {
+  animation: c47-modal-sheet-in 240ms var(--ease-out-soft) both;
+}
+@media (min-width: 1024px) {
+  .c47-modal-panel {
+    animation: c47-modal-in 200ms var(--ease-out-soft) both;
+  }
+}
+
+/* ------------------------------------------------------------
+   NEWS READER (InShortsFeed) fixed-inset contract.
+   The full-screen snap reader is `position: fixed`, so its offsets must match
+   the SHELL it renders inside. The (content) layout serves a DUAL shell:
+     - member  -> AppShell (top bar h-16, mobile bottom nav h-16, desktop
+                  sidebar w-60 = 15rem)
+     - public  -> PublicTopNav only (fixed h-16, no sidebar, no bottom nav)
+   The layout stamps data-news-shell on a wrapper; these vars cascade to the
+   fixed reader (custom properties inherit by DOM ancestry, not by layout box),
+   so the same component fits BOTH shells with no 240px dead gutter on the
+   indexable anonymous page. Responsiveness lives here (media query) instead of
+   being hardcoded into the component. */
+[data-news-shell="member"] {
+  --news-inset-top: 4rem;      /* below the h-16 top bar */
+  --news-inset-bottom: 4rem;   /* above the mobile bottom nav */
+  --news-inset-left: 0px;      /* no sidebar on mobile */
+}
+@media (min-width: 768px) {
+  [data-news-shell="member"] {
+    --news-inset-bottom: 0px;  /* desktop has no bottom nav */
+    --news-inset-left: 15rem;  /* clear the w-60 sidebar */
+  }
+}
+[data-news-shell="public"] {
+  --news-inset-top: 4rem;      /* below the fixed PublicTopNav (h-16) */
+  --news-inset-bottom: 0px;    /* no bottom nav in the public shell */
+  --news-inset-left: 0px;      /* no sidebar in the public shell */
+}
+
+/* Shared editorial brand gradient (ink -> saffron-dk), token-based so the
+   news reader + InShorts no-image header never hardcode hex. */
+.brand-gradient {
+  background-image: linear-gradient(
+    135deg,
+    var(--color-ink) 0%,
+    var(--color-saffron-dk) 100%
+  );
+}

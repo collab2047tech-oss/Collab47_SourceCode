@@ -33,7 +33,19 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+  modal,
+}: {
+  children: React.ReactNode;
+  /**
+   * Parallel @modal slot: the intercepted post overlay (or null via default.tsx).
+   * Optional so `tsc` is happy against the generated LayoutProps before Next's
+   * route typegen has run to register the new slot; at runtime it is always
+   * provided (default.tsx renders null when nothing is intercepted).
+   */
+  modal?: React.ReactNode;
+}) {
   const [profile, unreadCount, messagesUnread, allConvs] = await Promise.all([
     getMyProfile(),
     getUnreadCount(),
@@ -75,6 +87,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             manager (lib/realtime/postCounts) - no provider needed, works on every
             page including /p and /u. */}
         {children}
+        {/* Intercepted post modal overlay (fixed-position; escapes <main> flow). */}
+        {modal}
       </AppShell>
     </MessagesProvider>
   );

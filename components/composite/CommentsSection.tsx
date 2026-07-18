@@ -29,6 +29,12 @@ interface Props {
   initialLikes?: InitialLikes;
   currentUserId?: string;
   currentUserName?: string;
+  /**
+   * "page"  -> stacked full-page thread (default).
+   * "modal" -> comments rail: on desktop the list scrolls independently and the
+   *            composer is pinned at the bottom of the rail.
+   */
+  variant?: "page" | "modal";
 }
 
 export function CommentsSection({
@@ -37,6 +43,7 @@ export function CommentsSection({
   initialLikes,
   currentUserId = "",
   currentUserName = "You",
+  variant = "page",
 }: Props) {
   const [comments, setComments] = useState<CommentWithAuthor[]>(initialComments);
   const [body, setBody] = useState("");
@@ -170,62 +177,74 @@ export function CommentsSection({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (isPending) return;
     const text = body.trim();
     if (!text) return;
     setError(null);
+
+    // Capture the reply context for this submission (state may change).
+    const submittingReplyTo = replyTo;
 
     const optimistic: CommentWithAuthor = {
       id: `optimistic-${Date.now()}`,
       body: text,
       created_at: new Date().toISOString(),
-      parent_comment_id: replyTo?.id ?? null,
+      parent_comment_id: submittingReplyTo?.id ?? null,
       author_id: currentUserId,
       author: { handle: "", name: currentUserName, avatar_url: null },
     };
+    // Optimistically show the comment immediately (marked "sending" via its id).
     setComments((prev) => [...prev, optimistic]);
-    if (replyTo) setExpanded((prev) => new Set(prev).add(replyTo.id));
-    setBody("");
-    setReplyTo(null);
+    if (submittingReplyTo) setExpanded((prev) => new Set(prev).add(submittingReplyTo.id));
+    // P0: DO NOT clear the composer yet. The typed text stays put (composer is
+    // disabled via isPending) so a failed submit never loses it. We only clear
+    // on confirmed success, and restore + surface an error on failure.
 
     const fd = new FormData();
     fd.set("postId", postId);
     fd.set("body", text);
-    if (replyTo) fd.set("parentCommentId", replyTo.id);
+    if (submittingReplyTo) fd.set("parentCommentId", submittingReplyTo.id);
 
     startTransition(async () => {
       const res = await addCommentOnPostAction(fd);
-      if (!res.ok && "error" in res) {
+      if (res.ok) {
+        // Success: the comment is confirmed - now it is safe to clear the input.
+        setBody("");
+        setReplyTo(null);
+      } else {
+        // Failure: roll back the optimistic comment, keep the typed text intact
+        // for an immediate retry, and show an inline error.
         setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
-        setError(res.error ?? "Could not post comment.");
+        setError(("error" in res && res.error) ? res.error : "Could not post comment. Try again.");
       }
     });
   }
 
-  return (
-    <section className="mt-10 border-t border-bone pt-6">
-      <p className="mb-4 text-caption">Comments</p>
-
-      {/* Comment list */}
-      <ul className="divide-y divide-bone">
-        {tops.length === 0 ? (
-          <li className="py-4 text-center text-xs text-ash">No comments yet. Be first.</li>
-        ) : (
-          tops.map((c) => {
-            const replies = repliesMap.get(c.id) ?? [];
-            const isExpanded = expanded.has(c.id);
-            return (
-              <li key={c.id} className="py-4">
-                <article className="flex items-start gap-3">
-                  <Avatar name={c.author.name} src={c.author.avatar_url ?? undefined} size="sm" />
-                  <div className="flex-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-semibold text-ink">{c.author.name}</span>
-                      {c.author.handle ? (
-                        <span className="text-xs text-ash">@{c.author.handle}</span>
-                      ) : null}
-                      <span className="text-xs text-ash">{relativeTime(c.created_at)}</span>
-                    </div>
-                    <p className="mt-1 text-sm leading-relaxed text-ink">{c.body}</p>
+  const listEl = (
+    <ul className="divide-y divide-bone">
+      {tops.length === 0 ? (
+        <li className="py-4 text-center text-xs text-ash">No comments yet. Be first.</li>
+      ) : (
+        tops.map((c) => {
+          const replies = repliesMap.get(c.id) ?? [];
+          const isExpanded = expanded.has(c.id);
+          const isSending = c.id.startsWith("optimistic-");
+          return (
+            <li key={c.id} className="py-4">
+              <article className={cn("flex items-start gap-3", isSending && "opacity-60")}>
+                <Avatar name={c.author.name} src={c.author.avatar_url ?? undefined} size="sm" />
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-ink">{c.author.name}</span>
+                    {c.author.handle ? (
+                      <span className="text-xs text-ash">@{c.author.handle}</span>
+                    ) : null}
+                    <span className="text-xs text-ash">
+                      {isSending ? "Sending…" : relativeTime(c.created_at)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm leading-relaxed text-ink">{c.body}</p>
+                  {!isSending ? (
                     <div className="mt-1.5 flex items-center gap-4">
                       <LikeButton commentId={c.id} size="sm" />
                       <button
@@ -239,38 +258,41 @@ export function CommentsSection({
                         <DeleteButton commentId={c.id} size="sm" />
                       ) : null}
                     </div>
-                  </div>
-                </article>
+                  ) : null}
+                </div>
+              </article>
 
-                {/* View / Hide replies toggle */}
-                {replies.length > 0 ? (
-                  <div className="ml-11 mt-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleExpanded(c.id)}
-                      className="flex items-center gap-1 text-xs font-semibold text-saffron hover:text-saffron-dk transition-colors"
-                    >
-                      {isExpanded ? (
-                        <>
-                          <ChevronUp className="size-3.5" />
-                          Hide replies
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="size-3.5" />
-                          {replies.length} {replies.length === 1 ? "reply" : "replies"}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                ) : null}
+              {/* View / Hide replies toggle */}
+              {replies.length > 0 ? (
+                <div className="ml-11 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(c.id)}
+                    className="flex items-center gap-1 text-xs font-semibold text-saffron hover:text-saffron-dk transition-colors"
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="size-3.5" />
+                        Hide replies
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="size-3.5" />
+                        {replies.length} {replies.length === 1 ? "reply" : "replies"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : null}
 
-                {/* Replies (flattened to 1 level) */}
-                {replies.length > 0 && isExpanded ? (
-                  <ul className="ml-5 mt-3 space-y-3 border-l-2 border-bone pl-5">
-                    {replies.map((r) => (
+              {/* Replies (flattened to 1 level) */}
+              {replies.length > 0 && isExpanded ? (
+                <ul className="ml-5 mt-3 space-y-3 border-l-2 border-bone pl-5">
+                  {replies.map((r) => {
+                    const rSending = r.id.startsWith("optimistic-");
+                    return (
                       <li key={r.id}>
-                        <article className="flex items-start gap-2.5">
+                        <article className={cn("flex items-start gap-2.5", rSending && "opacity-60")}>
                           <Avatar name={r.author.name} src={r.author.avatar_url ?? undefined} size="xs" />
                           <div className="flex-1">
                             <div className="flex items-baseline gap-2">
@@ -278,73 +300,110 @@ export function CommentsSection({
                               {r.author.handle ? (
                                 <span className="text-[11px] text-ash">@{r.author.handle}</span>
                               ) : null}
-                              <span className="text-[11px] text-ash">{relativeTime(r.created_at)}</span>
+                              <span className="text-[11px] text-ash">
+                                {rSending ? "Sending…" : relativeTime(r.created_at)}
+                              </span>
                             </div>
                             <p className="mt-0.5 text-sm leading-relaxed text-ink">{r.body}</p>
-                            <div className="mt-1 flex items-center gap-3">
-                              <LikeButton commentId={r.id} size="xs" />
-                              <button
-                                type="button"
-                                onClick={() => startReply(c.id, r.author.name)}
-                                className="text-[11px] font-medium text-ash hover:text-ink transition-colors"
-                              >
-                                Reply
-                              </button>
-                              {currentUserId && r.author_id === currentUserId ? (
-                                <DeleteButton commentId={r.id} size="xs" />
-                              ) : null}
-                            </div>
+                            {!rSending ? (
+                              <div className="mt-1 flex items-center gap-3">
+                                <LikeButton commentId={r.id} size="xs" />
+                                <button
+                                  type="button"
+                                  onClick={() => startReply(c.id, r.author.name)}
+                                  className="text-[11px] font-medium text-ash hover:text-ink transition-colors"
+                                >
+                                  Reply
+                                </button>
+                                {currentUserId && r.author_id === currentUserId ? (
+                                  <DeleteButton commentId={r.id} size="xs" />
+                                ) : null}
+                              </div>
+                            ) : null}
                           </div>
                         </article>
                       </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            );
-          })
-        )}
-      </ul>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </li>
+          );
+        })
+      )}
+    </ul>
+  );
 
-      {/* Composer */}
-      <form onSubmit={submit} className="mt-4 flex items-start gap-3">
-        <Avatar name={currentUserName} size="sm" />
-        <div className="flex flex-1 flex-col gap-2">
-          {replyTo ? (
-            <div className="flex items-center gap-2 text-xs text-ash">
-              <span>Replying to <strong className="text-ink">{replyTo.name}</strong></span>
-              <button
-                type="button"
-                onClick={() => setReplyTo(null)}
-                className="text-ember hover:underline"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : null}
-          <div className="flex items-end gap-2">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value.slice(0, 600))}
-              rows={1}
-              placeholder={replyTo ? `Reply to ${replyTo.name}` : "Add a comment"}
-              className="min-h-9 flex-1 resize-none rounded-md border border-bone bg-cream px-3 py-2 text-sm text-ink placeholder:text-ash focus:border-ink focus:outline-none"
-            />
+  const composerEl = (
+    <form onSubmit={submit} className="flex items-start gap-3">
+      <Avatar name={currentUserName} size="sm" />
+      <div className="flex flex-1 flex-col gap-2">
+        {replyTo ? (
+          <div className="flex items-center gap-2 text-xs text-ash">
+            <span>Replying to <strong className="text-ink">{replyTo.name}</strong></span>
             <button
-              type="submit"
-              disabled={isPending || !body.trim()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-saffron px-4 text-sm text-cream transition-colors hover:bg-saffron/90 disabled:opacity-50"
+              type="button"
+              onClick={() => setReplyTo(null)}
+              className="text-ember hover:underline"
             >
-              <Send className="size-3.5" />
-              {isPending ? "..." : "Send"}
+              Cancel
             </button>
           </div>
-          <div className="flex items-center justify-between">
-            {error ? <span className="text-xs text-ember">{error}</span> : <span />}
-            <span className="text-caption">{body.length}/600</span>
-          </div>
+        ) : null}
+        <div className="flex items-end gap-2">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value.slice(0, 600))}
+            disabled={isPending}
+            rows={1}
+            aria-label={replyTo ? `Reply to ${replyTo.name}` : "Add a comment"}
+            placeholder={replyTo ? `Reply to ${replyTo.name}` : "Add a comment"}
+            className="min-h-9 flex-1 resize-none rounded-md border border-bone bg-cream px-3 py-2 text-sm text-ink placeholder:text-ash focus:border-ink focus:outline-none disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={isPending || !body.trim()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-saffron px-4 text-sm text-cream transition-colors hover:bg-saffron/90 disabled:opacity-50"
+          >
+            <Send className="size-3.5" />
+            {isPending ? "Sending…" : "Send"}
+          </button>
         </div>
-      </form>
+        <div className="flex items-center justify-between">
+          {error ? (
+            <span role="alert" className="text-xs text-ember">{error}</span>
+          ) : (
+            <span />
+          )}
+          <span className="text-caption">{body.length}/600</span>
+        </div>
+      </div>
+    </form>
+  );
+
+  // Modal rail: header + independently-scrolling list + composer pinned to the
+  // rail bottom on desktop; a simple stacked flow on mobile (whole panel scrolls).
+  if (variant === "modal") {
+    return (
+      <section
+        aria-label="Comments"
+        className="flex min-h-0 flex-col border-t border-bone lg:flex-1 lg:overflow-hidden lg:border-t-0"
+      >
+        <p className="shrink-0 px-4 pb-3 pt-5 text-caption sm:px-6 lg:border-b lg:border-bone">
+          Comments
+        </p>
+        <div className="px-4 sm:px-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">{listEl}</div>
+        <div className="shrink-0 border-t border-bone bg-paper px-4 py-3 sm:px-6">{composerEl}</div>
+      </section>
+    );
+  }
+
+  // Full-page stacked thread.
+  return (
+    <section className="mt-10 border-t border-bone pt-6">
+      <p className="mb-4 text-caption">Comments</p>
+      {listEl}
+      <div className="mt-4">{composerEl}</div>
     </section>
   );
 }

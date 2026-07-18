@@ -156,6 +156,11 @@ export function PostCard({
   const [hidden, setHidden] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // "see more" is driven by REAL overflow of the 6-line clamp, not a char count -
+  // so a short-but-tall post that gets clamped always gets an affordance (and a
+  // long-but-flat one does not falsely show it).
+  const [clamped, setClamped] = useState(false);
+  const bodyRef = useRef<HTMLParagraphElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const reactionRef = useRef<HTMLDivElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -340,6 +345,14 @@ export function PostCard({
       }
     });
   }
+
+  // Detect whether the clamped body actually overflows 6 lines, so "see more"
+  // matches the real clamp instead of a char-length guess.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || expanded) return;
+    setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [post.body, expanded]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -562,6 +575,7 @@ export function PostCard({
           {post.body ? (
             <div className="mt-2.5">
               <p
+                ref={bodyRef}
                 onClick={openPost}
                 className={cn(
                   "cursor-pointer text-[0.95rem] leading-relaxed text-ink/90 whitespace-pre-line wrap-break-word",
@@ -570,7 +584,7 @@ export function PostCard({
               >
                 {post.body}
               </p>
-              {!expanded && post.body.length > 320 ? (
+              {!expanded && clamped ? (
                 <button
                   type="button"
                   onClick={(e) => {
