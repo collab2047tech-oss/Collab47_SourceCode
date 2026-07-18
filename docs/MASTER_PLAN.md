@@ -1,7 +1,60 @@
-# Collab47 - Master Overhaul Plan
+# Collab47 - Master Overhaul Plan (v2 - post-teardown)
 
-Written 19 July 2026. Orchestrator: Fable. Builders: Opus subagents with tight specs.
+Written 19 July 2026, updated same day after the full-codebase teardown.
+Orchestrator: Fable. Builders: Opus subagents with tight specs.
 Scope: every element, component, feature. Local only - nothing deploys without explicit approval.
+
+## Teardown verdict (v2)
+
+Five parallel auditors read every route and component in the repo line by line.
+Full evidence with file:line refs in `docs/teardown/01..05-*.md`.
+
+**Scoreboard: ~198 defects. Verdicts: 55 KEEP · 68 POLISH · 8 REBUILD.**
+Architecture is sound; messaging honesty is clean (typing/seen/unread all event-backed,
+group chat real); analytics is 100% real data; search is the strongest surface.
+The problems are concentrated in states, feedback, and a handful of structural choices.
+
+### P0 - fix before anything else (data loss, legal, broken, dishonest)
+
+| # | Defect | Where |
+|---|---|---|
+| 1 | Privacy policy claims "we do not yet send transactional email" while Resend is live; Resend undisclosed as processor (DPDP) | privacy/page.tsx:72-78 |
+| 2 | Incoming connection request rendered as own "Pending"; click DELETES the invite | PersonCard + getRelationshipStates |
+| 3 | Message send with thrown action = permanent "Sending" spinner, lost message | MessageComposer (no try/catch on runSend) |
+| 4 | Comment textarea cleared before server confirms; comment lost on failure | CommentsSection.submit |
+| 5 | Admin queue "Open post" links UUID into short_id route: every link 404s | queue/page.tsx:93 |
+| 6 | ALL read-path errors swallowed into empty results: broken feed renders "all caught up" | lib/db readers + FeedClient catch |
+| 7 | slot_count allows 1-8 but hard 5-member cap: 6-8 can never fill, UI still shows "of 8" | projects.ts:325,355 |
+| 8 | Anonymous /news (indexable) mispositioned: offsets hardcoded to member shell | InShortsFeed.tsx:118 |
+| 9 | Unsourced "95% of India's talent outside top fifty institutions" on landing | Problem.tsx:9 |
+| 10 | Manifesto asserts unbuilt capabilities ("career impact engine", "anti bias layer") + contradictory stats; route reachable though unlinked | manifesto/page.tsx:105,133-136,147 |
+
+### P1 - structural rebuilds (map to existing phases)
+
+- **Post detail blast** (Phase 2.1): route lives OUTSIDE `(app)` group: click unmounts the whole AppShell, mounts public chrome, scroll resets, same text +48% size, skeleton geometry mismatched, stagger fade on top. Fix: move into `(app)` + intercepted modal; body-size type; matched skeleton; drop stagger.
+- **Collabs thin data model** (Phase 4): 1-char title + 2-char brief goes live instantly; no skills/tags/category/cover columns exist. Wizard + quality floor + schema additions confirmed as the right fix.
+- **Owner triage one-way** (Phase 4.2): accept/reject buttons vanish after click; server supports undo/remove, UI does not.
+- **Resume editor hover-only controls** (Phase 3.3): 28px, opacity-0, unreachable on touch.
+- **Login/signup**: no pending labels; error blocks lack aria-live (Phase 1.4).
+- **AcceptRequestButton**: optimistic accept without rollback (Phase 5.1).
+- **Dead code to delete**: FeedRealtimeProvider (140 lines, imported nowhere), Marquee (0 uses).
+
+### P2 - systemic gaps (fix once in primitives/patterns, propagate)
+
+- No `error.tsx` anywhere in the repo; `loading.tsx` missing for collabs, c/, profile, u/, (content), (admin).
+- `Input`/`Button` kill the focus ring (`focus:outline-none`, no focus-visible replacement); correct pattern exists in SettingsView Switch: standardise it.
+- Reduced-motion unguarded in SplitWords, MagneticButton, Lenis (inline transforms bypass the CSS net).
+- No `autoComplete` on any auth input; `Button` lacks default `type="button"`.
+- Detail-page save/repost not optimistic, no rollback (feed versions are correct: converge).
+- Digest email ships but Settings' email toggles are disabled placeholders; only /api/unsubscribe works. Reconcile.
+- RUNTIME-CHECK (security): message rail subscribes to all message INSERTs, filters client-side: verify realtime RLS publication is member-scoped.
+
+### P3 - token + copy debt
+
+- Hardcoded colors: EventCard `#9A6A00` x2 + `#047857`; PushToggle `text-red-600`; ProfileStrength stale cobalt rgba + `#F5A623`/`#1B7A4B`; PostDetailActions raw amber/rose/red/blue/green; ~12 literal `#B95402` that should be `text-saffron`; unused `--color-gold`.
+- Arbitrary `text-[...]` sizes bypassing the scale app-wide.
+- Status label casing mismatch (collabs list vs detail).
+- Contact email drift: site `collab2047.tech@gmail.com` vs deck `collab2047@gmail.com` (x3 files). Founder must say which is real.
 
 ## Ground rules (non-negotiable, apply to every phase)
 
@@ -100,8 +153,17 @@ Route-intercepted modal: `app/(app)/@modal/(.)p/[short_id]` renders PostCard-in-
 - Order: 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7. Within a phase, independent items run as parallel subagents (e.g. 1.1 and 1.4 concurrently - different files).
 - Founder checkpoints: end of each phase = screenshot set + one-line-per-change summary. Deploy only on explicit "ship it".
 
-## Known open questions for the founder (answer whenever, none block Phase 0-2)
+## Execution order (v2)
+
+P0 hotfix wave first (items 1-10 above, small and surgical), then phases as
+planned: 0 (harness + primitives, now including the focus-ring and error.tsx
+patterns from P2) -> 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7, with P3 token debt folded
+into whichever phase touches each file.
+
+## Known open questions for the founder (answer whenever, none block P0)
 
 1. Phase 4.4 schema additions (roles/commitment/duration/category on projects) - approve?
 2. Registered address for legal pages: decks show a Patiala contact block but never call it the registered office. Confirm or leave "India".
-3. Manifesto rewrite from deck material - still wanted after nav removal, or park it?
+3. Manifesto rewrite from deck material - still wanted after nav removal, or park it? (P0-10 neutralises the false lines either way.)
+4. Contact email: `collab2047.tech@gmail.com` (site) or `collab2047@gmail.com` (decks)?
+5. Slot cap: raise the 5-member cap to 8, or clamp the form to 5? (P0-7 needs one or the other.)
