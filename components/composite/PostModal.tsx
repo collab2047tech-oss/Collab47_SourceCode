@@ -95,7 +95,7 @@ export function PostModal({ children }: { children: React.ReactNode }) {
         aria-modal="true"
         aria-label="Post"
         tabIndex={-1}
-        className="c47-modal-panel relative flex w-full flex-col overflow-hidden bg-paper outline-none lg:h-auto lg:max-h-[85vh] lg:max-w-[1080px] lg:rounded-2xl lg:border lg:border-bone lg:shadow-2xl lg:shadow-ink/20"
+        className="c47-modal-panel relative flex w-[min(1080px,100%)] flex-col overflow-hidden bg-paper outline-none lg:h-auto lg:max-h-[85vh] lg:max-w-[1080px] lg:rounded-2xl lg:border lg:border-bone lg:shadow-2xl lg:shadow-ink/20"
       >
         <button
           type="button"

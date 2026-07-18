@@ -337,20 +337,33 @@ export function CommentsSection({
   const composerEl = (
     <form onSubmit={submit} className="flex items-start gap-3">
       <Avatar name={currentUserName} size="sm" />
-      <div className="flex flex-1 flex-col gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
         {replyTo ? (
-          <div className="flex items-center gap-2 text-xs text-ash">
-            <span>Replying to <strong className="text-ink">{replyTo.name}</strong></span>
+          <div className="flex min-w-0 items-center gap-2 text-xs text-ash">
+            <span className="min-w-0 truncate">Replying to <strong className="text-ink">{replyTo.name}</strong></span>
             <button
               type="button"
               onClick={() => setReplyTo(null)}
-              className="text-ember hover:underline"
+              className="shrink-0 text-ember hover:underline"
             >
               Cancel
             </button>
           </div>
         ) : null}
-        <div className="flex items-end gap-2">
+        {/*
+          Rail fits at the 1024px viewport (worst case):
+            backdrop lg:p-6      => panel = 1024 - 48 = 976
+            grid rail track = minmax(340px,380px); guaranteed floor = 340
+            composer sm:px-6     => content = 340 - 48 (24*2) = 292
+            form row = avatar(size-8 = 32) + gap-3(12) + right column
+                     => right column = 292 - 32 - 12 = 248
+            right column row = textarea(flex-1,min-w-0) + gap-2(8) + Send(~92 "Sending...")
+                     => textarea = 248 - 8 - 92 = 148px  (> 0, nothing clips)
+          min-w-0 down the chain (grid track -> section -> composer col ->
+          textarea) lets the textarea absorb all slack; Send and the counter are
+          shrink-0 so they can never truncate to "Sen..." / "0/6".
+        */}
+        <div className="flex min-w-0 items-end gap-2">
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 600))}
@@ -358,24 +371,24 @@ export function CommentsSection({
             rows={1}
             aria-label={replyTo ? `Reply to ${replyTo.name}` : "Add a comment"}
             placeholder={replyTo ? `Reply to ${replyTo.name}` : "Add a comment"}
-            className="min-h-9 flex-1 resize-none rounded-md border border-bone bg-cream px-3 py-2 text-sm text-ink placeholder:text-ash focus:border-ink focus:outline-none disabled:opacity-60"
+            className="min-h-9 min-w-0 flex-1 resize-none rounded-md border border-bone bg-cream px-3 py-2 text-sm text-ink placeholder:text-ash focus:border-ink focus:outline-none disabled:opacity-60"
           />
           <button
             type="submit"
             disabled={isPending || !body.trim()}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-saffron px-4 text-sm text-cream transition-colors hover:bg-saffron/90 disabled:opacity-50"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-saffron px-4 text-sm text-cream transition-colors hover:bg-saffron/90 disabled:opacity-50"
           >
             <Send className="size-3.5" />
             {isPending ? "Sending…" : "Send"}
           </button>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex min-w-0 items-center justify-between gap-2">
           {error ? (
-            <span role="alert" className="text-xs text-ember">{error}</span>
+            <span role="alert" className="min-w-0 text-xs text-ember">{error}</span>
           ) : (
             <span />
           )}
-          <span className="text-caption">{body.length}/600</span>
+          <span className="shrink-0 text-caption">{body.length}/600</span>
         </div>
       </div>
     </form>
@@ -387,13 +400,13 @@ export function CommentsSection({
     return (
       <section
         aria-label="Comments"
-        className="flex min-h-0 flex-col border-t border-bone lg:flex-1 lg:overflow-hidden lg:border-t-0"
+        className="flex min-h-0 min-w-0 flex-col border-t border-bone lg:flex-1 lg:overflow-hidden lg:border-t-0"
       >
         <p className="shrink-0 px-4 pb-3 pt-5 text-caption sm:px-6 lg:border-b lg:border-bone">
           Comments
         </p>
         <div className="px-4 sm:px-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">{listEl}</div>
-        <div className="shrink-0 border-t border-bone bg-paper px-4 py-3 sm:px-6">{composerEl}</div>
+        <div className="min-w-0 shrink-0 border-t border-bone bg-paper px-4 py-3 sm:px-6">{composerEl}</div>
       </section>
     );
   }
