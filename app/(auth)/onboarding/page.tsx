@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense, useActionState, useEffect, useState } from "react";
+import { Suspense, useActionState, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Button } from "@/components/primitives/Button";
-import { CollegeCombobox } from "@/components/composite/CollegeCombobox";
-import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Briefcase, Pencil, X } from "lucide-react";
+import { CollegeCombobox, type ComboboxSource } from "@/components/composite/CollegeCombobox";
+import { STARTUP_SECTORS } from "@/lib/data/sectors";
+import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Briefcase, Pencil, X, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -134,6 +135,61 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 32);
+}
+
+// A tiny per-type flavour word, used only to seed username suggestions like
+// "aarav_dev". Not shown anywhere else.
+const HANDLE_HINTS: Record<AccountType, string> = {
+  student: "dev",
+  researcher: "lab",
+  faculty: "prof",
+  institution: "org",
+  industry: "co",
+  startup: "labs",
+};
+
+const HANDLE_RE = /^[a-z0-9_]{3,32}$/;
+
+// Instagram-style "way out" of a blocked username. Derives candidates from the
+// typed handle + the person's name (slugified) + a per-type hint. These are only
+// CANDIDATES - each is verified against /api/handle-available before it is ever
+// shown, so the canonical (underscore-stripped) uniqueness rule is enforced by
+// the server, never re-implemented here. Returns up to 6 well-formed, distinct
+// candidates (excluding the handle they already typed).
+function generateHandleSuggestions(
+  base: string,
+  name: string,
+  type: AccountType | null
+): string[] {
+  const b = slugify(base);
+  const parts = name.split(/\s+/).map((p) => slugify(p)).filter(Boolean);
+  const first = parts[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1] : "";
+  const hint = type ? HANDLE_HINTS[type] : "hq";
+  const seed = b || first || "user";
+  const two = () => String(Math.floor(Math.random() * 90) + 10); // 10-99
+
+  const raw = [
+    last ? `${seed}_${last}` : "",
+    `${seed}_${two()}`,
+    `${seed}_in`,
+    first ? `${first}_${hint}` : "",
+    `${seed}${two()}`,
+    `${seed}_${hint}`,
+    last ? `${first}${last}${two()}` : "",
+  ];
+
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const c of raw) {
+    const v = c.slice(0, 32);
+    if (!HANDLE_RE.test(v)) continue;
+    if (v === b) continue; // do not re-suggest what they already typed
+    if (seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out.slice(0, 6);
 }
 
 // ---------------------------------------------------------------------------
@@ -286,6 +342,16 @@ function OnboardingFlow() {
   const [handleStatus, setHandleStatus] =
     useState<"idle" | "checking" | "ok" | "taken" | "reserved" | "similar">("idle");
 
+  // Username "way out": when the typed handle is blocked, offer up to 3
+  // verified-AVAILABLE alternatives as tappable chips. `suggestNonce` lets the
+  // "Refresh" affordance regenerate a fresh set (the random 2-digit variants).
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestNonce, setSuggestNonce] = useState(0);
+  // Cache of handle -> available? so repeat verifications (e.g. on Refresh, or
+  // the same candidate across regenerations) skip the round trip.
+  const availabilityCache = useRef<Map<string, boolean>>(new Map());
+
   const [customInterest, setCustomInterest] = useState("");
 
   function addCustomInterest() {
@@ -330,8 +396,97 @@ function OnboardingFlow() {
     }, 400);
     return () => window.clearTimeout(t);
   }, [data.handle]);
+
+  // Generate + verify username alternatives whenever the current handle is
+  // blocked. We fetch candidates in parallel against the SAME availability
+  // endpoint the live check uses, so "available:true" already guarantees the
+  // candidate clears format, reserved, taken AND canonical-similar - we invent
+  // no local canonical logic. First 3 that verify available are shown.
+  useEffect(() => {
+    const blocked =
+      handleStatus === "taken" ||
+      handleStatus === "similar" ||
+      handleStatus === "reserved";
+
+    if (!blocked || !handleValid) {
+      setSuggestions([]);
+      setSuggestLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSuggestLoading(true);
+    setSuggestions([]);
+
+    const candidates = generateHandleSuggestions(
+      data.handle,
+      data.name,
+      data.account_type
+    );
+
+    (async () => {
+      const results = await Promise.all(
+        candidates.map(async (c) => {
+          const cached = availabilityCache.current.get(c);
+          if (cached !== undefined) return { c, ok: cached };
+          try {
+            const res = await fetch(
+              `/api/handle-available?handle=${encodeURIComponent(c)}`
+            );
+            const json = (await res.json()) as { available: boolean };
+            const ok = !!json.available;
+            availabilityCache.current.set(c, ok);
+            return { c, ok };
+          } catch {
+            return { c, ok: false };
+          }
+        })
+      );
+      if (cancelled) return;
+      const available: string[] = [];
+      for (const r of results) {
+        if (r.ok && !available.includes(r.c)) available.push(r.c);
+      }
+      setSuggestions(available.slice(0, 3));
+      setSuggestLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // data.name is intentionally NOT a dep: retyping the name should not thrash
+    // suggestions mid-flow. Regeneration is driven by the handle, its status,
+    // and the explicit Refresh (suggestNonce).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleStatus, handleValid, data.handle, data.account_type, suggestNonce]);
+
   const affiliationValue = usesOrganization ? data.organization : data.college;
   const usesRole = data.account_type === "industry" || data.account_type === "startup";
+
+  // Which directory the affiliation combobox searches, per account type.
+  //  student / researcher / faculty / institution -> institution index
+  //  startup                                       -> startup index
+  //  industry                                      -> plain free text (no index):
+  //    industry companies are NOT DPIIT startups, so the startup index is wrong
+  //    for them; an MCA / corporate dataset is the future home for this.
+  const affiliationSource: ComboboxSource = (() => {
+    switch (data.account_type) {
+      case "startup":
+        return { kind: "startup" };
+      case "industry":
+        return { kind: "none" };
+      default:
+        // student / researcher / faculty / institution (and the null pre-choice)
+        return { kind: "institution" };
+    }
+  })();
+
+  // Field-step chips: startups and industry pick a real SECTOR; everyone else
+  // (student / researcher / faculty) keeps the academic branch list.
+  const fieldOptions =
+    data.account_type === "startup" || data.account_type === "industry"
+      ? STARTUP_SECTORS
+      : BRANCHES;
   const canContinue = (() => {
     switch (currentKey) {
       case "type":
@@ -605,6 +760,56 @@ function OnboardingFlow() {
                           </p>
                         ) : null}
                       </div>
+
+                      {/* The way OUT: when the handle is blocked, offer up to 3
+                          verified-AVAILABLE alternatives as tappable chips so a
+                          username step never dead-ends. Tapping one sets the
+                          input, which re-triggers the normal debounced check. */}
+                      {handleValid &&
+                      (handleStatus === "taken" ||
+                        handleStatus === "reserved" ||
+                        handleStatus === "similar") ? (
+                        <div className="mt-1" aria-live="polite">
+                          {suggestLoading ? (
+                            <div className="flex flex-wrap gap-2" aria-hidden="true">
+                              {[0, 1, 2].map((i) => (
+                                <span
+                                  key={i}
+                                  className="h-11 w-28 animate-pulse rounded-full bg-bone motion-reduce:animate-none"
+                                />
+                              ))}
+                            </div>
+                          ) : suggestions.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-xs text-ash">Available instead:</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {suggestions.map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    aria-label={`Use username ${s}`}
+                                    onClick={() => {
+                                      setHandleEdited(true);
+                                      setData((d) => ({ ...d, handle: slugify(s) }));
+                                    }}
+                                    className="inline-flex min-h-11 items-center rounded-full border border-bone bg-paper px-4 text-sm font-medium text-ink transition-colors hover:border-saffron hover:text-saffron-dk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/30"
+                                  >
+                                    @{s}
+                                  </button>
+                                ))}
+                                <button
+                                  type="button"
+                                  onClick={() => setSuggestNonce((n) => n + 1)}
+                                  aria-label="Refresh username suggestions"
+                                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-ash transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/30"
+                                >
+                                  <RefreshCw className="size-3.5" /> Refresh
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -625,6 +830,7 @@ function OnboardingFlow() {
                     </p>
                     <div className="relative mt-8">
                       <CollegeCombobox
+                        source={affiliationSource}
                         label={config.affiliationLabel}
                         placeholder={config.affiliationPlaceholder}
                         otherPlaceholder={config.affiliationOtherPlaceholder}
@@ -668,7 +874,7 @@ function OnboardingFlow() {
                       Choose the closest fit. Pick &quot;Other&quot; to type your own.
                     </p>
                     <div className="mt-8 flex flex-wrap gap-2.5">
-                      {BRANCHES.map((b, i) => {
+                      {fieldOptions.map((b, i) => {
                         const active = data.branch === b;
                         return (
                           <button
