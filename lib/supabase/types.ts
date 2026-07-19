@@ -5,7 +5,7 @@
  */
 
 export type DMPermission = "everyone" | "connections" | "nobody";
-export type AccountType = "student" | "researcher" | "faculty" | "institution" | "industry";
+export type AccountType = "student" | "researcher" | "faculty" | "institution" | "industry" | "startup";
 export type ReportCategory = "spam" | "hate" | "sexual" | "other";
 export type ConversationType = "one_to_one" | "group";
 export type ProjectStatus = "open" | "team_formed" | "in_progress" | "delivered" | "closed";

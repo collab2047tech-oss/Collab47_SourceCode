@@ -3,9 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { INDIAN_COLLEGES } from "@/lib/data/colleges";
 import { cn } from "@/lib/cn";
-import { Check, ChevronDown, Pencil, Search } from "lucide-react";
-
-const OTHER = "__other__";
+import { Check, ChevronDown, Search } from "lucide-react";
 
 interface CollegeComboboxProps {
   /** Current committed value (either a listed institution or free text). */
@@ -13,48 +11,62 @@ interface CollegeComboboxProps {
   onChange: (value: string) => void;
   label?: string;
   placeholder?: string;
-  /** Placeholder for the free-text "Other" input. */
+  /** Retained for call compatibility; free text is now typed directly into the
+   *  main field, so there is no separate "Other" input to placeholder. */
   otherPlaceholder?: string;
   autoFocus?: boolean;
 }
 
 /**
  * Accessible combobox over real Indian institutions (INDIAN_COLLEGES) with a
- * type-to-filter dropdown, keyboard navigation, and an always-available
- * "Other (type your own)" option for any institution not on the curated list.
- * Never invents institution names - all options come from real data or the
- * user's own free-text entry.
+ * type-to-filter dropdown, keyboard navigation, and first-class free text.
+ *
+ * Root-cause fix (founder-reported "onboarding still broken"): previously typing
+ * only updated a local `query` while the committed `value` changed ONLY on an
+ * option click / Enter-on-option. So a user could type their institute, SEE the
+ * text in the field, yet `value` stayed "" and Continue sat silently disabled.
+ * Now the typed text IS the value (`value` updates on every keystroke), the
+ * curated list simply refines/replaces it on selection, and an explicit
+ * "Use ..." row keeps the add-your-own affordance discoverable. There is no
+ * hidden distinction between what the field shows and what the form stores.
  */
 export function CollegeCombobox({
   value,
   onChange,
   label = "Institution",
   placeholder = "Search your institution",
-  otherPlaceholder = "Type your institution name",
   autoFocus,
 }: CollegeComboboxProps) {
   const listId = useId();
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  // "Other" mode = a free-text value that is not on the curated list.
-  const [otherMode, setOtherMode] = useState(
-    value !== "" && !INDIAN_COLLEGES.includes(value)
-  );
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
+  const trimmed = value.trim();
+  const q = trimmed.toLowerCase();
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     if (!q) return INDIAN_COLLEGES.slice(0, 60);
     return INDIAN_COLLEGES.filter((c) => c.toLowerCase().includes(q)).slice(0, 60);
-  }, [query]);
+  }, [q]);
 
-  // options = filtered institutions, then the "Other" affordance pinned last.
+  // Is what they typed already an exact list entry? If so we do not need the
+  // extra "use your own" row (the value is a real listed institution).
+  const exactInList = useMemo(
+    () => INDIAN_COLLEGES.some((c) => c.toLowerCase() === q),
+    [q]
+  );
+  const showAddOwn = trimmed.length > 0 && !exactInList;
+
+  // options = filtered institutions, then an explicit free-text affordance last.
   const options = useMemo(
-    () => [...filtered.map((c) => ({ value: c, label: c })), { value: OTHER, label: "Other (type your own)" }],
-    [filtered]
+    () => [
+      ...filtered.map((c) => ({ value: c, label: c, add: false })),
+      ...(showAddOwn ? [{ value: trimmed, label: `Use "${trimmed}"`, add: true }] : []),
+    ],
+    [filtered, showAddOwn, trimmed]
   );
 
   // Close on outside click.
@@ -75,19 +87,8 @@ export function CollegeCombobox({
     el?.scrollIntoView({ block: "nearest" });
   }, [active, open]);
 
-  function commit(option: string) {
-    if (option === OTHER) {
-      setOtherMode(true);
-      setOpen(false);
-      onChange("");
-      // Focus the free-text input on the next paint.
-      requestAnimationFrame(() => {
-        rootRef.current?.querySelector<HTMLInputElement>("[data-other-input]")?.focus();
-      });
-      return;
-    }
-    onChange(option);
-    setQuery("");
+  function commit(v: string) {
+    onChange(v);
     setOpen(false);
   }
 
@@ -100,6 +101,9 @@ export function CollegeCombobox({
       e.preventDefault();
       setActive((a) => Math.max(0, a - 1));
     } else if (e.key === "Enter") {
+      // Enter selects the highlighted option only when the list is open. When
+      // it is closed the typed value already stands, so we do nothing here and
+      // let the parent step's Enter-to-advance take over.
       if (open && options[active]) {
         e.preventDefault();
         commit(options[active].value);
@@ -109,61 +113,30 @@ export function CollegeCombobox({
     }
   }
 
-  // --- Free-text "Other" mode ----------------------------------------------
-  if (otherMode) {
-    return (
-      <div className="flex w-full flex-col gap-2" ref={rootRef}>
-        <label className="text-caption text-ink">{label}</label>
-        <div className="relative">
-          <Pencil className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ash" />
-          <input
-            data-other-input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={otherPlaceholder}
-            autoFocus={autoFocus}
-            className="h-14 w-full rounded-lg border border-ink/15 bg-paper pl-11 pr-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setOtherMode(false);
-            onChange("");
-            setQuery("");
-            requestAnimationFrame(() => inputRef.current?.focus());
-          }}
-          className="self-start text-sm font-medium text-saffron-dk underline underline-offset-2 hover:text-saffron"
-        >
-          Back to search the list
-        </button>
-      </div>
-    );
-  }
-
-  // --- Search / select mode -------------------------------------------------
-  const selected = value && INDIAN_COLLEGES.includes(value);
+  const selected = trimmed.length > 0 && exactInList;
 
   return (
     <div className="flex w-full flex-col gap-2" ref={rootRef}>
-      <label className="text-caption text-ink">{label}</label>
+      <label htmlFor={`${listId}-input`} className="text-caption text-ink">{label}</label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ash" />
         <input
+          id={`${listId}-input`}
           ref={inputRef}
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-autocomplete="list"
           autoFocus={autoFocus}
-          value={open ? query : value}
+          value={value}
           placeholder={placeholder}
           onFocus={() => setOpen(true)}
           onChange={(e) => {
-            setQuery(e.target.value);
+            // The typed text IS the value now - no hidden `query` that leaves the
+            // form empty while the field looks filled.
+            onChange(e.target.value);
             setActive(0);
             setOpen(true);
-            if (value) onChange("");
           }}
           onKeyDown={onKeyDown}
           className={cn(
@@ -194,18 +167,17 @@ export function CollegeCombobox({
           style={{ maxWidth: rootRef.current?.offsetWidth }}
         >
           {options.map((opt, i) => {
-            const isOther = opt.value === OTHER;
             const isActive = i === active;
-            const isSelected = !isOther && opt.value === value;
+            const isSelected = !opt.add && opt.value.toLowerCase() === q;
             return (
-              <li key={opt.value} data-idx={i} role="option" aria-selected={isSelected}>
+              <li key={`${opt.add ? "add" : "item"}-${opt.value}`} data-idx={i} role="option" aria-selected={isSelected}>
                 <button
                   type="button"
                   onMouseEnter={() => setActive(i)}
                   onClick={() => commit(opt.value)}
                   className={cn(
                     "flex w-full items-center justify-between gap-3 rounded-lg px-3.5 py-3 text-left text-sm transition-colors",
-                    isOther && "mt-1 border-t border-bone font-semibold text-saffron-dk",
+                    opt.add && "mt-1 border-t border-bone font-semibold text-saffron-dk",
                     isActive ? "bg-saffron/10 text-ink" : "text-ink hover:bg-cream"
                   )}
                 >
@@ -215,9 +187,9 @@ export function CollegeCombobox({
               </li>
             );
           })}
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && !showAddOwn ? (
             <li className="px-3.5 py-3 text-sm text-ash">
-              No match in the list. Use &quot;Other (type your own)&quot; above.
+              Type your institute name to add it.
             </li>
           ) : null}
         </ul>

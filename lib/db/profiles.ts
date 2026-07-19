@@ -125,6 +125,17 @@ export async function upsertOnboardingProfile(payload: {
     .maybeSingle();
   if (clash) return { ok: false, error: "That username is taken. Pick another." };
 
+  // Confusable-username defense: reject a handle whose underscore-stripped form
+  // already belongs to someone else ("shorya_noodle" vs "shoryanoodle"). The DB
+  // function excludes this user's own row, so a re-onboard keeping the same
+  // handle is not falsely flagged. The unique index below is the hard backstop.
+  const { data: canonicalTaken } = await sb.rpc("handle_canonical_taken", {
+    candidate: payload.handle,
+  });
+  if (canonicalTaken) {
+    return { ok: false, error: "That username is too close to an existing one. Try adding a word." };
+  }
+
   // Was this account already onboarded? If so, this is a re-onboard/edit and we
   // must NOT re-send the welcome email.
   const { data: existing } = await sb
@@ -154,8 +165,16 @@ export async function upsertOnboardingProfile(payload: {
 
   const { error } = await sb.from("profiles").upsert(row);
   if (error) {
-    // Lost the race to a concurrent claim on the same handle.
-    if (isUniqueViolation(error)) return { ok: false, error: "That username is taken." };
+    // Lost the race to a concurrent claim on the same handle. Distinguish an
+    // exact clash from a canonical (underscore-stripped) clash by the offending
+    // index name so the race loser gets the matching, actionable message.
+    if (isUniqueViolation(error)) {
+      const msg = (error.message ?? "").toLowerCase();
+      if (msg.includes("canonical")) {
+        return { ok: false, error: "That username is too close to an existing one. Try adding a word." };
+      }
+      return { ok: false, error: "That username is taken." };
+    }
     return { ok: false, error: error.message };
   }
 

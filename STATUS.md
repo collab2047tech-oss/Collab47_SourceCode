@@ -120,6 +120,11 @@ These are live even though the build is not deployed, because they are configura
 - **Custom auth domain.** Today the Google sign-in screen reads "to continue to `munpgkzcukoccoactszz.supabase.co`", which looks like gibberish to a new user right at the moment they are deciding to sign up. Fixing it needs Supabase's Custom Domain add-on (about $10/mo, Pro only) so the callback runs on `auth.collab47.com`. Setting an app name in Google alone does not fix it, because Google shows the domain where the OAuth flow terminates.
 - Raise database limits and enable daily backups
 - Re-enable email verification on signup if wanted (currently off by choice)
+- **Weekly digest email + push notifications - verify end to end in production.**
+  The infra already exists and is scheduled (Vercel cron `/api/cron/digest`
+  Mondays 02:30 UTC; web push via VAPID; per-user opt-out toggle live in
+  Settings writing `profiles.digest_opt_out`). What remains is confirming real
+  delivery on the production domain and deciding push campaign content.
 
 **Housekeeping**
 - The Mac's disk hit 100% full during this work. Desktop alone is ~31 GB. Worth clearing.

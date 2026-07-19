@@ -11,7 +11,7 @@ import { isReserved } from "@/lib/data/reserved-handles";
 
 export const dynamic = "force-dynamic";
 
-export type HandleStatus = "ok" | "format" | "reserved" | "taken" | "unknown";
+export type HandleStatus = "ok" | "format" | "reserved" | "taken" | "similar" | "unknown";
 
 export async function GET(req: NextRequest) {
   const handle = (req.nextUrl.searchParams.get("handle") ?? "").toLowerCase().trim();
@@ -30,8 +30,18 @@ export async function GET(req: NextRequest) {
   }
 
   const { data } = await admin.from("profiles").select("id").eq("handle", handle).maybeSingle();
-  return NextResponse.json({
-    available: !data,
-    status: (data ? "taken" : "ok") as HandleStatus,
-  });
+  if (data) {
+    return NextResponse.json({ available: false, status: "taken" as HandleStatus });
+  }
+
+  // Confusable-username check: is the canonical (underscore-stripped) form
+  // already taken? "shorya_noodle" collides with "shoryanoodle". The DB function
+  // is the single source of truth (also enforced by the unique index + the
+  // server action); we call it here so the user hears it while still typing.
+  const { data: canonicalTaken } = await admin.rpc("handle_canonical_taken", { candidate: handle });
+  if (canonicalTaken) {
+    return NextResponse.json({ available: false, status: "similar" as HandleStatus });
+  }
+
+  return NextResponse.json({ available: true, status: "ok" as HandleStatus });
 }

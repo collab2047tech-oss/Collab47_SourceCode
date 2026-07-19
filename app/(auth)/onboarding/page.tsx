@@ -4,7 +4,7 @@ import { Suspense, useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Button } from "@/components/primitives/Button";
 import { CollegeCombobox } from "@/components/composite/CollegeCombobox";
-import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Pencil, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Briefcase, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -27,7 +27,8 @@ const ACCOUNT_TYPES: {
   { id: "researcher", title: "Researcher", blurb: "Share work, find collaborators, push ideas.", Icon: Microscope },
   { id: "faculty", title: "Faculty", blurb: "Mentor, publish, and guide projects.", Icon: BookOpen },
   { id: "institution", title: "Institution", blurb: "Represent a college, lab, or society.", Icon: Building2 },
-  { id: "industry", title: "Industry / Startup", blurb: "Hire, sponsor, and ship with talent.", Icon: Rocket },
+  { id: "industry", title: "Industry", blurb: "Hire, sponsor, and ship with talent.", Icon: Briefcase },
+  { id: "startup", title: "Startup", blurb: "Build your team and ship your product.", Icon: Rocket },
 ];
 
 const BRANCHES = [
@@ -114,10 +115,18 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
     steps: ["type", "identity", "affiliation", "interests"],
   },
   industry: {
-    affiliationLabel: "Institution / Organization",
-    affiliationPlaceholder: "Search the organization",
+    affiliationLabel: "Company / organization",
+    affiliationPlaceholder: "Search your company",
     affiliationOtherPlaceholder: "e.g. Nimbus Labs",
     fieldLabel: "Your industry.",
+    fieldKind: "organization",
+    steps: ["type", "identity", "affiliation", "field", "interests"],
+  },
+  startup: {
+    affiliationLabel: "Startup name",
+    affiliationPlaceholder: "Search or type your startup",
+    affiliationOtherPlaceholder: "e.g. Nimbus Labs",
+    fieldLabel: "Your sector.",
     fieldKind: "organization",
     steps: ["type", "identity", "affiliation", "field", "interests"],
   },
@@ -275,7 +284,7 @@ function OnboardingFlow() {
   // instead of after they finish the whole flow. The server action still enforces
   // uniqueness authoritatively; this is purely to save the round trip.
   const [handleStatus, setHandleStatus] =
-    useState<"idle" | "checking" | "ok" | "taken" | "reserved">("idle");
+    useState<"idle" | "checking" | "ok" | "taken" | "reserved" | "similar">("idle");
 
   const [customInterest, setCustomInterest] = useState("");
 
@@ -306,7 +315,15 @@ function OnboardingFlow() {
       try {
         const res = await fetch(`/api/handle-available?handle=${encodeURIComponent(h)}`);
         const json = (await res.json()) as { available: boolean; status: string };
-        setHandleStatus(json.available ? "ok" : json.status === "reserved" ? "reserved" : "taken");
+        setHandleStatus(
+          json.available
+            ? "ok"
+            : json.status === "reserved"
+              ? "reserved"
+              : json.status === "similar"
+                ? "similar"
+                : "taken"
+        );
       } catch {
         setHandleStatus("idle");
       }
@@ -314,12 +331,19 @@ function OnboardingFlow() {
     return () => window.clearTimeout(t);
   }, [data.handle]);
   const affiliationValue = usesOrganization ? data.organization : data.college;
+  const usesRole = data.account_type === "industry" || data.account_type === "startup";
   const canContinue = (() => {
     switch (currentKey) {
       case "type":
         return !!data.account_type;
       case "identity":
-        return data.name.trim().length > 0 && handleValid && handleStatus !== "taken" && handleStatus !== "reserved";
+        return (
+          data.name.trim().length > 0 &&
+          handleValid &&
+          handleStatus !== "taken" &&
+          handleStatus !== "reserved" &&
+          handleStatus !== "similar"
+        );
       case "affiliation":
         return affiliationValue.trim().length > 0;
       case "field":
@@ -327,13 +351,50 @@ function OnboardingFlow() {
         // fields (birthday) stay optional.
         if (data.account_type === "student")
           return effectiveBranch.length > 0 && data.year.length > 0;
-        if (data.account_type === "industry")
+        if (usesRole)
           return effectiveBranch.length > 0 && data.role.trim().length > 0;
         return effectiveBranch.length > 0;
       case "interests":
         return data.interests.length >= MIN_INTERESTS;
       default:
         return true;
+    }
+  })();
+
+  // One consistent mechanism so Continue is NEVER silently disabled: when the
+  // current step's gate fails, name exactly what is still missing in a quiet
+  // ash hint next to the button (rendered in both the nav and the submit form).
+  const gateHint: string | null = (() => {
+    if (canContinue) return null;
+    switch (currentKey) {
+      case "identity":
+        if (!data.name.trim()) return "Enter your name to continue.";
+        if (!handleValid) return "Pick a username (3-32 letters, numbers, or underscore).";
+        if (handleStatus === "taken") return "That username is taken. Try another.";
+        if (handleStatus === "reserved") return "That username is reserved. Try another.";
+        if (handleStatus === "similar") return "That username is too close to an existing one. Add a word.";
+        return "Add your name and username to continue.";
+      case "affiliation":
+        if (data.account_type === "student") return "Pick your institute or type its name.";
+        if (data.account_type === "startup") return "Add your startup name.";
+        if (usesOrganization) return "Add your organization name.";
+        return "Pick your institution or type its name.";
+      case "field":
+        if (data.account_type === "student") {
+          if (!effectiveBranch) return "Pick your branch, or choose Other to type it.";
+          if (!data.year) return "Pick your year of study.";
+        }
+        if (usesRole) {
+          if (!effectiveBranch)
+            return data.account_type === "startup" ? "Pick your sector." : "Pick your industry.";
+          if (!data.role.trim()) return "Add your role.";
+        }
+        if (!effectiveBranch) return "Choose one, or pick Other to type your own.";
+        return "Fill in the details above to continue.";
+      case "interests":
+        return `Pick at least ${MIN_INTERESTS} (${data.interests.length} selected so far).`;
+      default:
+        return null;
     }
   })();
 
@@ -510,7 +571,7 @@ function OnboardingFlow() {
                         id="ob-handle"
                         className={cn(
                           "h-14 w-full rounded-lg border bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20",
-                          data.handle && (!handleValid || handleStatus === "taken" || handleStatus === "reserved")
+                          data.handle && (!handleValid || handleStatus === "taken" || handleStatus === "reserved" || handleStatus === "similar")
                             ? "border-ember focus:border-ember"
                             : "border-ink/15 focus:border-saffron"
                         )}
@@ -533,13 +594,14 @@ function OnboardingFlow() {
                               "text-xs font-medium",
                               handleStatus === "ok" && "text-moss",
                               handleStatus === "checking" && "text-ash",
-                              (handleStatus === "taken" || handleStatus === "reserved") && "text-ember"
+                              (handleStatus === "taken" || handleStatus === "reserved" || handleStatus === "similar") && "text-ember"
                             )}
                           >
                             {handleStatus === "checking" && "Checking availability..."}
                             {handleStatus === "ok" && `@${data.handle} is available`}
                             {handleStatus === "taken" && `@${data.handle} is already taken. Try another.`}
                             {handleStatus === "reserved" && `@${data.handle} is reserved. Try another.`}
+                            {handleStatus === "similar" && `@${data.handle} is too close to an existing username. Try adding a word.`}
                           </p>
                         ) : null}
                       </div>
@@ -554,7 +616,8 @@ function OnboardingFlow() {
                     <h1 className="mt-3 font-serif text-4xl text-ink sm:text-5xl">
                       {data.account_type === "student" ? "Where do you study?"
                         : data.account_type === "institution" ? "Tell us about your organization."
-                        : data.account_type === "industry" ? "Your organization."
+                        : data.account_type === "industry" ? "Your company."
+                        : data.account_type === "startup" ? "Your startup."
                         : "Where are you based?"}
                     </h1>
                     <p className="mt-3 text-body text-ash">
@@ -700,14 +763,21 @@ function OnboardingFlow() {
                       </>
                     )}
 
-                    {/* Merged from the old "role" step: industry job title. */}
-                    {data.account_type === "industry" && (
+                    {/* Merged from the old "role" step: industry job title, and
+                        the startup founder's role at their startup. */}
+                    {usesRole && (
                       <div className="mt-10 flex flex-col gap-2">
-                        <label htmlFor="ob-role" className="text-caption text-ink">Role / title</label>
+                        <label htmlFor="ob-role" className="text-caption text-ink">
+                          {data.account_type === "startup" ? "Your role" : "Role / title"}
+                        </label>
                         <input
                           id="ob-role"
                           className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
-                          placeholder="e.g. Founder, Talent Lead, Product Manager"
+                          placeholder={
+                            data.account_type === "startup"
+                              ? "e.g. Founder, Co-founder, CTO, Engineer"
+                              : "e.g. Founder, Talent Lead, Product Manager"
+                          }
                           value={data.role}
                           onChange={(e) => setData({ ...data, role: e.target.value })}
                           onKeyDown={advanceOnEnter}
@@ -849,7 +919,7 @@ function OnboardingFlow() {
                 {state?.error ? (
                   <p className="mb-4 rounded-lg border border-ember/30 bg-ember/5 px-4 py-3 text-sm text-ember">
                     {state.error}
-                    {/^That username is taken/i.test(state.error) ? (
+                    {/username is (taken|too close)/i.test(state.error) ? (
                       <>
                         {" "}
                         <button
@@ -863,6 +933,9 @@ function OnboardingFlow() {
                     ) : null}
                   </p>
                 ) : null}
+              </div>
+              <div aria-live="polite" role="status" className="mb-2 min-h-4 text-right">
+                {gateHint ? <span className="text-xs text-ash">{gateHint}</span> : null}
               </div>
               <div className="flex items-center justify-between gap-4">
                 <Button
@@ -885,22 +958,27 @@ function OnboardingFlow() {
               </div>
             </form>
           ) : (
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                variant="ghost"
-                onClick={back}
-                disabled={index === 0}
-                className="gap-2"
-              >
-                <ArrowLeft className="size-4" /> Back
-              </Button>
-              {currentKey !== "type" ? (
-                <Button onClick={next} size="lg" disabled={!canContinue} className="gap-2">
-                  Continue <ArrowRight className="size-4" />
+            <div>
+              <div aria-live="polite" role="status" className="mb-2 min-h-4 text-right">
+                {gateHint ? <span className="text-xs text-ash">{gateHint}</span> : null}
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Button
+                  variant="ghost"
+                  onClick={back}
+                  disabled={index === 0}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="size-4" /> Back
                 </Button>
-              ) : (
-                <span className="text-sm text-ash">Select one to continue</span>
-              )}
+                {currentKey !== "type" ? (
+                  <Button onClick={next} size="lg" disabled={!canContinue} className="gap-2">
+                    Continue <ArrowRight className="size-4" />
+                  </Button>
+                ) : (
+                  <span className="text-sm text-ash">Select one to continue</span>
+                )}
+              </div>
             </div>
           )}
         </div>

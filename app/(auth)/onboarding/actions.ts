@@ -12,6 +12,7 @@ const ACCOUNT_TYPES: AccountType[] = [
   "faculty",
   "institution",
   "industry",
+  "startup",
 ];
 
 /** Result surfaced back to the onboarding client. */
@@ -97,6 +98,12 @@ export async function completeOnboarding(
     case "industry":
       orgCol = organization; // company / org name
       // Combine role and industry sector so neither is lost (no role column).
+      branchCol = role && branch ? `${role} - ${branch}` : role || branch || undefined;
+      cityCol = city;
+      break;
+    case "startup":
+      orgCol = organization; // startup name
+      // Same shape as industry: combine role at the startup and its sector.
       branchCol = role && branch ? `${role} - ${branch}` : role || branch || undefined;
       cityCol = city;
       break;
