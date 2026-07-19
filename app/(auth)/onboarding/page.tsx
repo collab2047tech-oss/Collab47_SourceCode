@@ -167,7 +167,13 @@ function generateHandleSuggestions(
   const last = parts.length > 1 ? parts[parts.length - 1] : "";
   const hint = type ? HANDLE_HINTS[type] : "hq";
   const seed = b || first || "user";
-  const two = () => String(Math.floor(Math.random() * 90) + 10); // 10-99
+  // 10-99, excluding 69 - a professional network should not be suggesting
+  // "@name_69" to new members.
+  const two = () => {
+    let n = Math.floor(Math.random() * 90) + 10;
+    while (n === 69) n = Math.floor(Math.random() * 90) + 10;
+    return String(n);
+  };
 
   const raw = [
     last ? `${seed}_${last}` : "",

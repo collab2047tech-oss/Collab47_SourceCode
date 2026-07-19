@@ -1,0 +1,1862 @@
+{
+  "_note": "Bootstrap directory data. Institutions = the app's curated real Indian institution list. Startups = real, verifiable DPIIT-recognized companies (HQ city). City/state only where confidently known; never invented. Replaced/extended nightly by data.gov.in sync once DATA_GOV_IN_API_KEY is set.",
+  "institutions": [
+    {
+      "name": "Indian Institute of Science (IISc), Bengaluru",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "IISER Pune",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "IISER Kolkata",
+      "city": "Kolkata",
+      "state": "West Bengal"
+    },
+    {
+      "name": "IISER Mohali",
+      "city": "Mohali",
+      "state": "Punjab"
+    },
+    {
+      "name": "IISER Bhopal",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "IISER Thiruvananthapuram",
+      "city": "Thiruvananthapuram",
+      "state": "Kerala"
+    },
+    {
+      "name": "IISER Tirupati",
+      "city": "Tirupati",
+      "state": "Andhra Pradesh"
+    },
+    {
+      "name": "IISER Berhampur",
+      "city": "Berhampur",
+      "state": "Odisha"
+    },
+    {
+      "name": "IIT Bombay",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "IIT Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "IIT Madras",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "IIT Kanpur",
+      "city": "Kanpur",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "IIT Kharagpur",
+      "city": "Kharagpur",
+      "state": "West Bengal"
+    },
+    {
+      "name": "IIT Roorkee",
+      "city": "Roorkee",
+      "state": "Uttarakhand"
+    },
+    {
+      "name": "IIT Guwahati",
+      "city": "Guwahati",
+      "state": "Assam"
+    },
+    {
+      "name": "IIT Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "IIT Indore",
+      "city": "Indore",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "IIT (BHU) Varanasi",
+      "city": "Varanasi",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "IIT Gandhinagar",
+      "city": "Gandhinagar",
+      "state": "Gujarat"
+    },
+    {
+      "name": "IIT Ropar",
+      "city": "Rupnagar",
+      "state": "Punjab"
+    },
+    {
+      "name": "IIT Patna",
+      "city": "Patna",
+      "state": "Bihar"
+    },
+    {
+      "name": "IIT Mandi",
+      "city": "Mandi",
+      "state": "Himachal Pradesh"
+    },
+    {
+      "name": "IIT Jodhpur",
+      "city": "Jodhpur",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "IIT Bhubaneswar",
+      "city": "Bhubaneswar",
+      "state": "Odisha"
+    },
+    {
+      "name": "IIT Tirupati",
+      "city": "Tirupati",
+      "state": "Andhra Pradesh"
+    },
+    {
+      "name": "IIT Palakkad",
+      "city": "Palakkad",
+      "state": "Kerala"
+    },
+    {
+      "name": "IIT (ISM) Dhanbad",
+      "city": "Dhanbad",
+      "state": "Jharkhand"
+    },
+    {
+      "name": "IIT Bhilai",
+      "city": "Bhilai",
+      "state": "Chhattisgarh"
+    },
+    {
+      "name": "IIT Goa",
+      "city": "Ponda",
+      "state": "Goa"
+    },
+    {
+      "name": "IIT Jammu",
+      "city": "Jammu",
+      "state": "Jammu and Kashmir"
+    },
+    {
+      "name": "IIT Dharwad",
+      "city": "Dharwad",
+      "state": "Karnataka"
+    },
+    {
+      "name": "NIT Tiruchirappalli (NIT Trichy)",
+      "city": "Tiruchirappalli",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "NIT Karnataka, Surathkal",
+      "city": "Mangaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "NIT Warangal",
+      "city": "Warangal",
+      "state": "Telangana"
+    },
+    {
+      "name": "NIT Rourkela",
+      "city": "Rourkela",
+      "state": "Odisha"
+    },
+    {
+      "name": "NIT Calicut",
+      "city": "Kozhikode",
+      "state": "Kerala"
+    },
+    {
+      "name": "MNNIT Allahabad",
+      "city": "Prayagraj",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "VNIT Nagpur",
+      "city": "Nagpur",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "NIT Kurukshetra",
+      "city": "Kurukshetra",
+      "state": "Haryana"
+    },
+    {
+      "name": "NIT Durgapur",
+      "city": "Durgapur",
+      "state": "West Bengal"
+    },
+    {
+      "name": "MNIT Jaipur",
+      "city": "Jaipur",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "MANIT Bhopal",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "NIT Jalandhar",
+      "city": "Jalandhar",
+      "state": "Punjab"
+    },
+    {
+      "name": "NIT Hamirpur",
+      "city": "Hamirpur",
+      "state": "Himachal Pradesh"
+    },
+    {
+      "name": "NIT Silchar",
+      "city": "Silchar",
+      "state": "Assam"
+    },
+    {
+      "name": "NIT Srinagar",
+      "city": "Srinagar",
+      "state": "Jammu and Kashmir"
+    },
+    {
+      "name": "NIT Patna",
+      "city": "Patna",
+      "state": "Bihar"
+    },
+    {
+      "name": "NIT Raipur",
+      "city": "Raipur",
+      "state": "Chhattisgarh"
+    },
+    {
+      "name": "NIT Agartala",
+      "city": "Agartala",
+      "state": "Tripura"
+    },
+    {
+      "name": "NIT Jamshedpur",
+      "city": "Jamshedpur",
+      "state": "Jharkhand"
+    },
+    {
+      "name": "SVNIT Surat",
+      "city": "Surat",
+      "state": "Gujarat"
+    },
+    {
+      "name": "NIT Goa",
+      "city": "Ponda",
+      "state": "Goa"
+    },
+    {
+      "name": "NIT Meghalaya",
+      "city": "Shillong",
+      "state": "Meghalaya"
+    },
+    {
+      "name": "NIT Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "NIT Puducherry",
+      "city": "Karaikal",
+      "state": "Puducherry"
+    },
+    {
+      "name": "NIT Andhra Pradesh",
+      "city": "Tadepalligudem",
+      "state": "Andhra Pradesh"
+    },
+    {
+      "name": "NIT Uttarakhand",
+      "city": "Srinagar",
+      "state": "Uttarakhand"
+    },
+    {
+      "name": "IIIT Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "IIIT Bangalore",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "IIIT Allahabad",
+      "city": "Prayagraj",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "ABV-IIITM Gwalior",
+      "city": "Gwalior",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "IIIT Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "IIITDM Jabalpur",
+      "city": "Jabalpur",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "IIITDM Kancheepuram",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "IIIT Lucknow",
+      "city": "Lucknow",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "IIIT Vadodara",
+      "city": "Vadodara",
+      "state": "Gujarat"
+    },
+    {
+      "name": "IIIT Kota",
+      "city": "Kota",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "IIIT Pune",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "IIIT Nagpur",
+      "city": "Nagpur",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "IIIT Kalyani",
+      "city": "Kalyani",
+      "state": "West Bengal"
+    },
+    {
+      "name": "IIIT Sri City",
+      "city": "Sri City",
+      "state": "Andhra Pradesh"
+    },
+    {
+      "name": "IIIT Una",
+      "city": "Una",
+      "state": "Himachal Pradesh"
+    },
+    {
+      "name": "IIIT Sonepat",
+      "city": "Sonipat",
+      "state": "Haryana"
+    },
+    {
+      "name": "IIIT Bhagalpur",
+      "city": "Bhagalpur",
+      "state": "Bihar"
+    },
+    {
+      "name": "IIIT Bhopal",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "IIIT Surat",
+      "city": "Surat",
+      "state": "Gujarat"
+    },
+    {
+      "name": "IIIT Ranchi",
+      "city": "Ranchi",
+      "state": "Jharkhand"
+    },
+    {
+      "name": "Delhi Technological University (DTU)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Netaji Subhas University of Technology (NSUT)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Indira Gandhi Delhi Technical University for Women (IGDTUW)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "BITS Pilani",
+      "city": "Pilani",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "BITS Pilani, Goa Campus",
+      "city": "Zuarinagar",
+      "state": "Goa"
+    },
+    {
+      "name": "BITS Pilani, Hyderabad Campus",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "VIT Vellore",
+      "city": "Vellore",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "VIT Chennai",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "SRM Institute of Science and Technology",
+      "city": "Kattankulathur",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Manipal Institute of Technology (MIT Manipal)",
+      "city": "Manipal",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Thapar Institute of Engineering and Technology, Patiala",
+      "city": "Patiala",
+      "state": "Punjab"
+    },
+    {
+      "name": "Amity University, Noida",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Lovely Professional University (LPU)",
+      "city": "Phagwara",
+      "state": "Punjab"
+    },
+    {
+      "name": "Chandigarh University",
+      "city": "Mohali",
+      "state": "Punjab"
+    },
+    {
+      "name": "Shiv Nadar University",
+      "city": "Greater Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "PES University",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "RV College of Engineering",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "BMS College of Engineering",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "M S Ramaiah Institute of Technology",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "College of Engineering Pune (COEP)",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Veermata Jijabai Technological Institute (VJTI), Mumbai",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "PSG College of Technology, Coimbatore",
+      "city": "Coimbatore",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "SSN College of Engineering, Chennai",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Birla Institute of Technology (BIT) Mesra",
+      "city": "Ranchi",
+      "state": "Jharkhand"
+    },
+    {
+      "name": "Delhi College of Engineering",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Jaypee Institute of Information Technology, Noida",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Vellore Institute of Technology, Bhopal",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "KIIT University, Bhubaneswar",
+      "city": "Bhubaneswar",
+      "state": "Odisha"
+    },
+    {
+      "name": "SASTRA Deemed University",
+      "city": "Thanjavur",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Amrita Vishwa Vidyapeetham",
+      "city": "Coimbatore",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Symbiosis Institute of Technology, Pune",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "University of Delhi (DU)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Jamia Millia Islamia",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Jawaharlal Nehru University (JNU)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Banaras Hindu University (BHU)",
+      "city": "Varanasi",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Aligarh Muslim University (AMU)",
+      "city": "Aligarh",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "University of Mumbai",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "University of Calcutta",
+      "city": "Kolkata",
+      "state": "West Bengal"
+    },
+    {
+      "name": "University of Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "Anna University, Chennai",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Jadavpur University",
+      "city": "Kolkata",
+      "state": "West Bengal"
+    },
+    {
+      "name": "Savitribai Phule Pune University",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Osmania University, Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "Panjab University, Chandigarh",
+      "city": "Chandigarh",
+      "state": "Chandigarh"
+    },
+    {
+      "name": "Guru Gobind Singh Indraprastha University (GGSIPU)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Christ University, Bengaluru",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Ashoka University",
+      "city": "Sonipat",
+      "state": "Haryana"
+    },
+    {
+      "name": "O.P. Jindal Global University",
+      "city": "Sonipat",
+      "state": "Haryana"
+    },
+    {
+      "name": "Symbiosis International University",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Manipal Academy of Higher Education",
+      "city": "Manipal",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Vellore Institute of Technology University",
+      "city": "Vellore",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Bennett University",
+      "city": "Greater Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Plaksha University",
+      "city": "Mohali",
+      "state": "Punjab"
+    },
+    {
+      "name": "AIIMS Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "AIIMS Jodhpur",
+      "city": "Jodhpur",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "AIIMS Bhubaneswar",
+      "city": "Bhubaneswar",
+      "state": "Odisha"
+    },
+    {
+      "name": "AIIMS Bhopal",
+      "city": "Bhopal",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "AIIMS Raipur",
+      "city": "Raipur",
+      "state": "Chhattisgarh"
+    },
+    {
+      "name": "Christian Medical College (CMC), Vellore",
+      "city": "Vellore",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Armed Forces Medical College (AFMC), Pune",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Maulana Azad Medical College, Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Kasturba Medical College, Manipal",
+      "city": "Manipal",
+      "state": "Karnataka"
+    },
+    {
+      "name": "IIM Ahmedabad",
+      "city": "Ahmedabad",
+      "state": "Gujarat"
+    },
+    {
+      "name": "IIM Bangalore",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "IIM Calcutta",
+      "city": "Kolkata",
+      "state": "West Bengal"
+    },
+    {
+      "name": "IIM Lucknow",
+      "city": "Lucknow",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "IIM Kozhikode",
+      "city": "Kozhikode",
+      "state": "Kerala"
+    },
+    {
+      "name": "IIM Indore",
+      "city": "Indore",
+      "state": "Madhya Pradesh"
+    },
+    {
+      "name": "Indian School of Business (ISB), Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "XLRI Jamshedpur",
+      "city": "Jamshedpur",
+      "state": "Jharkhand"
+    },
+    {
+      "name": "MDI Gurgaon",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "FMS Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "National Institute of Design (NID), Ahmedabad",
+      "city": "Ahmedabad",
+      "state": "Gujarat"
+    },
+    {
+      "name": "National Institute of Fashion Technology (NIFT)",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "School of Planning and Architecture (SPA), Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "National Law School of India University (NLSIU), Bangalore",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "NALSAR University of Law, Hyderabad",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "National Law University (NLU), Delhi",
+      "city": "New Delhi",
+      "state": "Delhi"
+    }
+  ],
+  "startups": [
+    {
+      "name": "Flipkart",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zomato",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Swiggy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Paytm",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Ola",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Oyo",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Byju's",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Unacademy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Nykaa",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "PhonePe",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Razorpay",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "CRED",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Meesho",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Groww",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zerodha",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Dream11",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "PolicyBazaar",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Delhivery",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "BigBasket",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Udaan",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Cars24",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Spinny",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Lenskart",
+      "city": "Faridabad",
+      "state": "Haryana"
+    },
+    {
+      "name": "BharatPe",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Pine Labs",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Zepto",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "ShareChat",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Ola Electric",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Ather Energy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "boAt",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Mamaearth",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "upGrad",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Vedantu",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "PhysicsWallah",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Cult.fit",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "PharmEasy",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "1mg",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Practo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Urban Company",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Dunzo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Rapido",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "BlackBuck",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Rivigo",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Licious",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Country Delight",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "FirstCry",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Purplle",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Bewakoof",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "The Souled Store",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "boat Lifestyle",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Cashfree Payments",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Instamojo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zeta",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Slice",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Jupiter",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Fi Money",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "KreditBee",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "MoneyTap",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "CoinDCX",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "CoinSwitch",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zolve",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Open",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "RazorpayX",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Chargebee",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Freshworks",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Zoho",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Postman",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "BrowserStack",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Hasura",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Whatfix",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Darwinbox",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "Innovaccer",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Icertis",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Druva",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "MindTickle",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Gupshup",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Yellow.ai",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Observe.ai",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Uniphore",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Mad Street Den",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "SigTuple",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Niramai",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "HealthifyMe",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Cure.fit",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Pristyn Care",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "MFine",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Curefoods",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Rebel Foods",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Bira 91",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Sula Vineyards",
+      "city": "Nashik",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Wakefit",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Wow! Momo",
+      "city": "Kolkata",
+      "state": "West Bengal"
+    },
+    {
+      "name": "Chaayos",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Chai Point",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Blue Tokai Coffee",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Sleepy Owl Coffee",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "BluSmart",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Yulu",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Bounce",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zypp Electric",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Euler Motors",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Simple Energy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Ultraviolette Automotive",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Log9 Materials",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Battery Smart",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "ChargeZone",
+      "city": "Vadodara",
+      "state": "Gujarat"
+    },
+    {
+      "name": "Cpropelld",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "LEAD School",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Teachmint",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Classplus",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Toppr",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Doubtnut",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Cuemath",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Camp K12",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Skill-Lync",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Scaler Academy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Newton School",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Emeritus",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Great Learning",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Simplilearn",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "upGrad Campus",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Ninjacart",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "DeHaat",
+      "city": "Patna",
+      "state": "Bihar"
+    },
+    {
+      "name": "WayCool Foods",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Cropin",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "AgroStar",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Fasal",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Stellapps",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Otipy",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Captain Fresh",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Zetwerk",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "OfBusiness",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Infra.Market",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Moglix",
+      "city": "Noida",
+      "state": "Uttar Pradesh"
+    },
+    {
+      "name": "Bijnis",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Khatabook",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "OkCredit",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Vyapar",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Dukaan",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Shiprocket",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Shopflo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "GoKwik",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Xpressbees",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Ecom Express",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Porter",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Locus",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Shadowfax",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Koo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "MyGate",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "NoBroker",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Square Yards",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "NestAway",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Stanza Living",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Zolo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Rentomojo",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Furlenco",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Pepperfry",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Livspace",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "HomeLane",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Bluestone",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "CaratLane",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Melorra",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "GIVA",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Sugar Cosmetics",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Plum",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "mCaffeine",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "WOW Skin Science",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "The Man Company",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Bombay Shaving Company",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Noise",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Fire-Boltt",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Atomberg",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Ultrahuman",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "BeatO",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Tata 1mg",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Medibuddy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Digit Insurance",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Acko",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Turtlemint",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Onsurity",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Navi",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Lendingkart",
+      "city": "Ahmedabad",
+      "state": "Gujarat"
+    },
+    {
+      "name": "Capital Float",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Indifi",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Aye Finance",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "FlexiLoans",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Yubi",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Perfios",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Signzy",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Setu",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "M2P Fintech",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Juspay",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Cashfree",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Skyroot Aerospace",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "Agnikul Cosmos",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Pixxel",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Dhruva Space",
+      "city": "Hyderabad",
+      "state": "Telangana"
+    },
+    {
+      "name": "Bellatrix Aerospace",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "GalaxEye",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Digantara",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "ideaForge",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Garuda Aerospace",
+      "city": "Chennai",
+      "state": "Tamil Nadu"
+    },
+    {
+      "name": "Exicom",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Cashify",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "Droom",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "CarDekho",
+      "city": "Jaipur",
+      "state": "Rajasthan"
+    },
+    {
+      "name": "Turno",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Vahdam Teas",
+      "city": "New Delhi",
+      "state": "Delhi"
+    },
+    {
+      "name": "Milk Mantra",
+      "city": "Bhubaneswar",
+      "state": "Odisha"
+    },
+    {
+      "name": "iD Fresh Food",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Yoga Bar",
+      "city": "Bengaluru",
+      "state": "Karnataka"
+    },
+    {
+      "name": "Slurrp Farm",
+      "city": "Gurugram",
+      "state": "Haryana"
+    },
+    {
+      "name": "True Elements",
+      "city": "Pune",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Open Secret",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "The Whole Truth",
+      "city": "Mumbai",
+      "state": "Maharashtra"
+    },
+    {
+      "name": "Wingreens Farms",
+      "city": "Gurugram",
+      "state": "Haryana"
+    }
+  ]
+}
