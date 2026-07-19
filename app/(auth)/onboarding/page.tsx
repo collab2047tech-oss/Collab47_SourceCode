@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useActionState, useEffect, useMemo, useState } from "react";
+import { Suspense, useActionState, useEffect, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { Button } from "@/components/primitives/Button";
 import { CollegeCombobox } from "@/components/composite/CollegeCombobox";
-import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Pencil, Sparkles, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, GraduationCap, Microscope, BookOpen, Building2, Rocket, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -65,10 +65,7 @@ type StepKey =
   | "identity"
   | "affiliation"
   | "field"
-  | "studentDetails"
-  | "role"
-  | "interests"
-  | "review";
+  | "interests";
 
 interface TypeConfig {
   affiliationLabel: string;
@@ -79,14 +76,18 @@ interface TypeConfig {
   steps: StepKey[];
 }
 
+// Streamlined flow: no "review" step (submit now happens on the interests step),
+// and the old "studentDetails" (year + birthday) and "role" steps are folded
+// into "field". Counts are now 5/5/5/4/5 (student/researcher/faculty/institution
+// /industry).
 const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
   student: {
-    affiliationLabel: "College",
-    affiliationPlaceholder: "Search your college",
-    affiliationOtherPlaceholder: "e.g. your college name",
+    affiliationLabel: "Institute",
+    affiliationPlaceholder: "Search your institute",
+    affiliationOtherPlaceholder: "e.g. your institute name",
     fieldLabel: "Pick your branch.",
     fieldKind: "college",
-    steps: ["type", "identity", "affiliation", "field", "studentDetails", "interests", "review"],
+    steps: ["type", "identity", "affiliation", "field", "interests"],
   },
   researcher: {
     affiliationLabel: "Institution / Lab",
@@ -94,7 +95,7 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
     affiliationOtherPlaceholder: "e.g. your institution or lab",
     fieldLabel: "Your field or area of research.",
     fieldKind: "college",
-    steps: ["type", "identity", "affiliation", "field", "interests", "review"],
+    steps: ["type", "identity", "affiliation", "field", "interests"],
   },
   faculty: {
     affiliationLabel: "Institution",
@@ -102,7 +103,7 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
     affiliationOtherPlaceholder: "e.g. your institution",
     fieldLabel: "Your department.",
     fieldKind: "college",
-    steps: ["type", "identity", "affiliation", "field", "interests", "review"],
+    steps: ["type", "identity", "affiliation", "field", "interests"],
   },
   institution: {
     affiliationLabel: "Institution / Organization",
@@ -110,7 +111,7 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
     affiliationOtherPlaceholder: "e.g. your organization name",
     fieldLabel: "Focus areas.",
     fieldKind: "organization",
-    steps: ["type", "identity", "affiliation", "interests", "review"],
+    steps: ["type", "identity", "affiliation", "interests"],
   },
   industry: {
     affiliationLabel: "Institution / Organization",
@@ -118,7 +119,7 @@ const TYPE_CONFIG: Record<AccountType, TypeConfig> = {
     affiliationOtherPlaceholder: "e.g. Nimbus Labs",
     fieldLabel: "Your industry.",
     fieldKind: "organization",
-    steps: ["type", "identity", "affiliation", "field", "role", "interests", "review"],
+    steps: ["type", "identity", "affiliation", "field", "interests"],
   },
 };
 
@@ -178,6 +179,12 @@ function OnboardingFlow() {
     interests: [],
   });
 
+  // useActionState keeps ALL answers on screen when the server rejects (e.g. the
+  // username was taken). A plain <form action={completeOnboarding}> redirected on
+  // error, which remounted this tree and wiped every useState. Only SUCCESS
+  // redirects; validation failures RETURN an error and we keep every field.
+  const [state, formAction, isSubmitting] = useActionState(completeOnboarding, null);
+
   useEffect(() => {
     const sb = getSupabaseBrowser();
     if (!sb) return;
@@ -214,9 +221,9 @@ function OnboardingFlow() {
 
   const config = data.account_type ? TYPE_CONFIG[data.account_type] : null;
   const steps: StepKey[] = config ? config.steps : ["type"];
-  const total = config ? steps.length : 7; // estimated length before a type is chosen
+  const total = config ? steps.length : 5; // estimated length before a type is chosen
   const currentKey = steps[Math.min(index, steps.length - 1)];
-  const isReview = currentKey === "review";
+  const isInterests = currentKey === "interests";
 
   // Affiliation maps to college vs organization column based on type.
   const usesOrganization = config?.fieldKind === "organization";
@@ -316,11 +323,13 @@ function OnboardingFlow() {
       case "affiliation":
         return affiliationValue.trim().length > 0;
       case "field":
+        // Merged step: validate what each type requires. Previously-optional
+        // fields (birthday) stay optional.
+        if (data.account_type === "student")
+          return effectiveBranch.length > 0 && data.year.length > 0;
+        if (data.account_type === "industry")
+          return effectiveBranch.length > 0 && data.role.trim().length > 0;
         return effectiveBranch.length > 0;
-      case "studentDetails":
-        return data.year.length > 0; // birthday optional
-      case "role":
-        return data.role.trim().length > 0;
       case "interests":
         return data.interests.length >= MIN_INTERESTS;
       default:
@@ -331,6 +340,20 @@ function OnboardingFlow() {
   const stepNumber = (k: StepKey) => steps.indexOf(k) + 1;
   const pad = (n: number) => n.toString().padStart(2, "0");
 
+  // Enter advances to the next step when the current step is valid. Attached only
+  // to plain text inputs - the combobox and the custom-interest field own their
+  // Enter key (select option / add interest), so they are left untouched.
+  function advanceOnEnter(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (canContinue) next();
+    }
+  }
+
+  // Animated progress fill (decorative; the "Step X of Y" text is the a11y
+  // source of truth). Respects reduced motion.
+  const progressPct = total > 0 ? (Math.min(index + 1, total) / total) * 100 : 0;
+
   return (
     <main className="min-h-dvh bg-cream">
       <div className="container-edit flex min-h-dvh flex-col py-8 sm:py-10">
@@ -339,18 +362,15 @@ function OnboardingFlow() {
           <Link href="/" className="font-serif text-2xl text-ink">
             <Wordmark />
           </Link>
-          <div className="hidden flex-1 items-center justify-center gap-1.5 px-6 sm:flex">
-            {Array.from({ length: total }).map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "h-1.5 flex-1 max-w-12 rounded-full transition-colors duration-500",
-                  i < index ? "bg-saffron"
-                    : i === index ? "bg-saffron/60"
-                    : "bg-bone"
-                )}
+          <div className="hidden flex-1 px-6 sm:block" aria-hidden="true">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-bone">
+              <motion.div
+                className="h-full rounded-full bg-saffron"
+                initial={false}
+                animate={{ width: `${progressPct}%` }}
+                transition={{ duration: reduce ? 0 : 0.5, ease: [0.16, 1, 0.3, 1] }}
               />
-            ))}
+            </div>
           </div>
           <span className="shrink-0 text-caption text-ash">
             Step {Math.min(index + 1, total)} of {total}
@@ -363,11 +383,13 @@ function OnboardingFlow() {
           </p>
         ) : null}
 
-        {errorMsg ? (
-          <p className="mx-auto mt-4 max-w-2xl rounded-lg border border-ember/30 bg-ember/10 px-4 py-2.5 text-center text-sm font-medium text-ember">
-            {errorMsg}
-          </p>
-        ) : null}
+        <div aria-live="polite">
+          {errorMsg ? (
+            <p className="mx-auto mt-4 max-w-2xl rounded-lg border border-ember/30 bg-ember/10 px-4 py-2.5 text-center text-sm font-medium text-ember">
+              {errorMsg}
+            </p>
+          ) : null}
+        </div>
 
         {/* Card */}
         <div className="flex flex-1 items-center justify-center py-8">
@@ -397,6 +419,7 @@ function OnboardingFlow() {
                           <button
                             key={id}
                             type="button"
+                            aria-pressed={active}
                             onClick={() => chooseType(id)}
                             className={cn(
                               "group flex flex-col items-start gap-3 rounded-2xl border p-5 text-left transition-all duration-200",
@@ -444,7 +467,7 @@ function OnboardingFlow() {
                       </label>
                       <input
                         id="ob-name"
-                        className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
+                        className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
                         placeholder={
                           data.account_type === "institution" ? "e.g. Riverside Robotics Society"
                             : data.account_type === "industry" ? "e.g. Nimbus Labs"
@@ -452,6 +475,7 @@ function OnboardingFlow() {
                         }
                         value={data.name}
                         onChange={(e) => setName(e.target.value)}
+                        onKeyDown={advanceOnEnter}
                         autoFocus
                       />
                     </div>
@@ -464,6 +488,7 @@ function OnboardingFlow() {
                             <button
                               key={t}
                               type="button"
+                              aria-pressed={active}
                               onClick={() => setData({ ...data, title: active ? "" : t })}
                               className={cn(
                                 "rounded-full border px-4 py-2 text-sm font-medium transition-all",
@@ -484,7 +509,7 @@ function OnboardingFlow() {
                       <input
                         id="ob-handle"
                         className={cn(
-                          "h-14 w-full rounded-lg border bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:outline-none focus:ring-2 focus:ring-saffron/20",
+                          "h-14 w-full rounded-lg border bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20",
                           data.handle && (!handleValid || handleStatus === "taken" || handleStatus === "reserved")
                             ? "border-ember focus:border-ember"
                             : "border-ink/15 focus:border-saffron"
@@ -495,26 +520,29 @@ function OnboardingFlow() {
                           setHandleEdited(true);
                           setData({ ...data, handle: slugify(e.target.value) });
                         }}
+                        onKeyDown={advanceOnEnter}
                       />
                       <p className="text-xs text-ash">
                         collab47.com/u/<span className="font-medium text-ink">{data.handle || "username"}</span>
                         {"  -  "}letters, numbers, underscore
                       </p>
-                      {handleValid && handleStatus !== "idle" ? (
-                        <p
-                          className={cn(
-                            "text-xs font-medium",
-                            handleStatus === "ok" && "text-moss",
-                            handleStatus === "checking" && "text-ash",
-                            (handleStatus === "taken" || handleStatus === "reserved") && "text-ember"
-                          )}
-                        >
-                          {handleStatus === "checking" && "Checking availability..."}
-                          {handleStatus === "ok" && `@${data.handle} is available`}
-                          {handleStatus === "taken" && `@${data.handle} is already taken. Try another.`}
-                          {handleStatus === "reserved" && `@${data.handle} is reserved. Try another.`}
-                        </p>
-                      ) : null}
+                      <div aria-live="polite" role="status">
+                        {handleValid && handleStatus !== "idle" ? (
+                          <p
+                            className={cn(
+                              "text-xs font-medium",
+                              handleStatus === "ok" && "text-moss",
+                              handleStatus === "checking" && "text-ash",
+                              (handleStatus === "taken" || handleStatus === "reserved") && "text-ember"
+                            )}
+                          >
+                            {handleStatus === "checking" && "Checking availability..."}
+                            {handleStatus === "ok" && `@${data.handle} is available`}
+                            {handleStatus === "taken" && `@${data.handle} is already taken. Try another.`}
+                            {handleStatus === "reserved" && `@${data.handle} is reserved. Try another.`}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -555,16 +583,18 @@ function OnboardingFlow() {
                         </label>
                         <input
                           id="ob-city"
-                          className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
+                          className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
                           placeholder="e.g. your city"
                           value={data.city}
                           onChange={(e) => setData({ ...data, city: e.target.value })}
+                          onKeyDown={advanceOnEnter}
                         />
                     </div>
                   </div>
                 )}
 
-                {/* ----- Field / branch-style cards ----- */}
+                {/* ----- Field / branch-style cards (+ merged year+birthday for
+                    students, + merged role for industry) ----- */}
                 {currentKey === "field" && config && (
                   <div>
                     <p className="text-caption text-ash">{pad(stepNumber("field"))} / {pad(total)}</p>
@@ -575,12 +605,14 @@ function OnboardingFlow() {
                       Choose the closest fit. Pick &quot;Other&quot; to type your own.
                     </p>
                     <div className="mt-8 flex flex-wrap gap-2.5">
-                      {BRANCHES.map((b) => {
+                      {BRANCHES.map((b, i) => {
                         const active = data.branch === b;
                         return (
                           <button
                             key={b}
                             type="button"
+                            aria-pressed={active}
+                            autoFocus={i === 0}
                             onClick={() => setData({ ...data, branch: b })}
                             className={cn(
                               "rounded-full border px-4 py-2.5 text-sm font-medium transition-all duration-150",
@@ -612,90 +644,80 @@ function OnboardingFlow() {
                               <input
                                 id="ob-branch-other"
                                 autoFocus
-                                className="h-14 w-full rounded-lg border border-ink/15 bg-paper pl-11 pr-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
+                                className="h-14 w-full rounded-lg border border-ink/15 bg-paper pl-11 pr-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
                                 placeholder="e.g. Materials Engineering"
                                 value={data.branchOther}
                                 onChange={(e) => setData({ ...data, branchOther: e.target.value })}
+                                onKeyDown={advanceOnEnter}
                               />
                             </div>
                           </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {/* Merged from the old "studentDetails" step: year + birthday. */}
+                    {data.account_type === "student" && (
+                      <>
+                        <div className="mt-10">
+                          <p className="text-caption text-ink">Year of study</p>
+                          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {YEARS.map((y) => {
+                              const active = data.year === y;
+                              return (
+                                <button
+                                  key={y}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => setData({ ...data, year: y })}
+                                  className={cn(
+                                    "rounded-xl border px-4 py-4 text-base font-medium transition-all duration-150",
+                                    active
+                                      ? "border-saffron bg-saffron text-cream shadow-sm shadow-saffron/30"
+                                      : "border-bone bg-paper text-ink hover:border-saffron hover:text-saffron-dk"
+                                  )}
+                                >
+                                  {y}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="mt-6 flex flex-col gap-2">
+                          <label htmlFor="ob-bday" className="text-caption text-ink">
+                            Birthday (optional)
+                          </label>
+                          <input
+                            id="ob-bday"
+                            type="date"
+                            className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
+                            value={data.birthdate}
+                            onChange={(e) => setData({ ...data, birthdate: e.target.value })}
+                            onKeyDown={advanceOnEnter}
+                          />
+                          <p className="text-xs text-ash">Not shown publicly. Helps confirm you are a student.</p>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Merged from the old "role" step: industry job title. */}
+                    {data.account_type === "industry" && (
+                      <div className="mt-10 flex flex-col gap-2">
+                        <label htmlFor="ob-role" className="text-caption text-ink">Role / title</label>
+                        <input
+                          id="ob-role"
+                          className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
+                          placeholder="e.g. Founder, Talent Lead, Product Manager"
+                          value={data.role}
+                          onChange={(e) => setData({ ...data, role: e.target.value })}
+                          onKeyDown={advanceOnEnter}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* ----- Student details (year + birthday) ----- */}
-                {currentKey === "studentDetails" && (
-                  <div>
-                    <p className="text-caption text-ash">{pad(stepNumber("studentDetails"))} / {pad(total)}</p>
-                    <h1 className="mt-3 font-serif text-4xl text-ink sm:text-5xl">
-                      Year of study.
-                    </h1>
-                    <p className="mt-3 text-body text-ash">
-                      Where are you in your journey right now?
-                    </p>
-                    <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {YEARS.map((y) => {
-                        const active = data.year === y;
-                        return (
-                          <button
-                            key={y}
-                            type="button"
-                            onClick={() => setData({ ...data, year: y })}
-                            className={cn(
-                              "rounded-xl border px-4 py-5 text-base font-medium transition-all duration-150",
-                              active
-                                ? "border-saffron bg-saffron text-cream shadow-sm shadow-saffron/30"
-                                : "border-bone bg-paper text-ink hover:border-saffron hover:text-saffron-dk"
-                            )}
-                          >
-                            {y}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="mt-8 flex flex-col gap-2">
-                      <label htmlFor="ob-bday" className="text-caption text-ink">
-                        Birthday (optional)
-                      </label>
-                      <input
-                        id="ob-bday"
-                        type="date"
-                        className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
-                        value={data.birthdate}
-                        onChange={(e) => setData({ ...data, birthdate: e.target.value })}
-                      />
-                      <p className="text-xs text-ash">Not shown publicly. Helps confirm you are a student.</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* ----- Role / title (industry) ----- */}
-                {currentKey === "role" && (
-                  <div>
-                    <p className="text-caption text-ash">{pad(stepNumber("role"))} / {pad(total)}</p>
-                    <h1 className="mt-3 font-serif text-4xl text-ink sm:text-5xl">
-                      Your role.
-                    </h1>
-                    <p className="mt-3 text-body text-ash">
-                      What is your title at the organization?
-                    </p>
-                    <div className="mt-8 flex flex-col gap-2">
-                      <label htmlFor="ob-role" className="text-caption text-ink">Role / title</label>
-                      <input
-                        id="ob-role"
-                        autoFocus
-                        className="h-14 w-full rounded-lg border border-ink/15 bg-paper px-4 text-lg text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
-                        placeholder="e.g. Founder, Talent Lead, Product Manager"
-                        value={data.role}
-                        onChange={(e) => setData({ ...data, role: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* ----- Interests ----- */}
+                {/* ----- Interests (final, submitting step) ----- */}
                 {currentKey === "interests" && (
                   <div>
                     <p className="text-caption text-ash">
@@ -709,13 +731,15 @@ function OnboardingFlow() {
                       <span className="font-medium text-ink">{data.interests.length} selected</span>
                     </p>
                     <div className="mt-7 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                      {INTERESTS.map((t) => {
+                      {INTERESTS.map((t, i) => {
                         const active = data.interests.includes(t);
                         const atMax = !active && data.interests.length >= MAX_INTERESTS;
                         return (
                           <button
                             key={t}
                             type="button"
+                            aria-pressed={active}
+                            autoFocus={i === 0}
                             disabled={atMax}
                             onClick={() => toggleInterest(t)}
                             className={cn(
@@ -744,6 +768,7 @@ function OnboardingFlow() {
                             <button
                               key={i}
                               type="button"
+                              aria-label={`Remove ${i}`}
                               onClick={() => toggleInterest(i)}
                               className="flex items-center gap-2 rounded-full border border-saffron bg-saffron px-4 py-2 text-sm font-medium text-cream"
                             >
@@ -762,7 +787,7 @@ function OnboardingFlow() {
                       <div className="flex gap-2">
                         <input
                           id="ob-custom-interest"
-                          className="h-12 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus:ring-2 focus:ring-saffron/20"
+                          className="h-12 w-full rounded-lg border border-ink/15 bg-paper px-4 text-base text-ink placeholder:text-ash transition-colors focus:border-saffron focus:outline-none focus-visible:ring-2 focus-visible:ring-saffron/20"
                           placeholder="e.g. Quantum computing"
                           value={customInterest}
                           maxLength={40}
@@ -793,229 +818,93 @@ function OnboardingFlow() {
                     </div>
                   </div>
                 )}
-
-                {/* ----- Review & Create ----- */}
-                {currentKey === "review" && (
-                  <ReviewStep
-                    data={data}
-                    effectiveBranch={effectiveBranch}
-                    usesOrganization={usesOrganization}
-                    config={config}
-                    onEdit={goToStep}
-                  />
-                )}
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
 
         {/* Nav */}
-        {!isReview && (
-          <div className="flex items-center justify-between gap-4 border-t border-bone pt-7">
-            <Button
-              variant="ghost"
-              onClick={back}
-              disabled={index === 0}
-              className="gap-2"
-            >
-              <ArrowLeft className="size-4" /> Back
-            </Button>
-            {currentKey !== "type" ? (
-              <Button onClick={next} size="lg" disabled={!canContinue} className="gap-2">
-                Continue <ArrowRight className="size-4" />
+        <div className="border-t border-bone pt-7">
+          {isInterests ? (
+            // The interests step is now the final, submitting step. The submit
+            // machinery (useActionState above) lives here so a server rejection
+            // returns an error inline and every earlier answer stays on screen.
+            // FormData contract is byte-identical to the old review step.
+            <form action={formAction}>
+              <input type="hidden" name="account_type" value={data.account_type ?? ""} />
+              <input type="hidden" name="name" value={data.name} />
+              <input type="hidden" name="title" value={data.title} />
+              <input type="hidden" name="handle" value={data.handle} />
+              <input type="hidden" name="college" value={usesOrganization ? "" : data.college} />
+              <input type="hidden" name="organization" value={usesOrganization ? data.organization : ""} />
+              <input type="hidden" name="city" value={data.city} />
+              <input type="hidden" name="branch" value={effectiveBranch} />
+              <input type="hidden" name="role" value={data.role} />
+              <input type="hidden" name="year_of_study" value={data.year} />
+              <input type="hidden" name="birthdate" value={data.birthdate} />
+              {data.interests.map((i) => (
+                <input key={i} type="hidden" name="interests" value={i} />
+              ))}
+              <div aria-live="polite">
+                {state?.error ? (
+                  <p className="mb-4 rounded-lg border border-ember/30 bg-ember/5 px-4 py-3 text-sm text-ember">
+                    {state.error}
+                    {/^That username is taken/i.test(state.error) ? (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => goToStep("identity")}
+                          className="underline underline-offset-2"
+                        >
+                          Change username
+                        </button>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={back}
+                  disabled={index === 0}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="size-4" /> Back
+                </Button>
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={!canContinue || isSubmitting}
+                  className="gap-2"
+                >
+                  {isSubmitting ? "Creating..." : "Create my profile"} <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex items-center justify-between gap-4">
+              <Button
+                variant="ghost"
+                onClick={back}
+                disabled={index === 0}
+                className="gap-2"
+              >
+                <ArrowLeft className="size-4" /> Back
               </Button>
-            ) : (
-              <span className="text-sm text-ash">Select one to continue</span>
-            )}
-          </div>
-        )}
+              {currentKey !== "type" ? (
+                <Button onClick={next} size="lg" disabled={!canContinue} className="gap-2">
+                  Continue <ArrowRight className="size-4" />
+                </Button>
+              ) : (
+                <span className="text-sm text-ash">Select one to continue</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </main>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Review step
-// ---------------------------------------------------------------------------
-
-function ReviewStep({
-  data,
-  effectiveBranch,
-  usesOrganization,
-  config,
-  onEdit,
-}: {
-  data: FlowData;
-  effectiveBranch: string;
-  usesOrganization: boolean;
-  config: TypeConfig | null;
-  onEdit: (k: StepKey) => void;
-}) {
-  // useActionState keeps ALL answers on screen when the server rejects (e.g. the
-  // username was taken). The old <form action={completeOnboarding}> redirected on
-  // error, which remounted this tree and wiped every field.
-  const [state, formAction, isSubmitting] = useActionState(completeOnboarding, null);
-
-  const typeMeta = ACCOUNT_TYPES.find((t) => t.id === data.account_type);
-  const first = data.name.trim().split(/\s+/)[0] || "there";
-
-  // Build summary rows relevant to this account type.
-  const rows = useMemo(() => {
-    const r: { key: StepKey; label: string; value: string }[] = [
-      { key: "identity", label: "Name", value: data.name },
-      { key: "identity", label: "Username", value: `@${data.handle}` },
-    ];
-    if (config) {
-      r.push({
-        key: "affiliation",
-        label: config.affiliationLabel,
-        value: (usesOrganization ? data.organization : data.college) || "-",
-      });
-    }
-    if (data.account_type === "student") {
-      r.push({ key: "field", label: "Branch", value: effectiveBranch || "-" });
-      r.push({ key: "studentDetails", label: "Year", value: data.year || "-" });
-      if (data.city) r.push({ key: "affiliation", label: "City", value: data.city });
-      if (data.birthdate) r.push({ key: "studentDetails", label: "Birthday", value: data.birthdate });
-    }
-    if (data.account_type === "researcher") {
-      r.push({ key: "field", label: "Field / area", value: effectiveBranch || "-" });
-    }
-    if (data.account_type === "faculty") {
-      r.push({ key: "field", label: "Department", value: effectiveBranch || "-" });
-    }
-    if (data.account_type === "institution") {
-      if (data.city) r.push({ key: "affiliation", label: "Location", value: data.city });
-    }
-    if (data.account_type === "industry") {
-      r.push({ key: "field", label: "Industry", value: effectiveBranch || "-" });
-      r.push({ key: "role", label: "Role", value: data.role || "-" });
-    }
-    return r;
-  }, [data, effectiveBranch, usesOrganization, config]);
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-saffron-dk">
-        <Sparkles className="size-4" />
-        <p className="text-caption font-semibold">Almost done</p>
-      </div>
-      <h1 className="mt-3 font-serif text-4xl text-ink sm:text-5xl">
-        Looking good, <span className="text-saffron">{first}.</span>
-      </h1>
-      <p className="mt-3 text-body text-ash">
-        Review your details, then create your profile. You can edit anything later.
-      </p>
-
-      <div className="mt-8 rounded-2xl border border-bone bg-paper p-6 shadow-sm shadow-ink/5 sm:p-8">
-        {/* Header card */}
-        <div className="flex items-center gap-4 border-b border-bone pb-6">
-          <span className="flex size-12 items-center justify-center rounded-xl bg-saffron/10 text-saffron-dk">
-            {typeMeta ? <typeMeta.Icon className="size-6" /> : null}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-ink">{data.name || "Your name"}</p>
-            <p className="text-sm text-ash">
-              @{data.handle || "username"}  -  {typeMeta?.title ?? "Member"}
-            </p>
-          </div>
-        </div>
-
-        {/* Detail rows */}
-        <dl className="mt-2 divide-y divide-bone">
-          {rows.map((row, i) => (
-            <div key={`${row.label}-${i}`} className="flex items-center justify-between gap-4 py-3">
-              <dt className="text-sm text-ash">{row.label}</dt>
-              <div className="flex min-w-0 items-center gap-3">
-                <dd className="truncate text-sm font-medium text-ink">{row.value}</dd>
-                <button
-                  type="button"
-                  onClick={() => onEdit(row.key)}
-                  className="shrink-0 text-xs font-medium text-saffron-dk underline underline-offset-2 hover:text-saffron"
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-          ))}
-        </dl>
-
-        {/* Interests */}
-        <div className="mt-4 border-t border-bone pt-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-ash">Interests</p>
-            <button
-              type="button"
-              onClick={() => onEdit("interests")}
-              className="text-xs font-medium text-saffron-dk underline underline-offset-2 hover:text-saffron"
-            >
-              Edit
-            </button>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {data.interests.length ? (
-              data.interests.map((i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center rounded-full bg-saffron/10 px-3 py-1 text-xs font-medium text-saffron-dk"
-                >
-                  {i}
-                </span>
-              ))
-            ) : (
-              <span className="text-sm text-ash">None selected</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Submit */}
-      <form action={formAction} className="mt-8">
-        <input type="hidden" name="account_type" value={data.account_type ?? ""} />
-        <input type="hidden" name="name" value={data.name} />
-        <input type="hidden" name="title" value={data.title} />
-        <input type="hidden" name="handle" value={data.handle} />
-        <input type="hidden" name="college" value={usesOrganization ? "" : data.college} />
-        <input type="hidden" name="organization" value={usesOrganization ? data.organization : ""} />
-        <input type="hidden" name="city" value={data.city} />
-        <input type="hidden" name="branch" value={effectiveBranch} />
-        <input type="hidden" name="role" value={data.role} />
-        <input type="hidden" name="year_of_study" value={data.year} />
-        <input type="hidden" name="birthdate" value={data.birthdate} />
-        {data.interests.map((i) => (
-          <input key={i} type="hidden" name="interests" value={i} />
-        ))}
-        {state?.error ? (
-          <p className="mb-4 rounded-lg border border-ember/30 bg-ember/5 px-4 py-3 text-sm text-ember">
-            {state.error}
-            {/^That username is taken/i.test(state.error) ? (
-              <>
-                {" "}
-                <button
-                  type="button"
-                  onClick={() => onEdit("identity")}
-                  className="underline underline-offset-2"
-                >
-                  Change username
-                </button>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-        <div className="flex flex-col-reverse items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onEdit("interests")}
-            className="gap-2"
-          >
-            <ArrowLeft className="size-4" /> Back
-          </Button>
-          <Button type="submit" size="xl" className="rounded-full" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create my profile"} <ArrowRight className="size-5" />
-          </Button>
-        </div>
-      </form>
-    </div>
   );
 }
