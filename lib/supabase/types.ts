@@ -146,6 +146,29 @@ export interface Message {
   client_id: string | null;
 }
 
+/** Category slug for a project (migration 0054). Used for filtering + display. */
+export type ProjectCategory =
+  | "web"
+  | "mobile"
+  | "ml"
+  | "research"
+  | "design"
+  | "hardware"
+  | "social"
+  | "other";
+
+/**
+ * A single role a project needs (migration 0054, stored in `projects.roles`
+ * jsonb). Applications stay project-level; a role is only referenced inside an
+ * applicant's pitch, never a separate DB row.
+ */
+export interface ProjectRole {
+  title: string;
+  skills: string[];
+  /** How many people are needed for this role (1-3). */
+  count: number;
+}
+
 export interface Project {
   id: string;
   short_id: string;
@@ -159,6 +182,14 @@ export interface Project {
   delivered_at: string | null;
   deliverable_url: string | null;
   created_at: string;
+  /** Roles the team needs. Legacy rows default to []. (migration 0054) */
+  roles: ProjectRole[];
+  /** Expected effort in hours/week, or null if the author did not say. */
+  commitment_hours: number | null;
+  /** Expected duration, short freeform text ("3 months"), or null. */
+  duration: string | null;
+  /** Category slug for filtering/display, or null for legacy rows. */
+  category: ProjectCategory | null;
 }
 
 export interface ProjectApplication {

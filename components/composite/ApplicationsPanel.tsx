@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/primitives/Avatar";
 import { Button } from "@/components/primitives/Button";
@@ -28,11 +28,19 @@ export interface ApplicationRow {
   applicant: Applicant;
 }
 
+type Status = "pending" | "accepted" | "rejected";
+
 interface ApplicationsPanelProps {
   projectId: string;
   shortId: string;
   applications: ApplicationRow[];
 }
+
+const STATUS_LABEL: Record<Status, string> = {
+  pending: "Pending",
+  accepted: "Accepted",
+  rejected: "Rejected",
+};
 
 export function ApplicationsPanel({
   projectId,
@@ -40,45 +48,73 @@ export function ApplicationsPanel({
   applications: initialApplications,
 }: ApplicationsPanelProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [statuses, setStatuses] = useState<
-    Record<string, "pending" | "accepted" | "rejected">
-  >(() =>
-    Object.fromEntries(initialApplications.map((a) => [a.applicant_id, a.status]))
+  const [, startTransition] = useTransition();
+  const [statuses, setStatuses] = useState<Record<string, Status>>(() =>
+    Object.fromEntries(initialApplications.map((a) => [a.applicant_id, a.status])),
   );
-  const [actionError, setActionError] = useState<string | null>(null);
+  // Per-row concurrency + errors (the old panel disabled every row on one click
+  // and showed a single shared error - both fixed here).
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [confirm, setConfirm] = useState<{ id: string; kind: "reject" | "remove" } | null>(null);
 
-  function handleAccept(applicantId: string) {
-    setStatuses((prev) => ({ ...prev, [applicantId]: "accepted" }));
+  const setStatus = (id: string, status: Status) =>
+    setStatuses((s) => ({ ...s, [id]: status }));
+
+  // Optimistic mutation with per-row rollback + inline error.
+  function run(
+    applicantId: string,
+    optimistic: Status,
+    action: () => Promise<{ ok: boolean; error?: string }>,
+  ) {
+    const prev = statuses[applicantId];
+    setStatus(applicantId, optimistic);
+    setRowErrors((e) => ({ ...e, [applicantId]: "" }));
+    setBusy((b) => ({ ...b, [applicantId]: true }));
     startTransition(async () => {
-      const result = await acceptApplicantAction(projectId, applicantId, shortId);
+      const result = await action();
+      setBusy((b) => ({ ...b, [applicantId]: false }));
       if (!result.ok) {
-        setStatuses((prev) => ({ ...prev, [applicantId]: "pending" }));
-        setActionError(result.error ?? "Failed to accept applicant.");
+        setStatus(applicantId, prev);
+        setRowErrors((e) => ({ ...e, [applicantId]: result.error ?? "Action failed." }));
+      } else {
+        router.refresh();
       }
     });
   }
 
-  function handleReject(applicantId: string) {
-    setStatuses((prev) => ({ ...prev, [applicantId]: "rejected" }));
-    startTransition(async () => {
-      const result = await rejectApplicantAction(projectId, applicantId, shortId);
-      if (!result.ok) {
-        setStatuses((prev) => ({ ...prev, [applicantId]: "pending" }));
-        setActionError(result.error ?? "Failed to reject applicant.");
-      }
-    });
-  }
+  const handleAccept = (id: string) =>
+    run(id, "accepted", () => acceptApplicantAction(projectId, id, shortId));
 
-  function handleMessage(applicantId: string) {
+  // Reject (pending -> rejected) and Remove (accepted member -> off the team)
+  // both go through rejectApplicantAction; the server deletes the membership and
+  // reopens the project when a full team loses a member.
+  const doReject = (id: string) =>
+    run(id, "rejected", () => rejectApplicantAction(projectId, id, shortId));
+
+  // Undo a rejection by re-accepting (the server's supported reverse path).
+  const handleUndo = (id: string) =>
+    run(id, "accepted", () => acceptApplicantAction(projectId, id, shortId));
+
+  function handleMessage(id: string) {
+    setBusy((b) => ({ ...b, [id]: true }));
+    setRowErrors((e) => ({ ...e, [id]: "" }));
     startTransition(async () => {
-      const result = await messageApplicantAction(applicantId);
+      const result = await messageApplicantAction(id);
+      setBusy((b) => ({ ...b, [id]: false }));
       if (result.ok && result.conversationId) {
         router.push(`/messages/${result.conversationId}`);
       } else {
-        setActionError(result.error ?? "Could not open conversation.");
+        setRowErrors((e) => ({ ...e, [id]: result.error ?? "Could not open conversation." }));
       }
     });
+  }
+
+  function runConfirm() {
+    if (!confirm) return;
+    const { id } = confirm;
+    setConfirm(null);
+    doReject(id);
   }
 
   if (initialApplications.length === 0) {
@@ -96,14 +132,13 @@ export function ApplicationsPanel({
         Applications ({initialApplications.length})
       </h2>
 
-      {actionError && (
-        <p className="mt-2 text-sm text-ember">{actionError}</p>
-      )}
-
       <div className="mt-4 space-y-4">
         {initialApplications.map((app) => {
-          const status = statuses[app.applicant_id] ?? app.status;
-          const isResolved = status === "accepted" || status === "rejected";
+          const id = app.applicant_id;
+          const status = statuses[id] ?? app.status;
+          const isBusy = !!busy[id];
+          const rowError = rowErrors[id];
+          const isConfirming = confirm?.id === id;
 
           return (
             <div
@@ -121,9 +156,7 @@ export function ApplicationsPanel({
                     <p className="truncate font-medium text-ink">{app.applicant.name}</p>
                     <p className="truncate text-sm text-ash">
                       @{app.applicant.handle}
-                      {app.applicant.college
-                        ? ` . ${app.applicant.college}`
-                        : ""}
+                      {app.applicant.college ? ` . ${app.applicant.college}` : ""}
                     </p>
                   </div>
                 </div>
@@ -137,11 +170,11 @@ export function ApplicationsPanel({
                       : "saffron"
                   }
                 >
-                  {status}
+                  {STATUS_LABEL[status]}
                 </Tag>
               </div>
 
-              <p className="mt-4 line-clamp-3 break-words text-sm text-ink">
+              <p className="mt-4 whitespace-pre-wrap break-words text-sm text-ink">
                 {app.pitch}
               </p>
 
@@ -159,48 +192,97 @@ export function ApplicationsPanel({
                         {link}
                       </a>
                     ) : (
-                      // Belt-and-suspenders: never render a non-http(s) link as a
-                      // clickable anchor (guards against stored javascript: XSS).
-                      <span
-                        key={link}
-                        className="max-w-full truncate text-xs text-ash"
-                      >
+                      <span key={link} className="max-w-full truncate text-xs text-ash">
                         {link}
                       </span>
-                    )
+                    ),
                   )}
                 </div>
               )}
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {!isResolved && (
-                  <>
+              {/* Actions */}
+              {isConfirming ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-ink">
+                    {confirm?.kind === "remove"
+                      ? "Remove this member from the team?"
+                      : "Reject this applicant?"}
+                  </span>
+                  <Button
+                    size="md"
+                    variant="destructive"
+                    onClick={runConfirm}
+                    disabled={isBusy}
+                  >
+                    {confirm?.kind === "remove" ? "Yes, remove" : "Yes, reject"}
+                  </Button>
+                  <Button
+                    size="md"
+                    variant="ghost"
+                    onClick={() => setConfirm(null)}
+                    disabled={isBusy}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {status === "pending" && (
+                    <>
+                      <Button
+                        size="md"
+                        variant="primary"
+                        onClick={() => handleAccept(id)}
+                        disabled={isBusy}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="md"
+                        variant="secondary"
+                        onClick={() => setConfirm({ id, kind: "reject" })}
+                        disabled={isBusy}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
+
+                  {status === "accepted" && (
                     <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => handleAccept(app.applicant_id)}
-                      disabled={pending}
+                      size="md"
+                      variant="destructive"
+                      onClick={() => setConfirm({ id, kind: "remove" })}
+                      disabled={isBusy}
                     >
-                      Accept
+                      Remove from team
                     </Button>
+                  )}
+
+                  {status === "rejected" && (
                     <Button
-                      size="sm"
+                      size="md"
                       variant="secondary"
-                      onClick={() => handleReject(app.applicant_id)}
-                      disabled={pending}
+                      onClick={() => handleUndo(id)}
+                      disabled={isBusy}
                     >
-                      Reject
+                      Undo
                     </Button>
-                  </>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleMessage(app.applicant_id)}
-                  disabled={pending}
-                >
-                  Message
-                </Button>
+                  )}
+
+                  <Button
+                    size="md"
+                    variant="ghost"
+                    onClick={() => handleMessage(id)}
+                    disabled={isBusy}
+                  >
+                    Message
+                  </Button>
+                </div>
+              )}
+
+              <div aria-live="polite">
+                {rowError && <p className="mt-3 text-sm text-ember">{rowError}</p>}
               </div>
             </div>
           );

@@ -6,7 +6,7 @@ import { Avatar } from "@/components/primitives/Avatar";
 import { Tag } from "@/components/primitives/Tag";
 import { Button } from "@/components/primitives/Button";
 import { Reveal } from "@/components/motion/Reveal";
-import { Calendar, Users, Briefcase, ExternalLink, ArrowLeft, BadgeCheck } from "lucide-react";
+import { Users, Clock, CalendarRange, Calendar, ExternalLink, ArrowLeft, BadgeCheck } from "lucide-react";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import {
   getProjectByShortId,
@@ -19,6 +19,41 @@ import { ApplyForm } from "@/components/composite/ApplyForm";
 import { ApplicationsPanel } from "@/components/composite/ApplicationsPanel";
 import { ProgressComposer } from "@/components/composite/ProgressComposer";
 import { DeliverForm } from "@/components/composite/DeliverForm";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  web: "Web",
+  mobile: "Mobile",
+  ml: "ML / AI",
+  research: "Research",
+  design: "Design",
+  hardware: "Hardware",
+  social: "Social impact",
+  other: "Other",
+};
+
+interface Role {
+  title: string;
+  skills: string[];
+  count: number;
+}
+
+/** First sentence (or a clamp) of the brief - the hero one-liner. */
+function leadLine(brief: string): string {
+  const t = (brief ?? "").trim();
+  if (!t) return "";
+  const stop = t.search(/[.!?]\s/);
+  if (stop > 0 && stop < 180) return t.slice(0, stop + 1);
+  return t.length > 160 ? `${t.slice(0, 160).trimEnd()}...` : t;
+}
+
+/** Map the stored commitment int back to its honest band label. */
+function commitmentLabel(h: number | null): string | null {
+  if (h == null) return null;
+  if (h < 5) return "< 5 hrs/week";
+  if (h < 10) return "5-10 hrs/week";
+  if (h < 20) return "10-20 hrs/week";
+  return "20+ hrs/week";
+}
 
 export async function generateMetadata({
   params,
@@ -91,6 +126,17 @@ export default async function ProjectPage({
   const openSlots = Math.max(0, (project.slot_count as number) - acceptedMembers);
   const acceptsApplications = project.status === "open" && openSlots > 0;
 
+  // Structured fields (legacy rows: roles=[], nulls elsewhere).
+  const roles: Role[] = Array.isArray(project.roles) ? (project.roles as Role[]) : [];
+  const category = project.category as string | null;
+  const categoryLabel = category ? CATEGORY_LABELS[category] ?? "Other" : null;
+  const duration = (project.duration as string | null) ?? null;
+  const commitment = commitmentLabel((project.commitment_hours as number | null) ?? null);
+  const oneLiner = leadLine(project.brief as string);
+
+  const isDelivered = !!project.delivered_at;
+  const canApply = !isAuthor && !!user && acceptsApplications && !appState.applied;
+
   const statusBadgeVariant = (s: string) => {
     if (s === "open") return "saffron" as const;
     if (s === "team_formed" || s === "in_progress") return "moss" as const;
@@ -108,29 +154,39 @@ export default async function ProjectPage({
     return s.replace("_", " ");
   };
 
-  const isDelivered = !!project.delivered_at;
-
   return (
     <main className="min-h-dvh bg-cream">
       <PublicTopNav />
       <div className="container-edit max-w-3xl pt-28 pb-20 md:pt-32">
+        {/* Hero */}
         <Reveal>
           <Link
             href="/collabs"
-            className="inline-flex items-center gap-2 text-sm text-ash transition-colors hover:text-ink"
+            className="inline-flex items-center gap-2 rounded-md text-sm text-ash transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
           >
             <ArrowLeft className="size-4" /> Back to Collabs
           </Link>
-          <p className="mt-6 text-caption text-ash">Collab Project</p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            {categoryLabel && <Tag variant="outline">{categoryLabel}</Tag>}
+            <Tag variant={statusBadgeVariant(project.status)}>
+              {statusLabel(project.status)}
+            </Tag>
+          </div>
+
           <h1 className="mt-4 font-serif text-3xl leading-tight text-ink sm:text-4xl md:text-5xl">
             {project.title}
           </h1>
+
+          {oneLiner && (
+            <p className="mt-4 text-body-lg text-ash">{oneLiner}</p>
+          )}
         </Reveal>
 
         <Reveal delay={0.1}>
           <Link
             href={`/u/${project.author.handle}`}
-            className="mt-6 flex items-center gap-3"
+            className="mt-6 inline-flex items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
           >
             <Avatar
               name={project.author.name}
@@ -143,29 +199,36 @@ export default async function ProjectPage({
           </Link>
         </Reveal>
 
+        {/* Meta bar: commitment + duration when present; legacy shows the deadline. */}
         <Reveal delay={0.15}>
-          <div className="mt-8 flex flex-wrap items-center gap-6 border-y border-bone py-4 text-sm text-ash">
-            <span className="flex items-center gap-2">
-              <Calendar className="size-4" />
-              Due{" "}
-              {new Date(project.deadline).toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}
-            </span>
+          <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-bone py-4 text-sm text-ash">
+            {commitment && (
+              <span className="flex items-center gap-2">
+                <Clock className="size-4" /> {commitment}
+              </span>
+            )}
+            {duration && (
+              <span className="flex items-center gap-2">
+                <CalendarRange className="size-4" /> {duration}
+              </span>
+            )}
+            {!commitment && !duration && (
+              <span className="flex items-center gap-2">
+                <Calendar className="size-4" />
+                Due{" "}
+                {new Date(project.deadline).toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            )}
             {project.status === "open" && (
               <span className="flex items-center gap-2">
                 <Users className="size-4" />
                 {openSlots > 0 ? "Open to applicants" : "Team full"}
               </span>
             )}
-            <span className="flex items-center gap-2">
-              <Briefcase className="size-4" />
-              <Tag variant={statusBadgeVariant(project.status)} className="text-xs">
-                {statusLabel(project.status)}
-              </Tag>
-            </span>
           </div>
         </Reveal>
 
@@ -188,18 +251,62 @@ export default async function ProjectPage({
           </Reveal>
         )}
 
+        {/* The work */}
         <Reveal delay={0.2}>
           <section className="mt-10">
-            <h2 className="text-caption text-ash">Brief</h2>
+            <h2 className="text-caption text-ash">The work</h2>
             <p className="mt-2 whitespace-pre-wrap break-words text-body text-ink">
               {project.brief}
             </p>
           </section>
           <section className="mt-8">
             <h2 className="text-caption text-ash">Deliverable</h2>
-            <p className="mt-2 text-body text-ink">{project.deliverable}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-body text-ink">
+              {project.deliverable}
+            </p>
           </section>
         </Reveal>
+
+        {/* Roles needed (hidden for legacy projects with no roles) */}
+        {roles.length > 0 && (
+          <Reveal delay={0.22}>
+            <section className="mt-10">
+              <h2 className="text-caption text-ash">Roles needed</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {roles.map((role, i) => (
+                  <div
+                    key={`${role.title}-${i}`}
+                    className="flex flex-col rounded-lg border border-bone bg-paper p-5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-medium text-ink">{role.title}</h3>
+                      <span className="shrink-0 text-xs text-ash">
+                        {role.count} needed
+                      </span>
+                    </div>
+                    {role.skills.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {role.skills.map((s) => (
+                          <Tag key={s} variant="default" className="text-[11px]">
+                            {s}
+                          </Tag>
+                        ))}
+                      </div>
+                    )}
+                    {canApply && (
+                      <a
+                        href={`#apply-role-${i}`}
+                        className="mt-4 inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-saffron underline-offset-4 transition-colors hover:text-saffron-dk hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
+                      >
+                        Apply for this role
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </Reveal>
+        )}
 
         {/* Apply section (viewers only) */}
         {!isAuthor && user && (
@@ -225,16 +332,15 @@ export default async function ProjectPage({
                   <span className="text-sm text-ash">
                     {appState.status === "pending" &&
                       "The author will review your pitch."}
-                    {appState.status === "accepted" &&
-                      "You are on the team."}
-                    {appState.status === "rejected" &&
-                      "Better luck next time."}
+                    {appState.status === "accepted" && "You are on the team."}
+                    {appState.status === "rejected" && "Better luck next time."}
                   </span>
                 </div>
               ) : acceptsApplications ? (
                 <ApplyForm
                   projectId={project.id}
                   shortId={short_id}
+                  roles={roles.map((r) => r.title)}
                 />
               ) : (
                 <div className="rounded-lg border border-bone bg-paper px-6 py-5">
@@ -296,7 +402,7 @@ export default async function ProjectPage({
                   <Link
                     key={m.user_id}
                     href={`/u/${m.profile.handle}`}
-                    className="flex items-center gap-2 rounded-lg border border-bone bg-paper px-3 py-2 transition-all hover:-translate-y-0.5 hover:border-ink/30"
+                    className="flex items-center gap-2 rounded-lg border border-bone bg-paper px-3 py-2 transition-all hover:-translate-y-0.5 hover:border-ink/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/40"
                   >
                     <Avatar
                       name={m.profile.name}

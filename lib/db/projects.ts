@@ -3,6 +3,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { supabaseConfigured } from "@/lib/supabase/env";
 import { createNotification, getActorDisplayInfo } from "@/lib/db/notifications";
 import { moderateContent } from "@/lib/moderation/moderate";
+import type { ProjectCategory, ProjectRole } from "@/lib/supabase/types";
 
 export interface MiniProfile {
   id: string;
@@ -12,13 +13,85 @@ export interface MiniProfile {
   college: string | null;
 }
 
+/** Field-keyed floor a caller can jump back to (mirrors the wizard steps). */
+export type CreateProjectField = "title" | "brief" | "deliverable" | "roles";
+
+const CATEGORY_SLUGS: ProjectCategory[] = [
+  "web", "mobile", "ml", "research", "design", "hardware", "social", "other",
+];
+
+/** Known duration chips -> day offsets used to derive the NOT-NULL deadline. */
+const DURATION_DAYS: Record<string, number> = {
+  "2 weeks": 14,
+  "1 month": 30,
+  "3 months": 90,
+  "6 months+": 180,
+};
+
+/**
+ * The `projects.deadline` column is `date NOT NULL`, but the structured wizard
+ * captures a *duration* instead of a hard date. Derive an honest future date
+ * from the chosen duration so the column stays satisfied without fabricating a
+ * user-facing "due" claim (freeform / unknown durations get a neutral 60-day
+ * window). Returns YYYY-MM-DD for the `date` column.
+ */
+function deriveDeadline(duration: string | null): string {
+  const days = duration && DURATION_DAYS[duration] ? DURATION_DAYS[duration] : 60;
+  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Sanitize the roles array before it is written to the `roles` jsonb column.
+ * Drops rows without a title, trims + de-dupes skills, clamps count to 1-3, and
+ * caps the whole array. Never trusts client shape.
+ */
+function sanitizeRoles(input: unknown): ProjectRole[] {
+  if (!Array.isArray(input)) return [];
+  const out: ProjectRole[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    const title = typeof r.title === "string" ? r.title.trim().slice(0, 80) : "";
+    if (!title) continue;
+
+    const skills: string[] = [];
+    const seen = new Set<string>();
+    const skillsRaw = Array.isArray(r.skills) ? r.skills : [];
+    for (const s of skillsRaw) {
+      if (typeof s !== "string") continue;
+      const t = s.trim().slice(0, 40);
+      const key = t.toLowerCase();
+      if (!t || seen.has(key)) continue;
+      seen.add(key);
+      skills.push(t);
+      if (skills.length >= 12) break;
+    }
+
+    let count = typeof r.count === "number" ? Math.floor(r.count) : 1;
+    if (!Number.isFinite(count) || count < 1) count = 1;
+    if (count > 3) count = 3;
+
+    out.push({ title, skills, count });
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
 export async function createProject(input: {
   title: string;
   brief: string;
   deliverable: string;
-  deadline: string;
-  slot_count: number;
-}): Promise<{ ok: boolean; projectId?: string; shortId?: string; error?: string }> {
+  roles: ProjectRole[];
+  commitmentHours?: number | null;
+  duration?: string | null;
+  category?: string | null;
+}): Promise<{
+  ok: boolean;
+  projectId?: string;
+  shortId?: string;
+  error?: string;
+  field?: CreateProjectField;
+}> {
   const sb = await getSupabaseServer();
   if (!sb) return { ok: false, error: "Database not connected." };
 
@@ -31,16 +104,38 @@ export async function createProject(input: {
   const brief = input.brief.trim().slice(0, 4000);
   const deliverable = input.deliverable.trim().slice(0, 2000);
 
-  // Validate the deadline is a parseable date.
-  const deadlineMs = Date.parse(input.deadline);
-  if (Number.isNaN(deadlineMs)) {
-    return { ok: false, error: "Please enter a valid deadline date." };
+  // Substance floors - AUTHORITATIVE. The wizard mirrors these client-side, but
+  // the server is the real gate that killed the "1-char title goes live" bug.
+  if (title.length < 8) {
+    return { ok: false, field: "title", error: "Give your project a clear title of at least 8 characters." };
   }
-  const deadline = new Date(deadlineMs).toISOString();
+  if (brief.length < 140) {
+    return { ok: false, field: "brief", error: "The brief needs at least 140 characters so applicants understand the work." };
+  }
+  if (!deliverable) {
+    return { ok: false, field: "deliverable", error: "Describe what the team will deliver." };
+  }
 
-  // Moderate the world-readable free-text fields before insert (mirrors the
-  // single-pass gate in lib/db/events.ts createEvent).
-  const moderationText = [title, brief, deliverable]
+  const roles = sanitizeRoles(input.roles);
+  if (roles.length === 0) {
+    return { ok: false, field: "roles", error: "Add at least one role you need on the team." };
+  }
+
+  const category = CATEGORY_SLUGS.includes(input.category as ProjectCategory)
+    ? (input.category as ProjectCategory)
+    : null;
+
+  let commitment_hours: number | null = null;
+  if (typeof input.commitmentHours === "number" && Number.isFinite(input.commitmentHours)) {
+    commitment_hours = Math.max(1, Math.min(80, Math.floor(input.commitmentHours)));
+  }
+
+  const duration = input.duration ? input.duration.trim().slice(0, 40) || null : null;
+  const deadline = deriveDeadline(duration);
+
+  // Moderate all world-readable free-text (title + brief + deliverable + role
+  // titles + skills) in one pass before insert.
+  const moderationText = [title, brief, deliverable, ...roles.flatMap((r) => [r.title, ...r.skills])]
     .filter((v): v is string => Boolean(v))
     .join(" ");
   const moderationResult = await moderateContent(moderationText);
@@ -55,7 +150,12 @@ export async function createProject(input: {
       brief,
       deliverable,
       deadline,
-      slot_count: input.slot_count,
+      // slot_count is intentionally omitted: migration 0054 set the column
+      // default to 4, so the old hardcode is gone (mentor directive: no slot UI).
+      roles,
+      commitment_hours,
+      duration,
+      category,
       author_id: user.id,
       status: "open",
     })
@@ -112,20 +212,27 @@ export async function listOpenProjects(limit = 20) {
 
 export type ProjectListFilter = "open" | "forming" | "delivered" | "all";
 
+/** Commitment-band filter for the discovery grid (maps onto commitment_hours). */
+export type CommitmentBand = "light" | "part" | "significant" | "heavy";
+
 /**
  * Discovery listing with status filter + optional text search.
  *  - "open"      -> status = 'open' (accepting applications)
  *  - "forming"   -> team_formed / in_progress (team assembled, work underway)
  *  - "delivered" -> shipped projects (portfolio-grade outcomes)
  *  - "all"       -> everything, newest first
- * Each row is annotated with `member_count` so callers can render open slots.
+ * Optional `category` (legacy null rows are grouped under "other") and
+ * `commitment` band narrow the list further. Each row is annotated with
+ * `member_count` so callers can render open slots.
  */
 export async function listProjects(opts: {
   filter?: ProjectListFilter;
   search?: string;
+  category?: string;
+  commitment?: string;
   limit?: number;
 } = {}) {
-  const { filter = "open", search, limit = 24 } = opts;
+  const { filter = "open", search, category, commitment, limit = 24 } = opts;
   const sb = await getSupabaseServer();
   if (!sb) return [];
 
@@ -143,6 +250,28 @@ export async function listProjects(opts: {
     query = query.in("status", ["team_formed", "in_progress"]);
   } else if (filter === "delivered") {
     query = query.eq("status", "delivered");
+  }
+
+  // Category filter. Legacy rows (category IS NULL) live under "other" so they
+  // stay discoverable and never silently vanish from the grid.
+  if (category) {
+    if (category === "other") {
+      query = query.or("category.is.null,category.eq.other");
+    } else {
+      query = query.eq("category", category);
+    }
+  }
+
+  // Commitment band over commitment_hours. Legacy rows (null) never match a
+  // band - a project can't be filtered into an effort it never claimed.
+  if (commitment === "light") {
+    query = query.lt("commitment_hours", 5);
+  } else if (commitment === "part") {
+    query = query.gte("commitment_hours", 5).lt("commitment_hours", 10);
+  } else if (commitment === "significant") {
+    query = query.gte("commitment_hours", 10).lt("commitment_hours", 20);
+  } else if (commitment === "heavy") {
+    query = query.gte("commitment_hours", 20);
   }
 
   const term = search?.trim();
