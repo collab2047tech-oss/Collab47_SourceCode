@@ -27,8 +27,8 @@ export function CTABand() {
         </Reveal>
         <Reveal delay={0.1}>
  <h2 className="mt-6 max-w-5xl font-serif text-[2.5rem] leading-[1.16] tracking-tight text-cream sm:mt-8 sm:text-6xl md:text-8xl">
-            Start the profile you{" "}
- <span className="text-saffron">actually</span> wanted on LinkedIn.
+            Start the profile your{" "}
+ <span className="text-saffron">work</span> deserves.
           </h2>
         </Reveal>
         <Reveal delay={0.18}>
