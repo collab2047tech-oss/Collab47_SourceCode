@@ -68,6 +68,15 @@ export async function updateProfileAction(formData: FormData) {
     payload.cover_focal_y = clampFocal(focalRaw.y);
   }
 
+  // Honorific title (Mr/Dr/...). Read ONLY when the field is present, so the
+  // legacy full-page editor (which has no title field) never blanks a stored
+  // honorific. Attached at runtime; updateProfile persists it via its `...rest`
+  // passthrough. Empty -> null to match the onboarding convention.
+  if (formData.has("title")) {
+    const t = (formData.get("title") as string | null)?.trim() ?? "";
+    (payload as Record<string, unknown>).title = t === "" ? null : t;
+  }
+
   const result = await updateProfile(payload);
   if (!result.ok) {
     return { ok: false, error: result.error };
