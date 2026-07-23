@@ -8,6 +8,10 @@ import { cn } from "@/lib/cn";
  * drifted into four different forms ("Collab47.", "Collab" + colored "47",
  * "Collab47 ." and "C47."). Everything renders through here now: real logo mark,
  * capital C, no trailing full stop.
+ *
+ * The name is set in FULL CAPS ("COLLAB47") to match the pitch decks, and the
+ * mark is sized to hold its own beside it. Caps get slightly positive tracking
+ * because a serif at tracking-tight reads cramped once it is uppercased.
  */
 export interface WordmarkProps {
   className?: string;
@@ -19,7 +23,9 @@ export interface WordmarkProps {
 }
 
 const TEXT_SIZE = { sm: "text-xl", md: "text-2xl", lg: "text-3xl" } as const;
-const MARK_PX = { sm: 22, md: 28, lg: 36 } as const;
+// Mark sizes bumped so the logo reads as a real brand mark rather than a
+// favicon parked next to the name. Kept in step with TEXT_SIZE above.
+const MARK_PX = { sm: 30, md: 38, lg: 48 } as const;
 
 export function Wordmark({
   className,
@@ -43,8 +49,13 @@ export function Wordmark({
       {markOnly ? (
         <span className="sr-only">Collab47</span>
       ) : (
-        <span className={cn("font-serif font-medium tracking-tight text-ink", TEXT_SIZE[size])}>
-          Collab47
+        <span
+          className={cn(
+            "font-serif font-medium tracking-[0.01em] text-ink",
+            TEXT_SIZE[size]
+          )}
+        >
+          COLLAB47
         </span>
       )}
     </span>
